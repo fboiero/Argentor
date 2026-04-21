@@ -23,6 +23,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 
 /// Common English stopwords filtered during tokenization.
 const STOPWORDS: &[&str] = &[
@@ -205,6 +206,138 @@ pub struct ToolDiscoveryEngine {
     usage_history: HashMap<String, UsageRecord>,
     /// TF-IDF vocabulary: term -> IDF weight.
     vocabulary: HashMap<String, f32>,
+}
+
+/// Per-session cache for tool discovery results.
+///
+/// Caches the output of `ToolDiscoveryEngine::discover` keyed by a hash of
+/// (prompt_intent, registry_version). On a cache hit the TF-IDF scoring step
+/// is skipped entirely.  The cache is meant to live on the session / agent-
+/// runner and is cleared when the session ends.
+///
+/// # Invalidation
+///
+/// The cache is automatically invalidated when:
+/// * The key changes (different prompt or registry version).
+/// * `clear()` is called (e.g. when the session ends).
+/// * `turn_limit` turns have elapsed since last population (default: 50).
+///
+/// # Example
+///
+/// ```rust
+/// use argentor_agent::tool_discovery::{ToolDiscoveryCache, ToolDiscoveryEngine, ToolEntry};
+///
+/// let engine = ToolDiscoveryEngine::with_defaults();
+/// let mut cache = ToolDiscoveryCache::new(50);
+/// let tools = vec![ToolEntry::new("echo", "Echo a message")];
+///
+/// let result1 = cache.get_or_compute("say hello", &tools, 0, &engine);
+/// let result2 = cache.get_or_compute("say hello", &tools, 0, &engine);
+/// assert!(result2.is_some()); // second call is a cache hit
+/// ```
+pub struct ToolDiscoveryCache {
+    /// Stored results keyed by (intent_hash, registry_version).
+    store: HashMap<(u64, u64), CacheEntry>,
+    /// Maximum number of turns a cached entry is valid for.
+    turn_limit: u32,
+    /// Current turn counter (incremented externally or by `advance_turn`).
+    current_turn: u32,
+    /// Total cache hits since construction.
+    hits: u64,
+    /// Total cache misses since construction.
+    misses: u64,
+}
+
+struct CacheEntry {
+    result: Option<DiscoveryResult>,
+    inserted_at_turn: u32,
+}
+
+impl ToolDiscoveryCache {
+    /// Create a new cache with the given per-entry turn lifetime.
+    pub fn new(turn_limit: u32) -> Self {
+        Self {
+            store: HashMap::new(),
+            turn_limit,
+            current_turn: 0,
+            hits: 0,
+            misses: 0,
+        }
+    }
+
+    /// Create a cache with the default turn limit (50).
+    pub fn with_defaults() -> Self {
+        Self::new(50)
+    }
+
+    /// Advance the internal turn counter by 1.
+    ///
+    /// Call once per agent turn to enable time-based invalidation.
+    pub fn advance_turn(&mut self) {
+        self.current_turn = self.current_turn.saturating_add(1);
+    }
+
+    /// Clear all cached entries (e.g. when the session ends).
+    pub fn clear(&mut self) {
+        self.store.clear();
+        self.current_turn = 0;
+    }
+
+    /// Cache hit count since construction.
+    pub fn hits(&self) -> u64 {
+        self.hits
+    }
+
+    /// Cache miss count since construction.
+    pub fn misses(&self) -> u64 {
+        self.misses
+    }
+
+    /// Return cached result or compute (and cache) a fresh one.
+    ///
+    /// `intent` is the user-facing query / prompt for this turn.
+    /// `registry_version` should change whenever the tool registry changes
+    /// (e.g. a monotonically increasing counter or a hash of tool names).
+    pub fn get_or_compute(
+        &mut self,
+        intent: &str,
+        tools: &[ToolEntry],
+        registry_version: u64,
+        engine: &ToolDiscoveryEngine,
+    ) -> Option<DiscoveryResult> {
+        let intent_hash = hash_str(intent);
+        let key = (intent_hash, registry_version);
+
+        // Check for a valid cached entry.
+        if let Some(entry) = self.store.get(&key) {
+            let age = self.current_turn.saturating_sub(entry.inserted_at_turn);
+            if age < self.turn_limit {
+                self.hits += 1;
+                return entry.result.clone();
+            }
+            // Entry is stale — fall through to recompute.
+        }
+
+        // Cache miss: compute fresh result and store it.
+        self.misses += 1;
+        let result = engine.discover(intent, tools);
+        self.store.insert(
+            key,
+            CacheEntry {
+                result: result.clone(),
+                inserted_at_turn: self.current_turn,
+            },
+        );
+        result
+    }
+}
+
+/// Compute a stable 64-bit hash for a string using the default hasher.
+fn hash_str(s: &str) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    let mut h = DefaultHasher::new();
+    s.hash(&mut h);
+    h.finish()
 }
 
 impl ToolDiscoveryEngine {
@@ -1177,5 +1310,109 @@ mod tests {
         assert_eq!(record.total_uses, 2);
         assert_eq!(record.successful_uses, 1);
         assert!((record.success_rate() - 0.5).abs() < f32::EPSILON);
+    }
+
+    // -----------------------------------------------------------------------
+    // ToolDiscoveryCache tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_cache_hit_returns_same_result() {
+        let engine = ToolDiscoveryEngine::new(DiscoveryConfig {
+            strategy: DiscoveryStrategy::KeywordMatch,
+            similarity_threshold: 0.0,
+            ..DiscoveryConfig::default()
+        });
+        let mut cache = ToolDiscoveryCache::new(50);
+        let tools = sample_tools();
+
+        let r1 = cache.get_or_compute("read file from disk", &tools, 0, &engine);
+        let r2 = cache.get_or_compute("read file from disk", &tools, 0, &engine);
+
+        // Second call must be a cache hit.
+        assert_eq!(cache.hits(), 1);
+        assert_eq!(cache.misses(), 1);
+
+        // Both results must agree on selected tool names.
+        match (r1, r2) {
+            (Some(a), Some(b)) => {
+                let names_a: Vec<&str> = a.selected_tools.iter().map(|t| t.name.as_str()).collect();
+                let names_b: Vec<&str> = b.selected_tools.iter().map(|t| t.name.as_str()).collect();
+                assert_eq!(
+                    names_a, names_b,
+                    "cache hit should return identical tool list"
+                );
+            }
+            (None, None) => {}
+            _ => panic!("cache hit and miss returned different Some/None variants"),
+        }
+    }
+
+    #[test]
+    fn test_cache_miss_on_different_intent() {
+        let engine = ToolDiscoveryEngine::new(DiscoveryConfig {
+            strategy: DiscoveryStrategy::KeywordMatch,
+            similarity_threshold: 0.0,
+            ..DiscoveryConfig::default()
+        });
+        let mut cache = ToolDiscoveryCache::new(50);
+        let tools = sample_tools();
+
+        cache.get_or_compute("read file from disk", &tools, 0, &engine);
+        cache.get_or_compute("fetch data from api", &tools, 0, &engine);
+
+        assert_eq!(cache.misses(), 2);
+        assert_eq!(cache.hits(), 0);
+    }
+
+    #[test]
+    fn test_cache_miss_on_registry_version_change() {
+        let engine = ToolDiscoveryEngine::with_defaults();
+        let mut cache = ToolDiscoveryCache::new(50);
+        let tools = sample_tools();
+
+        cache.get_or_compute("search memory", &tools, 0, &engine);
+        // Same intent, different registry version → must recompute.
+        cache.get_or_compute("search memory", &tools, 1, &engine);
+
+        assert_eq!(cache.misses(), 2);
+        assert_eq!(cache.hits(), 0);
+    }
+
+    #[test]
+    fn test_cache_stale_after_turn_limit() {
+        let engine = ToolDiscoveryEngine::new(DiscoveryConfig {
+            strategy: DiscoveryStrategy::KeywordMatch,
+            similarity_threshold: 0.0,
+            ..DiscoveryConfig::default()
+        });
+        let mut cache = ToolDiscoveryCache::new(2); // tiny limit
+        let tools = sample_tools();
+
+        cache.get_or_compute("read file", &tools, 0, &engine);
+        assert_eq!(cache.misses(), 1);
+
+        // Advance past the turn limit.
+        cache.advance_turn();
+        cache.advance_turn();
+
+        // Entry is now stale — should recompute.
+        cache.get_or_compute("read file", &tools, 0, &engine);
+        assert_eq!(cache.misses(), 2, "stale entry should cause a miss");
+    }
+
+    #[test]
+    fn test_cache_clear_resets_state() {
+        let engine = ToolDiscoveryEngine::with_defaults();
+        let mut cache = ToolDiscoveryCache::new(50);
+        let tools = sample_tools();
+
+        cache.get_or_compute("search memory", &tools, 0, &engine);
+        cache.clear();
+
+        // After clear, same query must miss again.
+        cache.get_or_compute("search memory", &tools, 0, &engine);
+        assert_eq!(cache.misses(), 2);
+        assert_eq!(cache.hits(), 0);
     }
 }

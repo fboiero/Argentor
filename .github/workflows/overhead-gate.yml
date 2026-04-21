@@ -1,0 +1,94 @@
+name: Framework Overhead Gate
+
+on:
+  pull_request:
+    branches: [main, master]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  overhead-gate:
+    name: Overhead regression gate
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-overhead-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-overhead-
+
+      - name: Build benchmark harness (release)
+        run: cargo build --release -p argentor-benchmarks
+
+      # Warm-up run: ensure the binary is paged into OS cache.
+      - name: Warm-up run (discarded)
+        run: >
+          cargo run --release -p argentor-benchmarks --
+          --tasks-dir benchmarks/tasks
+          run --task t1_pdf_summary --runner argentor
+          > /dev/null 2>&1 || true
+
+      # Timed run: 3 samples, take the median wall-clock in milliseconds.
+      - name: Measure framework overhead (3 samples)
+        id: measure
+        run: |
+          TIMES=""
+          for i in 1 2 3; do
+            MS=$( { time cargo run --release -p argentor-benchmarks -- \
+              --tasks-dir benchmarks/tasks \
+              run --task t1_pdf_summary --runner argentor \
+              > /dev/null; } 2>&1 \
+              | grep real | sed 's/real\t//' \
+              | awk -F'[ms]' '{print int($1)*60000 + int($2)*1000 + int($3)}' )
+            echo "Sample $i: ${MS} ms"
+            TIMES="$TIMES $MS"
+          done
+
+          # Compute median of 3 values.
+          MEDIAN=$(echo "$TIMES" | tr ' ' '\n' | sort -n | sed -n '2p')
+          echo "Measured median: ${MEDIAN} ms"
+          echo "median_ms=${MEDIAN}" >> "$GITHUB_OUTPUT"
+
+      - name: Load baseline
+        id: baseline
+        run: |
+          BASELINE=$(cat .github/overhead.baseline 2>/dev/null || echo "0")
+          echo "baseline_ms=${BASELINE}" >> "$GITHUB_OUTPUT"
+          echo "Baseline: ${BASELINE} ms"
+
+      - name: Enforce regression gate (20% tolerance)
+        run: |
+          CURRENT="${{ steps.measure.outputs.median_ms }}"
+          BASELINE="${{ steps.baseline.outputs.baseline_ms }}"
+
+          if [ "$BASELINE" -eq 0 ]; then
+            echo "::warning::No baseline found at .github/overhead.baseline — skipping gate."
+            echo "Run locally and commit: echo $CURRENT > .github/overhead.baseline"
+            exit 0
+          fi
+
+          # Allow up to 20% regression.
+          MAX_ALLOWED=$(( BASELINE + BASELINE * 20 / 100 ))
+
+          echo "Baseline: ${BASELINE} ms  |  Current: ${CURRENT} ms  |  Max allowed: ${MAX_ALLOWED} ms"
+
+          if [ "$CURRENT" -gt "$MAX_ALLOWED" ]; then
+            echo "::error::Framework overhead regression detected!"
+            echo "  Baseline : ${BASELINE} ms"
+            echo "  Current  : ${CURRENT} ms"
+            echo "  Allowed  : ${MAX_ALLOWED} ms (+20%)"
+            echo ""
+            echo "Profile the changes and reduce overhead, or update the baseline"
+            echo "with: echo <new_value> > .github/overhead.baseline"
+            exit 1
+          fi
+
+          echo "Overhead within tolerance: ${CURRENT} ms vs baseline ${BASELINE} ms (max ${MAX_ALLOWED} ms)"

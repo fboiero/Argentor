@@ -216,7 +216,8 @@ pub use thinking::{
 };
 pub use token_counter::{TokenCounter, TokenEstimate, UsageTracker};
 pub use tool_discovery::{
-    DiscoveredTool, DiscoveryConfig, DiscoveryResult, DiscoveryStrategy, ToolDiscoveryEngine,
+    DiscoveredTool, DiscoveryConfig, DiscoveryResult, DiscoveryStrategy, ToolDiscoveryCache,
+    ToolDiscoveryEngine,
 };
 pub use tool_selector::{SelectionStrategy, ToolSelection, ToolSelector, ToolStats};
 pub use vision_backends::{ClaudeVisionBackend, GeminiVisionBackend, OpenAiVisionBackend};
