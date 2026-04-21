@@ -54,6 +54,7 @@ type OptionalProxy = Option<(Arc<argentor_mcp::McpProxy>, String)>;
 ///     temperature: 0.7,
 ///     max_tokens: 4096,
 ///     max_turns: 10,
+///     max_context_tokens: 200_000,
 ///     fallback_models: vec![],
 ///     retry_policy: None,
 /// };

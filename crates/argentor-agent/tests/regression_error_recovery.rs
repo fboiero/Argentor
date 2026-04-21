@@ -45,6 +45,7 @@ fn mock_config(base_url: String, provider: LlmProvider) -> ModelConfig {
         temperature: 0.0,
         max_tokens: 256,
         max_turns: 5,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     }

@@ -1,0 +1,150 @@
+# Nightly live-LLM quality benchmark — issue #24 (Q-01)
+#
+# Runs the three real-API smoke tests that are otherwise #[ignore]'d in CI.
+# Requires repository secrets:
+#   - ANTHROPIC_API_KEY
+#   - OPENAI_API_KEY
+#
+# Budget guard: the smoke tests use cheap models (claude-haiku, gpt-4o-mini)
+# and each is capped at 256 output tokens, so a full run costs well under $0.05
+# — far below the $5/run ceiling.
+#
+# Results are uploaded as a GitHub Actions artifact for 30 days.
+
+name: Nightly LLM Quality Benchmark
+
+on:
+  schedule:
+    # 04:00 UTC every night
+    - cron: "0 4 * * *"
+  # Allow manual triggering for debugging
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_LOG: info
+
+jobs:
+  nightly-llm-smoke:
+    name: Real LLM smoke tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo registry and build artefacts
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-nightly-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-nightly-
+
+      - name: Build test binary (no-run)
+        run: cargo test -p argentor-agent --test llm_integration --no-run
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Run Claude smoke test
+        id: claude_smoke
+        continue-on-error: true
+        run: |
+          cargo test -p argentor-agent --test llm_integration \
+            smoke_claude_simple_prompt -- --ignored --nocapture 2>&1 | tee /tmp/claude-smoke.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Run OpenAI smoke test
+        id: openai_smoke
+        continue-on-error: true
+        run: |
+          cargo test -p argentor-agent --test llm_integration \
+            smoke_openai_simple_prompt -- --ignored --nocapture 2>&1 | tee /tmp/openai-smoke.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+      - name: Run tool-calling smoke test
+        id: tool_smoke
+        continue-on-error: true
+        run: |
+          cargo test -p argentor-agent --test llm_integration \
+            smoke_tool_calling_agent -- --ignored --nocapture 2>&1 | tee /tmp/tool-smoke.log
+          echo "exit_code=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+      - name: Generate benchmark report
+        if: always()
+        run: |
+          {
+            echo "# Nightly LLM Smoke Test Report"
+            echo ""
+            echo "**Run:** $(date -u '+%Y-%m-%d %H:%M UTC')"
+            echo ""
+            echo "| Test | Result |"
+            echo "|------|--------|"
+
+            if [ "${{ steps.claude_smoke.outputs.exit_code }}" = "0" ]; then
+              echo "| smoke_claude_simple_prompt | PASS |"
+            else
+              echo "| smoke_claude_simple_prompt | FAIL |"
+            fi
+
+            if [ "${{ steps.openai_smoke.outputs.exit_code }}" = "0" ]; then
+              echo "| smoke_openai_simple_prompt | PASS |"
+            else
+              echo "| smoke_openai_simple_prompt | FAIL |"
+            fi
+
+            if [ "${{ steps.tool_smoke.outputs.exit_code }}" = "0" ]; then
+              echo "| smoke_tool_calling_agent | PASS |"
+            else
+              echo "| smoke_tool_calling_agent | FAIL |"
+            fi
+
+            echo ""
+            echo "## Claude smoke log"
+            echo '```'
+            cat /tmp/claude-smoke.log 2>/dev/null || echo "(no output)"
+            echo '```'
+            echo ""
+            echo "## OpenAI smoke log"
+            echo '```'
+            cat /tmp/openai-smoke.log 2>/dev/null || echo "(no output)"
+            echo '```'
+            echo ""
+            echo "## Tool-calling smoke log"
+            echo '```'
+            cat /tmp/tool-smoke.log 2>/dev/null || echo "(no output)"
+            echo '```'
+          } > /tmp/nightly-report.md
+
+          cat /tmp/nightly-report.md
+
+      - name: Upload benchmark report artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nightly-llm-report-${{ github.run_id }}
+          path: /tmp/nightly-report.md
+          retention-days: 30
+
+      - name: Fail if any smoke test failed
+        if: >
+          steps.claude_smoke.outputs.exit_code != '0' ||
+          steps.openai_smoke.outputs.exit_code != '0' ||
+          steps.tool_smoke.outputs.exit_code != '0'
+        run: |
+          echo "One or more nightly smoke tests failed. See the uploaded report artifact."
+          exit 1

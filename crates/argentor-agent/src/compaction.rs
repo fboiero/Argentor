@@ -145,12 +145,31 @@ pub struct CompactionResult {
 ///
 /// Controls when compaction triggers, how aggressively to compress, and
 /// which messages to preserve.
+///
+/// ## Adaptive trigger
+///
+/// When `adaptive_trigger_pct` is `Some(pct)` the compactor ignores the
+/// static `trigger_threshold` and instead fires when the conversation
+/// reaches `pct`% of `max_context_tokens`.  For example, with
+/// `max_context_tokens = 200_000` and `adaptive_trigger_pct = Some(70)`,
+/// compaction fires at 140 000 tokens — earlier for small-context models,
+/// later for large-context ones.
 #[derive(Debug, Clone)]
 pub struct CompactionConfig {
     /// Whether automatic compaction is enabled.
     pub enabled: bool,
-    /// Token threshold that triggers compaction (default: 30000).
+    /// Static token threshold that triggers compaction (default: 30 000).
+    ///
+    /// Ignored when `adaptive_trigger_pct` is set.
     pub trigger_threshold: usize,
+    /// Adaptive trigger: fire compaction at this percentage of the model's
+    /// context window.  Range: 1–99.  Default: `Some(70)`.
+    ///
+    /// When `None`, the static `trigger_threshold` is used instead.
+    pub adaptive_trigger_pct: Option<u8>,
+    /// The model's total context window in tokens.  Used only when
+    /// `adaptive_trigger_pct` is set (default: 200 000).
+    pub max_context_tokens: u64,
     /// Target compression ratio (default: 0.3 = compress to 30%).
     pub target_ratio: f32,
     /// Always keep the last N messages intact (default: 4).
@@ -166,10 +185,27 @@ impl Default for CompactionConfig {
         Self {
             enabled: true,
             trigger_threshold: 30_000,
+            adaptive_trigger_pct: Some(70),
+            max_context_tokens: 200_000,
             target_ratio: 0.3,
             preserve_recent: 4,
             preserve_system: true,
             strategy: CompactionStrategy::Hybrid,
+        }
+    }
+}
+
+impl CompactionConfig {
+    /// Compute the effective trigger threshold in tokens.
+    ///
+    /// Returns `adaptive_trigger_pct % of max_context_tokens` when the
+    /// adaptive mode is active, otherwise returns `trigger_threshold`.
+    pub fn effective_trigger(&self) -> usize {
+        if let Some(pct) = self.adaptive_trigger_pct {
+            let pct = pct.clamp(1, 99) as f64;
+            ((self.max_context_tokens as f64 * pct / 100.0) as usize).max(1)
+        } else {
+            self.trigger_threshold
         }
     }
 }
@@ -203,14 +239,14 @@ impl ContextCompactorEngine {
 
     /// Check whether compaction should trigger for the given messages.
     ///
-    /// Returns `true` if the engine is enabled and the total estimated
-    /// tokens exceed the trigger threshold.
+    /// Returns `true` if the engine is enabled and the total estimated tokens
+    /// exceed the effective trigger threshold (adaptive or static).
     pub fn should_compact(&self, messages: &[CompactableMessage]) -> bool {
         if !self.config.enabled {
             return false;
         }
         let total_tokens: usize = messages.iter().map(|m| m.token_estimate).sum();
-        total_tokens >= self.config.trigger_threshold
+        total_tokens >= self.config.effective_trigger()
     }
 
     /// Compact the given messages using the configured strategy.
@@ -223,8 +259,8 @@ impl ContextCompactorEngine {
 
         let total_tokens: usize = messages.iter().map(|m| m.token_estimate).sum();
 
-        // Don't compact if below threshold
-        if total_tokens < self.config.trigger_threshold {
+        // Don't compact if below the effective trigger
+        if total_tokens < self.config.effective_trigger() {
             return None;
         }
 
@@ -674,18 +710,20 @@ mod tests {
     fn large_conversation() -> Vec<CompactableMessage> {
         let mut msgs = vec![CompactableMessage::system("You are a helpful assistant.")];
 
-        // Generate enough messages to exceed 30K tokens (~120K chars).
-        // Each message is ~2K chars => 120 msgs => ~240K chars => ~60K tokens.
-        for i in 0..60 {
+        // Generate enough messages to exceed the adaptive default threshold of
+        // 140 000 tokens (70% of 200 000).  Each iteration adds ~2 messages of
+        // ~5K chars each => ~2.5K tokens per message => ~5K tokens per pair.
+        // 200 pairs = ~1 000 000 chars ≈ 200 000 tokens — well above 140 000.
+        for i in 0..200 {
             msgs.push(CompactableMessage::user(&format!(
                 "Question {i}: Tell me about topic number {i} in great detail please. \
                  I need comprehensive information about this subject. {}",
-                "more context and additional detailed information about the topic ".repeat(20)
+                "more context and additional detailed information about the topic ".repeat(50)
             )));
             msgs.push(CompactableMessage::assistant(&format!(
                 "Answer {i}: Here is detailed information about topic {i}. \
                  The key points are numerous and important. {}",
-                "detailed explanation with thorough analysis of the subject matter ".repeat(20)
+                "detailed explanation with thorough analysis of the subject matter ".repeat(50)
             )));
         }
 
@@ -804,6 +842,80 @@ mod tests {
         assert_eq!(config.preserve_recent, 4);
         assert!(config.preserve_system);
         assert_eq!(config.strategy, CompactionStrategy::Hybrid);
+    }
+
+    // -----------------------------------------------------------------------
+    // Adaptive trigger (issue #25 — L-01) tests
+    // -----------------------------------------------------------------------
+
+    #[test]
+    fn test_effective_trigger_static_when_adaptive_disabled() {
+        let cfg = CompactionConfig {
+            adaptive_trigger_pct: None,
+            trigger_threshold: 30_000,
+            ..CompactionConfig::default()
+        };
+        assert_eq!(cfg.effective_trigger(), 30_000);
+    }
+
+    #[test]
+    fn test_effective_trigger_adaptive_70pct_of_200k() {
+        // Default: 70% of 200 000 = 140 000
+        let cfg = CompactionConfig::default();
+        assert_eq!(cfg.effective_trigger(), 140_000);
+    }
+
+    #[test]
+    fn test_effective_trigger_adaptive_70pct_of_128k() {
+        // GPT-4o context window
+        let cfg = CompactionConfig {
+            adaptive_trigger_pct: Some(70),
+            max_context_tokens: 128_000,
+            ..CompactionConfig::default()
+        };
+        assert_eq!(cfg.effective_trigger(), 89_600);
+    }
+
+    #[test]
+    fn test_effective_trigger_clamps_pct_to_valid_range() {
+        // pct=0 → clamped to 1 → 1% of 200K = 2000
+        let cfg_zero = CompactionConfig {
+            adaptive_trigger_pct: Some(0),
+            max_context_tokens: 200_000,
+            ..CompactionConfig::default()
+        };
+        assert_eq!(cfg_zero.effective_trigger(), 2_000);
+
+        // pct=100 → clamped to 99 → 99% of 200K = 198 000
+        let cfg_hundred = CompactionConfig {
+            adaptive_trigger_pct: Some(100),
+            max_context_tokens: 200_000,
+            ..CompactionConfig::default()
+        };
+        assert_eq!(cfg_hundred.effective_trigger(), 198_000);
+    }
+
+    #[test]
+    fn test_should_compact_uses_adaptive_threshold() {
+        // Adaptive at 1% of 200 000 = 2 000 tokens — should fire on a small conversation
+        let engine = ContextCompactorEngine::new(CompactionConfig {
+            adaptive_trigger_pct: Some(1),
+            max_context_tokens: 200_000,
+            ..CompactionConfig::default()
+        });
+        // Even a short conversation exceeds 2 000 tokens when repeated enough
+        let msgs: Vec<CompactableMessage> = (0..20)
+            .flat_map(|i| {
+                vec![
+                    CompactableMessage::user(&format!("question {i}: {}", "word ".repeat(100))),
+                    CompactableMessage::assistant(&format!("answer {i}: {}", "word ".repeat(100))),
+                ]
+            })
+            .collect();
+        assert!(
+            engine.should_compact(&msgs),
+            "Adaptive trigger at 1% should fire on a moderately-sized conversation"
+        );
     }
 
     // -----------------------------------------------------------------------
@@ -1028,6 +1140,8 @@ mod tests {
         // Use a low threshold to ensure compaction triggers regardless of message size
         let engine = ContextCompactorEngine::new(CompactionConfig {
             trigger_threshold: 100,
+            // Disable adaptive mode so the static trigger_threshold of 100 is used.
+            adaptive_trigger_pct: None,
             ..CompactionConfig::default()
         });
         let result = engine.compact(&msgs).unwrap();

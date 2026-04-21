@@ -147,13 +147,19 @@ pub enum HandoffStatus {
     /// The target agent completed its task.
     Completed,
     /// The target agent handed control back with a reason.
-    HandedBack { reason: String },
+    HandedBack {
+        /// Human-readable reason the agent handed back control.
+        reason: String,
+    },
     /// The handoff exceeded its timeout.
     TimedOut,
     /// The handoff chain exceeded the maximum depth.
     DepthExceeded,
     /// The handoff failed for an arbitrary reason.
-    Failed { reason: String },
+    Failed {
+        /// Human-readable reason the handoff failed.
+        reason: String,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -495,15 +501,34 @@ impl HandoffProtocol {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum HandoffError {
     /// The handoff chain has exceeded the maximum allowed depth.
-    DepthExceeded { max: u32, current: u32 },
+    DepthExceeded {
+        /// Maximum allowed depth.
+        max: u32,
+        /// Depth at which the error was triggered.
+        current: u32,
+    },
     /// A circular handoff was detected and `allow_handback` is false.
-    CircularHandoff { agent: String, chain: Vec<String> },
+    CircularHandoff {
+        /// Agent that caused the cycle.
+        agent: String,
+        /// Current handoff chain at the time of detection.
+        chain: Vec<String>,
+    },
     /// An agent attempted to hand off to itself.
-    SelfHandoff { agent: String },
+    SelfHandoff {
+        /// Name of the agent that attempted self-handoff.
+        agent: String,
+    },
     /// The specified record index does not exist.
-    RecordNotFound { index: usize },
+    RecordNotFound {
+        /// The index that was requested.
+        index: usize,
+    },
     /// The handoff has already been completed.
-    AlreadyCompleted { index: usize },
+    AlreadyCompleted {
+        /// The index of the already-completed record.
+        index: usize,
+    },
     /// Handback is not allowed by configuration.
     HandbackNotAllowed,
 }

@@ -283,14 +283,8 @@ fn decode_xml_entities(s: &str) -> String {
 
 /// Parse a cell reference like "B3" into (col_idx, row_number_1indexed).
 fn parse_cell_ref(cell: &str) -> Option<(usize, usize)> {
-    let letters: String = cell
-        .chars()
-        .take_while(|c| c.is_ascii_alphabetic())
-        .collect();
-    let digits: String = cell
-        .chars()
-        .skip_while(|c| c.is_ascii_alphabetic())
-        .collect();
+    let letters: String = cell.chars().take_while(char::is_ascii_alphabetic).collect();
+    let digits: String = cell.chars().skip_while(char::is_ascii_alphabetic).collect();
     if letters.is_empty() || digits.is_empty() {
         return None;
     }

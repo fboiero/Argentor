@@ -175,6 +175,7 @@ mod tests {
             temperature: 0.5,
             max_tokens: 256,
             max_turns: 5,
+            max_context_tokens: 200_000,
             fallback_models: vec![],
             retry_policy: None,
         }

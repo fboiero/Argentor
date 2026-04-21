@@ -66,6 +66,7 @@ fn make_config(provider: LlmProvider, model_id: &str, api_key: String) -> ModelC
         temperature: 0.0, // deterministic
         max_tokens: 256,
         max_turns: 5,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     }
@@ -81,6 +82,7 @@ fn mock_config(provider: LlmProvider, base_url: &str) -> ModelConfig {
         temperature: 0.0,
         max_tokens: 256,
         max_turns: 5,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     }

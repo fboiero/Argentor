@@ -74,6 +74,7 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
             temperature: 0.3,
             max_tokens: 2048,
             max_turns: 5,
+            max_context_tokens: 200_000,
             fallback_models: vec![ModelConfig {
                 provider: argentor_agent::config::LlmProvider::OpenAi,
                 model_id: "gpt-4o-mini".to_string(),
@@ -82,6 +83,7 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
                 temperature: 0.3,
                 max_tokens: 2048,
                 max_turns: 5,
+                max_context_tokens: 200_000,
                 fallback_models: vec![],
                 retry_policy: None,
             }],
@@ -101,6 +103,7 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
             temperature: 0.7,
             max_tokens: 4096,
             max_turns: 5,
+            max_context_tokens: 200_000,
             fallback_models: vec![ModelConfig {
                 provider: argentor_agent::config::LlmProvider::OpenAi,
                 model_id: "gpt-4o-mini".to_string(),
@@ -109,6 +112,7 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
                 temperature: 0.7,
                 max_tokens: 4096,
                 max_turns: 5,
+                max_context_tokens: 200_000,
                 fallback_models: vec![],
                 retry_policy: None,
             }],
@@ -128,6 +132,7 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
             temperature: 0.4,
             max_tokens: 4096,
             max_turns: 5,
+            max_context_tokens: 200_000,
             fallback_models: vec![ModelConfig {
                 provider: argentor_agent::config::LlmProvider::OpenAi,
                 model_id: "gpt-4o-mini".to_string(),
@@ -136,6 +141,7 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
                 temperature: 0.4,
                 max_tokens: 4096,
                 max_turns: 5,
+                max_context_tokens: 200_000,
                 fallback_models: vec![],
                 retry_policy: None,
             }],
@@ -155,6 +161,7 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
             temperature: 0.2,
             max_tokens: 1024,
             max_turns: 3,
+            max_context_tokens: 200_000,
             fallback_models: vec![ModelConfig {
                 provider: argentor_agent::config::LlmProvider::OpenAi,
                 model_id: "gpt-4o-mini".to_string(),
@@ -163,6 +170,7 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
                 temperature: 0.2,
                 max_tokens: 1024,
                 max_turns: 3,
+                max_context_tokens: 200_000,
                 fallback_models: vec![],
                 retry_policy: None,
             }],

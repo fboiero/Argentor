@@ -53,6 +53,7 @@ fn test_model_config_full_serialization() {
         temperature: 0.5,
         max_tokens: 2048,
         max_turns: 10,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };
@@ -77,6 +78,7 @@ fn test_model_config_base_url_defaults() {
         temperature: 0.7,
         max_tokens: 4096,
         max_turns: 20,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };
@@ -90,6 +92,7 @@ fn test_model_config_base_url_defaults() {
         temperature: 0.7,
         max_tokens: 4096,
         max_turns: 20,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };
@@ -103,6 +106,7 @@ fn test_model_config_base_url_defaults() {
         temperature: 0.7,
         max_tokens: 4096,
         max_turns: 20,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };
@@ -119,6 +123,7 @@ fn test_model_config_base_url_custom_override() {
         temperature: 0.7,
         max_tokens: 4096,
         max_turns: 20,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };
@@ -281,6 +286,7 @@ async fn test_agent_runner_construction() {
         temperature: 0.7,
         max_tokens: 100,
         max_turns: 3,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };
@@ -310,6 +316,7 @@ async fn test_agent_runner_with_builtins() {
         temperature: 0.7,
         max_tokens: 100,
         max_turns: 3,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };
@@ -332,6 +339,7 @@ async fn test_agent_runner_run_fails_with_bad_url() {
         temperature: 0.7,
         max_tokens: 100,
         max_turns: 3,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };
@@ -391,6 +399,7 @@ fn make_config() -> ModelConfig {
         temperature: 0.7,
         max_tokens: 100,
         max_turns: 3,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     }

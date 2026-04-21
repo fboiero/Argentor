@@ -24,6 +24,7 @@ fn make_config(provider: LlmProvider, base_url: &str) -> ModelConfig {
         temperature: 0.7,
         max_tokens: 1024,
         max_turns: 10,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     }
@@ -850,6 +851,7 @@ fn default_base_urls_correct() {
             temperature: 0.7,
             max_tokens: 1024,
             max_turns: 10,
+            max_context_tokens: 200_000,
             fallback_models: vec![],
             retry_policy: None,
         };
@@ -872,6 +874,7 @@ fn custom_base_url_overrides_default() {
         temperature: 0.7,
         max_tokens: 1024,
         max_turns: 10,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };
@@ -1020,6 +1023,7 @@ fn new_provider_default_base_urls_correct() {
             temperature: 0.7,
             max_tokens: 1024,
             max_turns: 10,
+            max_context_tokens: 200_000,
             fallback_models: vec![],
             retry_policy: None,
         };
@@ -1074,6 +1078,7 @@ fn bedrock_is_available_without_api_key() {
         temperature: 0.7,
         max_tokens: 1024,
         max_turns: 10,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };
@@ -1093,6 +1098,7 @@ fn cohere_requires_api_key_for_availability() {
         temperature: 0.7,
         max_tokens: 1024,
         max_turns: 10,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };
@@ -1109,6 +1115,7 @@ fn replicate_requires_api_key_for_availability() {
         temperature: 0.7,
         max_tokens: 1024,
         max_turns: 10,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     };

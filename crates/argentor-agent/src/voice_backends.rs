@@ -373,7 +373,7 @@ impl TtsBackend for OpenAiTtsBackend {
     fn available_voices(&self) -> Vec<String> {
         Self::AVAILABLE_VOICES
             .iter()
-            .map(|v| v.to_string())
+            .map(std::string::ToString::to_string)
             .collect()
     }
 

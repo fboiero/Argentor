@@ -444,6 +444,7 @@ impl ProtocolHandler {
             temperature: temperature.unwrap_or(0.7),
             max_tokens: 4096,
             max_turns: max_turns.unwrap_or(20),
+            max_context_tokens: 200_000,
             fallback_models: vec![],
             retry_policy: None,
         };

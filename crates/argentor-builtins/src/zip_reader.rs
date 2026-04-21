@@ -476,15 +476,11 @@ fn read_dynamic_huffman(
             }
             17 => {
                 let repeat = reader.read_bits(3)? as usize + 3;
-                for _ in 0..repeat {
-                    lengths.push(0);
-                }
+                lengths.extend(std::iter::repeat(0).take(repeat));
             }
             18 => {
                 let repeat = reader.read_bits(7)? as usize + 11;
-                for _ in 0..repeat {
-                    lengths.push(0);
-                }
+                lengths.extend(std::iter::repeat(0).take(repeat));
             }
             _ => return Err(format!("Invalid code length symbol: {sym}")),
         }
@@ -503,18 +499,10 @@ static FIXED_DIST: std::sync::OnceLock<HuffmanTable> = std::sync::OnceLock::new(
 fn fixed_litlen() -> &'static HuffmanTable {
     FIXED_LITLEN.get_or_init(|| {
         let mut lens = vec![0u8; 288];
-        for i in 0..=143 {
-            lens[i] = 8;
-        }
-        for i in 144..=255 {
-            lens[i] = 9;
-        }
-        for i in 256..=279 {
-            lens[i] = 7;
-        }
-        for i in 280..=287 {
-            lens[i] = 8;
-        }
+        lens[..=143].fill(8);
+        lens[144..=255].fill(9);
+        lens[256..=279].fill(7);
+        lens[280..=287].fill(8);
         HuffmanTable::from_lengths(&lens).unwrap_or(HuffmanTable {
             entries: Vec::new(),
             max_len: 0,

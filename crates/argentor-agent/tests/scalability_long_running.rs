@@ -124,18 +124,20 @@ fn make_runner_with(backend: Box<dyn LlmBackend>, max_turns: u32) -> AgentRunner
 // Tests
 // ---------------------------------------------------------------------------
 
-/// Build a synthetic 1000-turn conversation transcript and verify the
-/// compaction engine triggers around the 30K-token threshold and produces a
-/// strictly smaller output.
+/// Build a synthetic conversation and verify the compaction engine triggers
+/// and produces a strictly smaller output.
+///
+/// Uses the adaptive default (70% of 200K = 140K tokens). We generate
+/// enough messages to exceed that threshold.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_1_hour_session_equivalent_context_compacts() {
     let engine = ContextCompactorEngine::with_defaults();
 
-    // Build 1000 turns. Each turn has a 50-token user message + 50-token reply.
-    // Token estimate ≈ words * 1.3 — we make content long enough that 1000
-    // turns easily exceed the default 30K token threshold.
-    let mut messages = Vec::with_capacity(2000);
-    for i in 0..1000 {
+    // Build enough turns to exceed the adaptive trigger (140K tokens by default).
+    // Each message is ~150 chars ≈ 33 tokens. We need > 4 250 messages (140K/33).
+    // Use 5 000 messages = 2 500 turns to be safely above the threshold.
+    let mut messages = Vec::with_capacity(5000);
+    for i in 0..2500 {
         messages.push(CompactableMessage::user(&format!(
             "User turn {i}: please answer this somewhat verbose question that takes roughly fifty tokens to render once tokenized so we exceed budget"
         )));
@@ -145,10 +147,10 @@ async fn test_1_hour_session_equivalent_context_compacts() {
     }
 
     let total_tokens: usize = messages.iter().map(|m| m.token_estimate).sum();
+    let effective = engine.config().effective_trigger();
     assert!(
-        total_tokens > engine.config().trigger_threshold,
-        "synthetic transcript ({total_tokens} tokens) must exceed trigger threshold ({})",
-        engine.config().trigger_threshold
+        total_tokens > effective,
+        "synthetic transcript ({total_tokens} tokens) must exceed effective trigger ({effective})"
     );
     assert!(engine.should_compact(&messages), "should_compact must fire");
 

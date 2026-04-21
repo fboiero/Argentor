@@ -118,8 +118,7 @@ fn count_pages_internal(bytes: &[u8]) -> usize {
         let rest = &haystack[abs..];
         // Check the following characters for /Page but not /Pages
         let after_type = &rest[5..].trim_start();
-        if after_type.starts_with("/Page") {
-            let after = &after_type[5..];
+        if let Some(after) = after_type.strip_prefix("/Page") {
             // Not /Pages or /PageLabels etc — require non-alpha next
             if !after
                 .chars()
@@ -146,6 +145,7 @@ fn extract_text_internal(bytes: &[u8]) -> String {
     let mut depth: i32 = 0;
     let mut escape = false;
 
+    #[allow(clippy::while_let_on_iterator)]
     while let Some(c) = chars.next() {
         if escape {
             // Handle basic escape sequences

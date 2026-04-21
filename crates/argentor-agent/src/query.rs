@@ -346,6 +346,7 @@ impl QueryOptions {
             temperature: self.temperature,
             max_tokens: self.max_tokens,
             max_turns: self.max_turns,
+            max_context_tokens: 200_000,
             fallback_models: vec![],
             retry_policy: None,
         }

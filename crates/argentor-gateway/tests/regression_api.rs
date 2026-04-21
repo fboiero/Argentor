@@ -34,6 +34,7 @@ fn test_model_config() -> ModelConfig {
         temperature: 0.0,
         max_tokens: 100,
         max_turns: 2,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     }
