@@ -22,6 +22,8 @@ pub mod deployment;
 pub mod dev_team;
 /// Orchestration engine and pipeline execution.
 pub mod engine;
+/// Agent handoff protocol for sequential control transfer between specialized agents.
+pub mod handoff;
 /// Agent health monitoring with state machine transitions.
 pub mod health;
 /// Inter-agent message bus for A2A communication.
@@ -44,8 +46,6 @@ pub mod spawner;
 pub mod task_queue;
 /// Shared orchestration types (Task, AgentProfile, Artifact, etc.).
 pub mod types;
-/// Agent handoff protocol for sequential control transfer between specialized agents.
-pub mod handoff;
 /// Configurable workflow engine for automating business pipelines.
 pub mod workflow;
 /// TOML-based Workflow DSL for declarative pipeline definitions.

@@ -94,13 +94,7 @@ impl ToolBuilder {
     /// Add a parameter definition.
     ///
     /// `type_name` should be one of: `"string"`, `"number"`, `"boolean"`, `"object"`, `"array"`.
-    pub fn param(
-        mut self,
-        name: &str,
-        type_name: &str,
-        description: &str,
-        required: bool,
-    ) -> Self {
+    pub fn param(mut self, name: &str, type_name: &str, description: &str, required: bool) -> Self {
         self.params.push(ParamDef {
             name: name.to_string(),
             type_name: type_name.to_string(),
@@ -424,9 +418,7 @@ mod tests {
     #[tokio::test]
     async fn test_async_handler_error() {
         let tool = ToolBuilder::new("async_fail")
-            .async_handler(|_| async move {
-                Err(ArgentorError::Skill("async boom".to_string()))
-            })
+            .async_handler(|_| async move { Err(ArgentorError::Skill("async boom".to_string())) })
             .build();
 
         let call = make_call("async_fail", json!({}));

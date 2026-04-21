@@ -142,7 +142,12 @@ impl CloudScheduler {
     pub fn jobs_for_tenant(&self, tenant_id: &str) -> Vec<ScheduledJob> {
         self.queue
             .read()
-            .map(|q| q.iter().filter(|j| j.tenant_id == tenant_id).cloned().collect())
+            .map(|q| {
+                q.iter()
+                    .filter(|j| j.tenant_id == tenant_id)
+                    .cloned()
+                    .collect()
+            })
             .unwrap_or_default()
     }
 }
@@ -291,12 +296,30 @@ mod tests {
     fn pop_due_chain_drains_due_jobs() {
         let s = CloudScheduler::new();
         let now = Utc::now();
-        s.enqueue(ScheduledJob::new("t1", "a", "m", now - Duration::seconds(10), 0))
-            .unwrap();
-        s.enqueue(ScheduledJob::new("t1", "a", "m", now - Duration::seconds(5), 0))
-            .unwrap();
-        s.enqueue(ScheduledJob::new("t1", "a", "m", now + Duration::seconds(60), 0))
-            .unwrap();
+        s.enqueue(ScheduledJob::new(
+            "t1",
+            "a",
+            "m",
+            now - Duration::seconds(10),
+            0,
+        ))
+        .unwrap();
+        s.enqueue(ScheduledJob::new(
+            "t1",
+            "a",
+            "m",
+            now - Duration::seconds(5),
+            0,
+        ))
+        .unwrap();
+        s.enqueue(ScheduledJob::new(
+            "t1",
+            "a",
+            "m",
+            now + Duration::seconds(60),
+            0,
+        ))
+        .unwrap();
         let first = s.pop_due(now).unwrap();
         let second = s.pop_due(now).unwrap();
         assert!(first.run_at <= second.run_at);

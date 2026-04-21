@@ -82,8 +82,7 @@ pub struct HandoffRequest {
 }
 
 /// Context bundle transferred during a handoff.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[derive(Default)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct HandoffContext {
     /// Conversation messages to transfer.
     pub messages: Vec<ContextMessage>,
@@ -94,7 +93,6 @@ pub struct HandoffContext {
     /// Chain of agent names that led to this handoff (oldest first).
     pub parent_chain: Vec<String>,
 }
-
 
 /// A single message in the transferred context.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -266,10 +264,14 @@ impl HandoffProtocol {
         let record = self
             .history
             .get(record_index)
-            .ok_or(HandoffError::RecordNotFound { index: record_index })?;
+            .ok_or(HandoffError::RecordNotFound {
+                index: record_index,
+            })?;
 
         if record.result.is_some() {
-            return Err(HandoffError::AlreadyCompleted { index: record_index });
+            return Err(HandoffError::AlreadyCompleted {
+                index: record_index,
+            });
         }
 
         Ok(&record.request)
@@ -288,10 +290,14 @@ impl HandoffProtocol {
         let record = self
             .history
             .get_mut(record_index)
-            .ok_or(HandoffError::RecordNotFound { index: record_index })?;
+            .ok_or(HandoffError::RecordNotFound {
+                index: record_index,
+            })?;
 
         if record.result.is_some() {
-            return Err(HandoffError::AlreadyCompleted { index: record_index });
+            return Err(HandoffError::AlreadyCompleted {
+                index: record_index,
+            });
         }
 
         let result = HandoffResult {
@@ -305,7 +311,7 @@ impl HandoffProtocol {
         };
 
         record.result = Some(result);
-                // Safety: we just assigned `Some(result)` above
+        // Safety: we just assigned `Some(result)` above
         #[allow(clippy::expect_used)]
         Ok(record.result.as_ref().expect("just inserted"))
     }
@@ -327,10 +333,14 @@ impl HandoffProtocol {
         let record = self
             .history
             .get_mut(record_index)
-            .ok_or(HandoffError::RecordNotFound { index: record_index })?;
+            .ok_or(HandoffError::RecordNotFound {
+                index: record_index,
+            })?;
 
         if record.result.is_some() {
-            return Err(HandoffError::AlreadyCompleted { index: record_index });
+            return Err(HandoffError::AlreadyCompleted {
+                index: record_index,
+            });
         }
 
         let result = HandoffResult {
@@ -346,7 +356,7 @@ impl HandoffProtocol {
         };
 
         record.result = Some(result);
-                // Safety: we just assigned `Some(result)` above
+        // Safety: we just assigned `Some(result)` above
         #[allow(clippy::expect_used)]
         Ok(record.result.as_ref().expect("just inserted"))
     }
@@ -362,10 +372,14 @@ impl HandoffProtocol {
         let record = self
             .history
             .get_mut(record_index)
-            .ok_or(HandoffError::RecordNotFound { index: record_index })?;
+            .ok_or(HandoffError::RecordNotFound {
+                index: record_index,
+            })?;
 
         if record.result.is_some() {
-            return Err(HandoffError::AlreadyCompleted { index: record_index });
+            return Err(HandoffError::AlreadyCompleted {
+                index: record_index,
+            });
         }
 
         record.result = Some(HandoffResult {
@@ -393,10 +407,14 @@ impl HandoffProtocol {
         let record = self
             .history
             .get_mut(record_index)
-            .ok_or(HandoffError::RecordNotFound { index: record_index })?;
+            .ok_or(HandoffError::RecordNotFound {
+                index: record_index,
+            })?;
 
         if record.result.is_some() {
-            return Err(HandoffError::AlreadyCompleted { index: record_index });
+            return Err(HandoffError::AlreadyCompleted {
+                index: record_index,
+            });
         }
 
         record.result = Some(HandoffResult {
@@ -420,9 +438,10 @@ impl HandoffProtocol {
     pub fn current_chain(&self) -> Vec<String> {
         let mut chain = Vec::new();
         for record in &self.history {
-            if chain.last().map_or(true, |last: &String| {
-                *last != record.request.from_agent
-            }) {
+            if chain
+                .last()
+                .map_or(true, |last: &String| *last != record.request.from_agent)
+            {
                 chain.push(record.request.from_agent.clone());
             }
             chain.push(record.request.to_agent.clone());
@@ -440,10 +459,7 @@ impl HandoffProtocol {
 
     /// Return the last completed handoff result, if any.
     pub fn last_result(&self) -> Option<&HandoffResult> {
-        self.history
-            .iter()
-            .rev()
-            .find_map(|r| r.result.as_ref())
+        self.history.iter().rev().find_map(|r| r.result.as_ref())
     }
 
     /// Count how many handoffs have been completed (regardless of status).
@@ -496,10 +512,7 @@ impl std::fmt::Display for HandoffError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::DepthExceeded { max, current } => {
-                write!(
-                    f,
-                    "Handoff depth exceeded: current {current}, max {max}"
-                )
+                write!(f, "Handoff depth exceeded: current {current}, max {max}")
             }
             Self::CircularHandoff { agent, chain } => {
                 write!(
@@ -647,7 +660,12 @@ mod tests {
         let mut proto = HandoffProtocol::with_defaults();
         let idx = proto.initiate_handoff(make_request("A", "B")).unwrap();
         let result = proto
-            .handback(idx, "need more info".to_string(), 50, Duration::from_secs(2))
+            .handback(
+                idx,
+                "need more info".to_string(),
+                50,
+                Duration::from_secs(2),
+            )
             .unwrap();
         assert_eq!(
             result.status,
@@ -682,9 +700,7 @@ mod tests {
         let mut proto = HandoffProtocol::new(cfg);
         proto.initiate_handoff(make_request("A", "B")).unwrap();
         proto.initiate_handoff(make_request("B", "C")).unwrap();
-        let err = proto
-            .initiate_handoff(make_request("C", "D"))
-            .unwrap_err();
+        let err = proto.initiate_handoff(make_request("C", "D")).unwrap_err();
         assert!(matches!(err, HandoffError::DepthExceeded { max: 2, .. }));
     }
 
@@ -692,9 +708,7 @@ mod tests {
     #[test]
     fn test_self_handoff_rejected() {
         let mut proto = HandoffProtocol::with_defaults();
-        let err = proto
-            .initiate_handoff(make_request("A", "A"))
-            .unwrap_err();
+        let err = proto.initiate_handoff(make_request("A", "A")).unwrap_err();
         assert!(matches!(err, HandoffError::SelfHandoff { .. }));
     }
 
@@ -707,9 +721,7 @@ mod tests {
         };
         let mut proto = HandoffProtocol::new(cfg);
         proto.initiate_handoff(make_request("A", "B")).unwrap();
-        let err = proto
-            .initiate_handoff(make_request("B", "A"))
-            .unwrap_err();
+        let err = proto.initiate_handoff(make_request("B", "A")).unwrap_err();
         assert!(matches!(err, HandoffError::CircularHandoff { .. }));
     }
 
@@ -947,10 +959,7 @@ mod tests {
     #[test]
     fn test_error_display() {
         let errors = vec![
-            HandoffError::DepthExceeded {
-                max: 5,
-                current: 5,
-            },
+            HandoffError::DepthExceeded { max: 5, current: 5 },
             HandoffError::CircularHandoff {
                 agent: "B".to_string(),
                 chain: vec!["A".to_string(), "B".to_string()],
@@ -1016,7 +1025,9 @@ mod tests {
         proto
             .complete_handoff(idx, "ok".to_string(), 10, Duration::from_secs(1))
             .unwrap();
-        let err = proto.mark_timeout(idx, Duration::from_secs(60)).unwrap_err();
+        let err = proto
+            .mark_timeout(idx, Duration::from_secs(60))
+            .unwrap_err();
         assert!(matches!(err, HandoffError::AlreadyCompleted { .. }));
     }
 

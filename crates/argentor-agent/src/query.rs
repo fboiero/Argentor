@@ -179,11 +179,7 @@ impl QueryOptions {
 
     /// Quick setup for Anthropic Claude.
     pub fn claude(api_key: impl Into<String>) -> Self {
-        Self::with_provider(
-            LlmProvider::Claude,
-            "claude-sonnet-4-20250514",
-            api_key,
-        )
+        Self::with_provider(LlmProvider::Claude, "claude-sonnet-4-20250514", api_key)
     }
 
     /// Quick setup for OpenAI.
@@ -419,9 +415,7 @@ pub async fn query(
         let (stream_tx, mut stream_rx) = mpsc::unbounded_channel::<StreamEvent>();
 
         // We run the streaming loop in a spawned task and bridge events
-        let result = agent
-            .run_streaming(&mut session, &prompt, stream_tx)
-            .await;
+        let result = agent.run_streaming(&mut session, &prompt, stream_tx).await;
 
         // Note: run_streaming sends StreamEvents to stream_tx synchronously
         // within its own loop, so by the time it returns, all stream events
@@ -531,10 +525,7 @@ pub async fn query_with_backend(
 /// # Errors
 ///
 /// Returns an error if the agent fails to produce a response.
-pub async fn query_simple(
-    prompt: &str,
-    options: QueryOptions,
-) -> ArgentorResult<String> {
+pub async fn query_simple(prompt: &str, options: QueryOptions) -> ArgentorResult<String> {
     let mut rx = query(prompt, options).await?;
     let mut final_output = None;
     let mut last_error = None;
@@ -744,7 +735,12 @@ fn stream_event_to_query_event(event: StreamEvent) -> QueryEvent {
             arguments: serde_json::Value::Null,
             call_id: id,
         },
-        StreamEvent::ToolCallDelta { id: _, arguments_delta } => QueryEvent::Text { text: arguments_delta },
+        StreamEvent::ToolCallDelta {
+            id: _,
+            arguments_delta,
+        } => QueryEvent::Text {
+            text: arguments_delta,
+        },
         StreamEvent::ToolCallEnd { id: _ } => QueryEvent::ToolResult {
             name: String::new(),
             content: String::new(),
@@ -1072,10 +1068,8 @@ mod tests {
 
     #[test]
     fn test_builder_tools_only() {
-        let opts = QueryOptions::claude("key").tools(ToolConfig::Only(vec![
-            "echo".into(),
-            "time".into(),
-        ]));
+        let opts =
+            QueryOptions::claude("key").tools(ToolConfig::Only(vec!["echo".into(), "time".into()]));
         if let ToolConfig::Only(names) = &opts.tools {
             assert_eq!(names.len(), 2);
             assert_eq!(names[0], "echo");
@@ -1113,10 +1107,7 @@ mod tests {
     #[test]
     fn test_builder_api_base_url() {
         let opts = QueryOptions::claude("key").api_base_url("http://localhost:8080");
-        assert_eq!(
-            opts.api_base_url.as_deref(),
-            Some("http://localhost:8080")
-        );
+        assert_eq!(opts.api_base_url.as_deref(), Some("http://localhost:8080"));
     }
 
     #[test]
@@ -1157,10 +1148,7 @@ mod tests {
         assert_eq!(config.max_turns, 5);
         assert!((config.temperature - 0.3).abs() < f32::EPSILON);
         assert_eq!(config.max_tokens, 2048);
-        assert_eq!(
-            config.api_base_url.as_deref(),
-            Some("http://custom:9999")
-        );
+        assert_eq!(config.api_base_url.as_deref(), Some("http://custom:9999"));
         assert!(config.fallback_models.is_empty());
         assert!(config.retry_policy.is_none());
     }
@@ -1179,7 +1167,9 @@ mod tests {
 
     #[test]
     fn test_query_event_text_serialization() {
-        let event = QueryEvent::Text { text: "hello".into() };
+        let event = QueryEvent::Text {
+            text: "hello".into(),
+        };
         let json = serde_json::to_string(&event).unwrap();
         assert!(json.contains("\"type\":\"text\""));
     }
@@ -1397,10 +1387,7 @@ mod tests {
             name: "echo".into(),
         };
         let qe = stream_event_to_query_event(se);
-        if let QueryEvent::ToolCall {
-            name, call_id, ..
-        } = qe
-        {
+        if let QueryEvent::ToolCall { name, call_id, .. } = qe {
             assert_eq!(name, "echo");
             assert_eq!(call_id, "tc-1");
         } else {
@@ -1467,11 +1454,7 @@ mod tests {
 
     #[test]
     fn test_with_provider_generic() {
-        let opts = QueryOptions::with_provider(
-            LlmProvider::Mistral,
-            "mistral-medium",
-            "mist-key",
-        );
+        let opts = QueryOptions::with_provider(LlmProvider::Mistral, "mistral-medium", "mist-key");
         assert!(matches!(opts.provider, LlmProvider::Mistral));
         assert_eq!(opts.model, "mistral-medium");
         assert_eq!(opts.api_key, "mist-key");

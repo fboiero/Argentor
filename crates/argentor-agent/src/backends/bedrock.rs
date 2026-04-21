@@ -223,8 +223,7 @@ mod tests {
     #[test]
     fn build_request_body_maps_roles_correctly() {
         let backend = BedrockBackend::new(sample_config());
-        let body =
-            backend.build_request_body(None, &[user_msg("Hi"), assistant_msg("Hello")], &[]);
+        let body = backend.build_request_body(None, &[user_msg("Hi"), assistant_msg("Hello")], &[]);
         let messages = body["messages"].as_array().unwrap();
         assert_eq!(messages.len(), 2);
         assert_eq!(messages[0]["role"], "user");

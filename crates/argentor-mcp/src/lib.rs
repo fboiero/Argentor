@@ -17,6 +17,8 @@ pub mod client;
 pub mod credential_vault;
 /// Tool discovery over MCP.
 pub mod discovery;
+/// In-process MCP server — define tools without spawning a subprocess.
+pub mod in_process;
 /// MCP server lifecycle manager.
 pub mod manager;
 /// JSON-RPC 2.0 protocol types.
@@ -25,8 +27,6 @@ pub mod protocol;
 pub mod proxy;
 /// Multi-proxy coordination with routing, circuit breaker, and failover.
 pub mod proxy_orchestrator;
-/// In-process MCP server — define tools without spawning a subprocess.
-pub mod in_process;
 /// MCP server — exposes Argentor skills as MCP tools.
 pub mod server;
 /// MCP tool-to-skill adapter.
@@ -37,10 +37,10 @@ pub mod token_pool;
 pub use client::McpClient;
 pub use credential_vault::CredentialVault;
 pub use discovery::ToolDiscovery;
+pub use in_process::InProcessMcpServer;
 pub use manager::{McpServerConfig, McpServerManager, McpServerStatus};
 pub use proxy::McpProxy;
 pub use proxy_orchestrator::ProxyOrchestrator;
-pub use in_process::InProcessMcpServer;
 pub use server::McpServer;
 pub use skill::McpSkill;
 pub use token_pool::{PoolHealth, PoolStats, SelectionStrategy, TokenPool, TokenTier};

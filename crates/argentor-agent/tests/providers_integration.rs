@@ -967,7 +967,10 @@ async fn llm_client_dispatches_cohere_to_cohere_backend() {
 
 #[tokio::test]
 async fn llm_client_dispatches_bedrock_to_bedrock_backend() {
-    let mut config = make_config(LlmProvider::Bedrock, "https://bedrock-runtime.us-east-1.amazonaws.com");
+    let mut config = make_config(
+        LlmProvider::Bedrock,
+        "https://bedrock-runtime.us-east-1.amazonaws.com",
+    );
     config.api_key = String::new();
     let client = argentor_agent::LlmClient::new(config);
     assert_eq!(client.provider_name(), "bedrock");

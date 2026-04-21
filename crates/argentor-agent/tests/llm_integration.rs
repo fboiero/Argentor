@@ -298,10 +298,12 @@ async fn mock_claude_tool_use_parsing() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/v1/messages"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(claude_tool_use_response(
-            "get_weather",
-            serde_json::json!({"city": "Rosario"}),
-        )))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(claude_tool_use_response(
+                "get_weather",
+                serde_json::json!({"city": "Rosario"}),
+            )),
+        )
         .mount(&server)
         .await;
 
@@ -309,7 +311,11 @@ async fn mock_claude_tool_use_parsing() {
     let backend = ClaudeBackend::new(config);
 
     let result = backend
-        .chat(None, &[user_message("Weather in Rosario?")], &[sample_tool()])
+        .chat(
+            None,
+            &[user_message("Weather in Rosario?")],
+            &[sample_tool()],
+        )
         .await
         .unwrap();
 
@@ -334,9 +340,7 @@ async fn mock_claude_multiple_tool_calls() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/v1/messages"))
-        .respond_with(
-            ResponseTemplate::new(200).set_body_json(claude_multi_tool_response()),
-        )
+        .respond_with(ResponseTemplate::new(200).set_body_json(claude_multi_tool_response()))
         .mount(&server)
         .await;
 
@@ -407,10 +411,12 @@ async fn mock_openai_tool_call_parsing() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(openai_tool_response(
-            "calculator",
-            r#"{"expression":"3 * 7"}"#,
-        )))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(openai_tool_response(
+                "calculator",
+                r#"{"expression":"3 * 7"}"#,
+            )),
+        )
         .mount(&server)
         .await;
 
@@ -475,10 +481,12 @@ async fn mock_gemini_function_call_parsing() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(query_param("key", "test-key-mock"))
-        .respond_with(ResponseTemplate::new(200).set_body_json(gemini_tool_response(
-            "get_weather",
-            serde_json::json!({"city": "Mendoza"}),
-        )))
+        .respond_with(
+            ResponseTemplate::new(200).set_body_json(gemini_tool_response(
+                "get_weather",
+                serde_json::json!({"city": "Mendoza"}),
+            )),
+        )
         .mount(&server)
         .await;
 
@@ -920,8 +928,7 @@ async fn mock_failover_non_retryable_skips_to_fallback() {
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(openai_text_response("OpenAI fallback OK")),
+            ResponseTemplate::new(200).set_body_json(openai_text_response("OpenAI fallback OK")),
         )
         .mount(&fallback_server)
         .await;
@@ -980,7 +987,11 @@ fn circuit_breaker_lifecycle() {
     // Phase 2: Record failures up to threshold
     breaker.record_failure();
     breaker.record_failure();
-    assert_eq!(breaker.state(), CircuitState::Closed, "2 failures < threshold 3");
+    assert_eq!(
+        breaker.state(),
+        CircuitState::Closed,
+        "2 failures < threshold 3"
+    );
 
     breaker.record_failure(); // 3rd failure = threshold
     assert_eq!(breaker.state(), CircuitState::Open);
@@ -1009,10 +1020,16 @@ fn circuit_breaker_registry_isolation() {
     // Fail provider_a twice -> opens
     registry.record_failure("provider_a");
     registry.record_failure("provider_a");
-    assert!(!registry.allow_request("provider_a"), "provider_a should be open");
+    assert!(
+        !registry.allow_request("provider_a"),
+        "provider_a should be open"
+    );
 
     // provider_b should be unaffected
-    assert!(registry.allow_request("provider_b"), "provider_b should be closed");
+    assert!(
+        registry.allow_request("provider_b"),
+        "provider_b should be closed"
+    );
 
     // Verify status
     let status_a = registry.status("provider_a").unwrap();
@@ -1081,8 +1098,7 @@ async fn mock_llm_client_dispatch_by_provider() {
     Mock::given(method("POST"))
         .and(path("/v1/messages"))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(claude_text_response("I am Claude.")),
+            ResponseTemplate::new(200).set_body_json(claude_text_response("I am Claude.")),
         )
         .mount(&claude_server)
         .await;
@@ -1092,8 +1108,7 @@ async fn mock_llm_client_dispatch_by_provider() {
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(openai_text_response("I am OpenAI.")),
+            ResponseTemplate::new(200).set_body_json(openai_text_response("I am OpenAI.")),
         )
         .mount(&openai_server)
         .await;
@@ -1102,8 +1117,7 @@ async fn mock_llm_client_dispatch_by_provider() {
     let gemini_server = MockServer::start().await;
     Mock::given(method("POST"))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(gemini_text_response("I am Gemini.")),
+            ResponseTemplate::new(200).set_body_json(gemini_text_response("I am Gemini.")),
         )
         .mount(&gemini_server)
         .await;
@@ -1151,8 +1165,9 @@ async fn mock_agent_runner_simple_conversation() {
     Mock::given(method("POST"))
         .and(path("/v1/messages"))
         .respond_with(
-            ResponseTemplate::new(200)
-                .set_body_json(claude_text_response("The capital of Argentina is Buenos Aires.")),
+            ResponseTemplate::new(200).set_body_json(claude_text_response(
+                "The capital of Argentina is Buenos Aires.",
+            )),
         )
         .mount(&server)
         .await;
@@ -1352,4 +1367,104 @@ async fn test_agent_runner_real_e2e() {
         response.contains('4'),
         "Expected response to contain '4', got: {response}"
     );
+}
+
+// ---------------------------------------------------------------------------
+// Nightly smoke tests — issue #24 (Q-01)
+// Executed by .github/workflows/nightly-llm.yml with `--ignored`.
+// Never run in standard CI (no API keys available there).
+// ---------------------------------------------------------------------------
+
+/// Smoke 1 — Claude returns a non-empty response to a trivial prompt.
+#[tokio::test]
+#[ignore = "nightly: requires ANTHROPIC_API_KEY"]
+async fn smoke_claude_simple_prompt() {
+    let api_key = std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY required");
+    let config = make_config(LlmProvider::Claude, "claude-haiku-4-5-20251001", api_key);
+    let backend = ClaudeBackend::new(config);
+
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        backend.chat(
+            Some("Reply concisely."),
+            &[user_message("Respond with the single word: PONG")],
+            &[],
+        ),
+    )
+    .await
+    .expect("smoke_claude_simple_prompt timed out")
+    .expect("Claude API call failed");
+
+    match result {
+        LlmResponse::Done(text) | LlmResponse::Text(text) => {
+            assert!(!text.is_empty(), "Claude response must not be empty");
+        }
+        other => panic!("Expected text response from Claude, got: {other:?}"),
+    }
+}
+
+/// Smoke 2 — OpenAI returns a non-empty response to a trivial prompt.
+#[tokio::test]
+#[ignore = "nightly: requires OPENAI_API_KEY"]
+async fn smoke_openai_simple_prompt() {
+    let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY required");
+    let config = make_config(LlmProvider::OpenAi, "gpt-4o-mini", api_key);
+    let backend = OpenAiBackend::new(config);
+
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        backend.chat(
+            Some("Reply concisely."),
+            &[user_message("Respond with the single word: PONG")],
+            &[],
+        ),
+    )
+    .await
+    .expect("smoke_openai_simple_prompt timed out")
+    .expect("OpenAI API call failed");
+
+    match result {
+        LlmResponse::Done(text) | LlmResponse::Text(text) => {
+            assert!(!text.is_empty(), "OpenAI response must not be empty");
+        }
+        other => panic!("Expected text response from OpenAI, got: {other:?}"),
+    }
+}
+
+/// Smoke 3 — Claude tool-calling: model must call a registered calculator tool.
+#[tokio::test]
+#[ignore = "nightly: requires ANTHROPIC_API_KEY"]
+async fn smoke_tool_calling_agent() {
+    let api_key = std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY required");
+    let config = make_config(LlmProvider::Claude, "claude-haiku-4-5-20251001", api_key);
+    let backend = ClaudeBackend::new(config);
+
+    let result = tokio::time::timeout(
+        std::time::Duration::from_secs(30),
+        backend.chat(
+            Some("You have a calculator tool. ALWAYS use it for math questions."),
+            &[user_message("What is 6 * 7? Use the calculator tool.")],
+            &[simple_calculator_tool()],
+        ),
+    )
+    .await
+    .expect("smoke_tool_calling_agent timed out")
+    .expect("Claude API call failed");
+
+    match result {
+        LlmResponse::ToolUse { tool_calls, .. } => {
+            assert!(!tool_calls.is_empty(), "Expected at least one tool call");
+            assert_eq!(
+                tool_calls[0].name, "calculator",
+                "Expected calculator tool, got: {}",
+                tool_calls[0].name
+            );
+            assert!(
+                tool_calls[0].arguments.get("expression").is_some(),
+                "Expected 'expression' argument, got: {:?}",
+                tool_calls[0].arguments
+            );
+        }
+        other => panic!("Expected ToolUse for math question, got: {other:?}"),
+    }
 }

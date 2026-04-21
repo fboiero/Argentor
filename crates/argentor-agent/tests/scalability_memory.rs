@@ -66,8 +66,10 @@ impl LlmBackend for InstantMockBackend {
         _system_prompt: Option<&str>,
         _messages: &[Message],
         _tools: &[SkillDescriptor],
-    ) -> ArgentorResult<(mpsc::Receiver<StreamEvent>, JoinHandle<ArgentorResult<LlmResponse>>)>
-    {
+    ) -> ArgentorResult<(
+        mpsc::Receiver<StreamEvent>,
+        JoinHandle<ArgentorResult<LlmResponse>>,
+    )> {
         let (_tx, rx) = mpsc::channel(1);
         let handle = tokio::spawn(async { Ok(LlmResponse::Done("ok".to_string())) });
         Ok((rx, handle))
@@ -95,8 +97,10 @@ impl LlmBackend for AlwaysFailBackend {
         _system_prompt: Option<&str>,
         _messages: &[Message],
         _tools: &[SkillDescriptor],
-    ) -> ArgentorResult<(mpsc::Receiver<StreamEvent>, JoinHandle<ArgentorResult<LlmResponse>>)>
-    {
+    ) -> ArgentorResult<(
+        mpsc::Receiver<StreamEvent>,
+        JoinHandle<ArgentorResult<LlmResponse>>,
+    )> {
         Err(ArgentorError::Http("mock failure".into()))
     }
     fn provider_name(&self) -> &str {
@@ -107,7 +111,9 @@ impl LlmBackend for AlwaysFailBackend {
 fn make_runner_with(backend: Box<dyn LlmBackend>) -> AgentRunner {
     let registry = Arc::new(SkillRegistry::new());
     let permissions = PermissionSet::new();
-    let audit = Arc::new(AuditLog::new(std::env::temp_dir().join("argentor-mem-audit")));
+    let audit = Arc::new(AuditLog::new(
+        std::env::temp_dir().join("argentor-mem-audit"),
+    ));
     AgentRunner::from_backend(backend, registry, permissions, audit, 1)
 }
 
@@ -309,7 +315,11 @@ async fn test_debug_recorder_capped() {
     }
 
     // Cap enforced: only the most recent 1000 steps retained
-    assert_eq!(recorder.step_count(), 1000, "cap should retain exactly 1000");
+    assert_eq!(
+        recorder.step_count(),
+        1000,
+        "cap should retain exactly 1000"
+    );
     // Total recorded (including evicted) is accurate
     assert_eq!(recorder.total_recorded(), 10_000);
     // Eviction count = 10_000 emitted - 1000 retained

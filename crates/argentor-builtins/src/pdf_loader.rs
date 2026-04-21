@@ -97,7 +97,10 @@ fn validate_pdf(bytes: &[u8]) -> Result<String, String> {
         return Err("Missing %PDF- header".to_string());
     }
     // Extract version bytes e.g. %PDF-1.4
-    let end = bytes.iter().take(10).position(|b| *b == b'\n' || *b == b'\r');
+    let end = bytes
+        .iter()
+        .take(10)
+        .position(|b| *b == b'\n' || *b == b'\r');
     let header_end = end.unwrap_or(8);
     let version = String::from_utf8_lossy(&bytes[5..header_end]).to_string();
     Ok(version)
@@ -381,7 +384,8 @@ trailer\n<< /Size 6 /Info 5 0 R >>\nstartxref\n0\n%%EOF\n";
     #[tokio::test]
     async fn test_extract_text() {
         let skill = PdfLoaderSkill::new();
-        let call = make_call(json!({"operation": "extract_text", "data": SAMPLE_PDF, "encoding": "raw"}));
+        let call =
+            make_call(json!({"operation": "extract_text", "data": SAMPLE_PDF, "encoding": "raw"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error, "Result: {}", result.content);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -395,7 +399,8 @@ trailer\n<< /Size 6 /Info 5 0 R >>\nstartxref\n0\n%%EOF\n";
     #[tokio::test]
     async fn test_count_pages() {
         let skill = PdfLoaderSkill::new();
-        let call = make_call(json!({"operation": "count_pages", "data": SAMPLE_PDF, "encoding": "raw"}));
+        let call =
+            make_call(json!({"operation": "count_pages", "data": SAMPLE_PDF, "encoding": "raw"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -451,7 +456,8 @@ trailer\n<< /Size 6 /Info 5 0 R >>\nstartxref\n0\n%%EOF\n";
     #[tokio::test]
     async fn test_invalid_pdf_header() {
         let skill = PdfLoaderSkill::new();
-        let call = make_call(json!({"operation": "extract_text", "data": "not a pdf", "encoding": "raw"}));
+        let call =
+            make_call(json!({"operation": "extract_text", "data": "not a pdf", "encoding": "raw"}));
         let result = skill.execute(call).await.unwrap();
         assert!(result.is_error);
         assert!(result.content.contains("PDF") || result.content.contains("header"));
@@ -469,9 +475,8 @@ trailer\n<< /Size 6 /Info 5 0 R >>\nstartxref\n0\n%%EOF\n";
     async fn test_base64_encoded() {
         let skill = PdfLoaderSkill::new();
         let encoded = base64::engine::general_purpose::STANDARD.encode(SAMPLE_PDF.as_bytes());
-        let call = make_call(
-            json!({"operation": "count_pages", "data": encoded, "encoding": "base64"}),
-        );
+        let call =
+            make_call(json!({"operation": "count_pages", "data": encoded, "encoding": "base64"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error, "Result: {}", result.content);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -516,7 +521,8 @@ trailer\n<< /Size 6 /Info 5 0 R >>\nstartxref\n0\n%%EOF\n";
     #[tokio::test]
     async fn test_unknown_operation() {
         let skill = PdfLoaderSkill::new();
-        let call = make_call(json!({"operation": "redact_pii", "data": SAMPLE_PDF, "encoding": "raw"}));
+        let call =
+            make_call(json!({"operation": "redact_pii", "data": SAMPLE_PDF, "encoding": "raw"}));
         let result = skill.execute(call).await.unwrap();
         assert!(result.is_error);
         assert!(result.content.contains("Unknown operation"));
@@ -525,7 +531,8 @@ trailer\n<< /Size 6 /Info 5 0 R >>\nstartxref\n0\n%%EOF\n";
     #[tokio::test]
     async fn test_pdf_version_extracted() {
         let skill = PdfLoaderSkill::new();
-        let call = make_call(json!({"operation": "count_pages", "data": SAMPLE_PDF, "encoding": "raw"}));
+        let call =
+            make_call(json!({"operation": "count_pages", "data": SAMPLE_PDF, "encoding": "raw"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();

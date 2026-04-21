@@ -18,7 +18,10 @@ use argentor_agent::{
     ModelConfig, ModelSnapshot,
 };
 use argentor_core::{ArgentorResult, Message};
-use argentor_orchestrator::handoff::{ContextTransferMode, HandoffConfig, HandoffContext, HandoffError, HandoffProtocol, HandoffRequest};
+use argentor_orchestrator::handoff::{
+    ContextTransferMode, HandoffConfig, HandoffContext, HandoffError, HandoffProtocol,
+    HandoffRequest,
+};
 use argentor_orchestrator::{
     default_budget, AgentMessage, AgentRole, ArtifactKind, BackendFactory, BroadcastTarget,
     BudgetStatus, BudgetTracker, DevRole, DevTeam, DevWorkflow, FailureContext, MessageBus,
@@ -115,9 +118,8 @@ async fn test_orchestrator_worker_pipeline() {
     let skills = Arc::new(SkillRegistry::new());
     let permissions = PermissionSet::new();
 
-    let factory: BackendFactory = Arc::new(|role| {
-        Box::new(RoleAwareBackend { role: role.clone() })
-    });
+    let factory: BackendFactory =
+        Arc::new(|role| Box::new(RoleAwareBackend { role: role.clone() }));
 
     let orchestrator = Orchestrator::new(&test_config(), skills, permissions, audit)
         .with_backend_factory(factory)
@@ -262,15 +264,16 @@ async fn test_budget_tracker_stops_expensive_agent() {
     tracker.record_tokens(&role, 500, 200).await;
     let after = tracker.check_budget(&role).await;
     match after {
-        BudgetStatus::Exceeded { resource, limit, used } => {
+        BudgetStatus::Exceeded {
+            resource,
+            limit,
+            used,
+        } => {
             assert!(
                 !resource.is_empty(),
                 "exceeded status must include resource name"
             );
-            assert!(
-                used > limit,
-                "used ({used}) must exceed limit ({limit})"
-            );
+            assert!(used > limit, "used ({used}) must exceed limit ({limit})");
         }
         other => panic!("expected Exceeded, got: {other:?}"),
     }

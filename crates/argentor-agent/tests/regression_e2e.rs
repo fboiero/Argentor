@@ -48,6 +48,7 @@ fn make_config(base_url: String) -> ModelConfig {
         temperature: 0.0,
         max_tokens: 256,
         max_turns: 5,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     }
@@ -199,7 +200,10 @@ async fn test_full_loop_single_turn_success() {
         .collect();
     let joined = step_types.join(",");
     assert!(joined.contains("Input"), "trace missing Input: {joined}");
-    assert!(joined.contains("LlmCall"), "trace missing LlmCall: {joined}");
+    assert!(
+        joined.contains("LlmCall"),
+        "trace missing LlmCall: {joined}"
+    );
     assert!(
         joined.contains("LlmResponse"),
         "trace missing LlmResponse: {joined}"
@@ -230,7 +234,11 @@ async fn test_full_loop_with_tool_call() {
     let response = agent.run(&mut session, "What is 2+2?").await.unwrap();
 
     assert_eq!(response, "The answer is 4.");
-    assert_eq!(counter.load(Ordering::Relaxed), 2, "LLM should be hit twice");
+    assert_eq!(
+        counter.load(Ordering::Relaxed),
+        2,
+        "LLM should be hit twice"
+    );
     // Session: user, thinking, tool_result, final = at least 3
     assert!(
         session.message_count() >= 3,
@@ -411,11 +419,7 @@ async fn test_full_loop_guardrail_redacts_output() {
         }
         Err(e) => {
             let msg = e.to_string().to_lowercase();
-            assert!(
-                msg.contains("guardrail"),
-                "unexpected error type: {}",
-                e
-            );
+            assert!(msg.contains("guardrail"), "unexpected error type: {}", e);
         }
     }
 }
@@ -472,10 +476,7 @@ async fn test_full_loop_critique_revises_response() {
         enabled: true,
         max_revisions: 2,
         quality_threshold: 0.99, // forces low-score response to attempt revision
-        critique_dimensions: vec![
-            CritiqueDimension::Completeness,
-            CritiqueDimension::Accuracy,
-        ],
+        critique_dimensions: vec![CritiqueDimension::Completeness, CritiqueDimension::Accuracy],
         auto_fix: true,
     });
 
@@ -502,6 +503,8 @@ async fn test_full_loop_compaction_triggers_at_threshold() {
     let cfg = CompactionConfig {
         enabled: true,
         trigger_threshold: 1,
+        adaptive_trigger_pct: None,
+        max_context_tokens: 200_000,
         target_ratio: 0.3,
         preserve_recent: 2,
         preserve_system: true,
@@ -525,9 +528,10 @@ async fn test_full_loop_compaction_triggers_at_threshold() {
         .unwrap();
 
     let trace = agent.debug_recorder().finalize();
-    let compaction_step = trace.steps.iter().find(|s| {
-        matches!(&s.step_type, StepType::Custom(n) if n == "compaction")
-    });
+    let compaction_step = trace
+        .steps
+        .iter()
+        .find(|s| matches!(&s.step_type, StepType::Custom(n) if n == "compaction"));
     assert!(
         compaction_step.is_some(),
         "compaction step should be recorded with trigger_threshold=1"

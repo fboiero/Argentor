@@ -128,7 +128,11 @@ impl TeeProvider for AwsNitroProvider {
                 enclave_id
             )));
         }
-        Ok(AttestationReport::mock(TeeKind::AwsNitro, enclave_id, nonce))
+        Ok(AttestationReport::mock(
+            TeeKind::AwsNitro,
+            enclave_id,
+            nonce,
+        ))
     }
 
     async fn list_enclaves(&self) -> ArgentorResult<Vec<EnclaveInfo>> {
@@ -256,7 +260,10 @@ mod tests {
     async fn attestation_succeeds_with_valid_params() {
         let p = AwsNitroProvider::new();
         let info = p.spawn_enclave(cfg()).await.unwrap();
-        let r = p.get_attestation(&info.enclave_id, "nonce-1").await.unwrap();
+        let r = p
+            .get_attestation(&info.enclave_id, "nonce-1")
+            .await
+            .unwrap();
         assert_eq!(r.kind, TeeKind::AwsNitro);
         assert_eq!(r.enclave_id, info.enclave_id);
         assert_eq!(r.nonce, "nonce-1");

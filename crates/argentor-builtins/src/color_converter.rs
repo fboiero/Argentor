@@ -19,7 +19,9 @@ impl ColorConverterSkill {
         Self {
             descriptor: SkillDescriptor {
                 name: "color_converter".to_string(),
-                description: "Color conversion (Hex/RGB/HSL), named colors, contrast ratio, lighten/darken.".to_string(),
+                description:
+                    "Color conversion (Hex/RGB/HSL), named colors, contrast ratio, lighten/darken."
+                        .to_string(),
                 parameters_schema: json!({
                     "type": "object",
                     "properties": {
@@ -62,7 +64,10 @@ impl Default for ColorConverterSkill {
 fn hex_to_rgb(hex: &str) -> Result<(u8, u8, u8), String> {
     let hex = hex.trim().strip_prefix('#').unwrap_or(hex);
     if hex.len() != 6 {
-        return Err(format!("Invalid hex color: expected 6 characters, got {}", hex.len()));
+        return Err(format!(
+            "Invalid hex color: expected 6 characters, got {}",
+            hex.len()
+        ));
     }
     let r = u8::from_str_radix(&hex[0..2], 16).map_err(|_| "Invalid red component")?;
     let g = u8::from_str_radix(&hex[2..4], 16).map_err(|_| "Invalid green component")?;
@@ -493,7 +498,9 @@ mod tests {
     #[tokio::test]
     async fn test_contrast_ratio_bw() {
         let skill = ColorConverterSkill::new();
-        let call = make_call(json!({"operation": "contrast_ratio", "hex_a": "#FFFFFF", "hex_b": "#000000"}));
+        let call = make_call(
+            json!({"operation": "contrast_ratio", "hex_a": "#FFFFFF", "hex_b": "#000000"}),
+        );
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -504,7 +511,9 @@ mod tests {
     #[tokio::test]
     async fn test_contrast_ratio_same_color() {
         let skill = ColorConverterSkill::new();
-        let call = make_call(json!({"operation": "contrast_ratio", "hex_a": "#FF0000", "hex_b": "#FF0000"}));
+        let call = make_call(
+            json!({"operation": "contrast_ratio", "hex_a": "#FF0000", "hex_b": "#FF0000"}),
+        );
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();

@@ -121,7 +121,9 @@ fn json_to_csv(data: &[Value], delimiter: char) -> Result<String, String> {
     result.push('\n');
 
     for item in data {
-        let obj = item.as_object().ok_or("Each JSON element must be an object")?;
+        let obj = item
+            .as_object()
+            .ok_or("Each JSON element must be an object")?;
         let row: Vec<String> = headers
             .iter()
             .map(|h| {

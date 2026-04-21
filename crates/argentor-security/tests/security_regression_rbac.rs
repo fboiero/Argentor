@@ -133,7 +133,9 @@ fn test_wildcard_permissions_scope_correctly() {
 
     // Wildcard allows arbitrary skills
     assert!(policy.evaluate(&Role::Operator, "echo").is_allowed());
-    assert!(policy.evaluate(&Role::Operator, "memory_search").is_allowed());
+    assert!(policy
+        .evaluate(&Role::Operator, "memory_search")
+        .is_allowed());
 
     // But the denylist STILL wins
     let blocked = policy.evaluate(&Role::Operator, "dangerous_skill");
@@ -236,5 +238,7 @@ fn test_deny_takes_precedence_over_explicit_allow() {
     );
 
     // The other allowed skill still works
-    assert!(policy.evaluate(&Role::Operator, "memory_search").is_allowed());
+    assert!(policy
+        .evaluate(&Role::Operator, "memory_search")
+        .is_allowed());
 }

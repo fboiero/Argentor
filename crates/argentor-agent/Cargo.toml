@@ -10,6 +10,11 @@ homepage.workspace = true
 keywords.workspace = true
 categories.workspace = true
 
+[features]
+# Enable the real AWS Bedrock implementation (SigV4-signed HTTP via reqwest).
+# Uses sha2/hmac/hex from the workspace — no extra toolchain requirement.
+bedrock = []
+
 [lints]
 workspace = true
 
@@ -32,7 +37,12 @@ futures-util = "0.3"
 tokio-stream = "0.1"
 toml.workspace = true
 regex.workspace = true
+unicode-normalization.workspace = true
 base64 = "0.22"
+# SigV4 signing for the Bedrock feature (already in the workspace graph)
+sha2.workspace = true
+hmac.workspace = true
+hex.workspace = true
 
 [dev-dependencies]
 tempfile = "3"

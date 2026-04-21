@@ -20,7 +20,9 @@ impl TemplateEngineSkill {
         Self {
             descriptor: SkillDescriptor {
                 name: "template_engine".to_string(),
-                description: "Simple {{variable}} template rendering with conditionals, loops, and defaults.".to_string(),
+                description:
+                    "Simple {{variable}} template rendering with conditionals, loops, and defaults."
+                        .to_string(),
                 parameters_schema: json!({
                     "type": "object",
                     "properties": {
@@ -97,7 +99,10 @@ fn render_template(template: &str, variables: &HashMap<String, Value>) -> Result
 }
 
 /// Process {{#each items}}...{{/each}} blocks.
-fn process_each_blocks(template: &str, variables: &HashMap<String, Value>) -> Result<String, String> {
+fn process_each_blocks(
+    template: &str,
+    variables: &HashMap<String, Value>,
+) -> Result<String, String> {
     let mut result = template.to_string();
     let each_start = "{{#each ";
     let each_end = "{{/each}}";
@@ -195,7 +200,11 @@ fn process_if_blocks(template: &str, variables: &HashMap<String, Value>) -> Resu
             (block_content, "")
         };
 
-        let rendered = if is_truthy { true_content } else { false_content };
+        let rendered = if is_truthy {
+            true_content
+        } else {
+            false_content
+        };
 
         result = format!(
             "{}{}{}",
@@ -243,7 +252,9 @@ fn process_variables(template: &str, variables: &HashMap<String, Value>) -> Stri
             Some(Value::String(s)) => s.clone(),
             Some(Value::Null) => default_val.unwrap_or("").to_string(),
             Some(v) => v.to_string(),
-            None => default_val.unwrap_or(&format!("{{{{{var_name}}}}}")).to_string(),
+            None => default_val
+                .unwrap_or(&format!("{{{{{var_name}}}}}"))
+                .to_string(),
         };
 
         processed.push_str(&value);

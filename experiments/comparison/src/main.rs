@@ -20,7 +20,10 @@ async fn main() {
     println!();
     println!("╔══════════════════════════════════════════════════════════════════╗");
     println!("║  Argentor Comparison Experiment — Baseline Run                   ║");
-    println!("║  Date: {}                                            ║", chrono::Utc::now().format("%Y-%m-%d %H:%M:%S"));
+    println!(
+        "║  Date: {}                                            ║",
+        chrono::Utc::now().format("%Y-%m-%d %H:%M:%S")
+    );
     println!("╚══════════════════════════════════════════════════════════════════╝");
 
     let mut all_measurements = Vec::new();
@@ -42,13 +45,19 @@ async fn main() {
 
     // Final memory check
     let final_memory_kb = memory::current_rss_kb();
-    println!("\nFinal RSS: {final_memory_kb} KB (delta: {} KB)", final_memory_kb as i64 - initial_memory_kb as i64);
+    println!(
+        "\nFinal RSS: {final_memory_kb} KB (delta: {} KB)",
+        final_memory_kb as i64 - initial_memory_kb as i64
+    );
 
     // Print JSON summary
     println!("\n==================================================================");
     println!("  JSON Output");
     println!("==================================================================");
-    println!("{}", serde_json::to_string_pretty(&all_measurements).unwrap_or_default());
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&all_measurements).unwrap_or_default()
+    );
 }
 
 // ─── Scenario 1: Cold Start ─────────────────────────────────────────────────
@@ -125,7 +134,9 @@ async fn scenario_tool_dispatch() -> Vec<Measurement> {
     let mut registry = SkillRegistry::new();
     argentor_builtins::register_builtins(&mut registry);
 
-    let calc = registry.get("calculator").expect("calculator skill registered");
+    let calc = registry
+        .get("calculator")
+        .expect("calculator skill registered");
     let input = argentor_core::ToolCall {
         id: "test".into(),
         name: "calculator".into(),
@@ -174,12 +185,15 @@ async fn scenario_guardrails() -> Vec<Measurement> {
             samples.push(start.elapsed());
         }
 
-        let metric_name = format!("input_check_{}", match i {
-            0 => "clean",
-            1 => "pii_credit_card",
-            2 => "prompt_injection",
-            _ => "neutral",
-        });
+        let metric_name = format!(
+            "input_check_{}",
+            match i {
+                0 => "clean",
+                1 => "pii_credit_card",
+                2 => "prompt_injection",
+                _ => "neutral",
+            }
+        );
         let m = measurement_from_durations("guardrails", &metric_name, &samples);
         print_measurement(&m);
         measurements.push(m);
@@ -237,7 +251,8 @@ async fn scenario_intelligence_overhead() -> Vec<Measurement> {
 
     // Critique
     let critique = argentor_agent::critique::CritiqueEngine::with_defaults();
-    let response = "The answer is 4. To compute 2+2, I added the two numbers using basic arithmetic.";
+    let response =
+        "The answer is 4. To compute 2+2, I added the two numbers using basic arithmetic.";
     let no_tools: Vec<&str> = Vec::new();
     for _ in 0..WARMUP_ITERATIONS {
         let _ = critique.critique("What is 2+2?", response, &no_tools);
@@ -304,7 +319,10 @@ async fn scenario_throughput() -> Vec<Measurement> {
     };
     println!(
         "  {:<35} {:>10.0} ops/sec (total: {} ops in {:.2}s)",
-        m.metric, m.value, TOTAL_OPS, total_duration.as_secs_f64()
+        m.metric,
+        m.value,
+        TOTAL_OPS,
+        total_duration.as_secs_f64()
     );
     println!("  Comparison: Rust ~5 rps (full agent loop), Python ~3-4 rps (DEV.to 2026)");
     vec![m]
@@ -319,7 +337,9 @@ async fn scenario_memory_under_load() -> Vec<Measurement> {
     let mut registry = SkillRegistry::new();
     argentor_builtins::register_builtins(&mut registry);
     let registry = Arc::new(registry);
-    let _audit = Arc::new(AuditLog::new(std::path::PathBuf::from("/tmp/argentor-bench-audit")));
+    let _audit = Arc::new(AuditLog::new(std::path::PathBuf::from(
+        "/tmp/argentor-bench-audit",
+    )));
     let _permissions = PermissionSet::new();
 
     // Allocate session-like data
@@ -370,28 +390,83 @@ async fn scenario_ecosystem_gaps() -> Vec<Measurement> {
 
     // These are HONEST measurements showing where we're behind (or now closer!)
     let gaps = vec![
-        ("ecosystem_gaps", "skills_count", argentor_skills as f64, "skills",
-         "LangChain 500+, CrewAI 100+ — we have ~50 native + 5800 via MCP"),
-        ("ecosystem_gaps", "llm_providers", argentor_llm_providers as f64, "providers",
-         "LangChain 100+, OpenRouter 300+ — we have 19 (+ HF route to 100K+ models)"),
-        ("ecosystem_gaps", "vector_stores", argentor_vector_stores as f64, "stores",
-         "LangChain 200+ — we have 5 (Pinecone, Weaviate, Qdrant, pgvector, local)"),
-        ("ecosystem_gaps", "embedding_providers", argentor_embedding_providers as f64, "providers",
-         "LangChain 40+ — we have 10 (closed from 4)"),
-        ("ecosystem_gaps", "document_loaders", argentor_document_loaders as f64, "loaders",
-         "LangChain 50+ — we have 6 (was 0, gap closed by 6/50)"),
-        ("ecosystem_gaps", "intelligence_modules", argentor_intelligence_modules as f64, "modules",
-         "Most frameworks: 0-3 — we have 10 (UNIQUE in ecosystem)"),
-        ("ecosystem_gaps", "mcp_integrations_available", argentor_mcp_integrations as f64, "servers",
-         "Industry: 5,800+ MCP servers — we support ALL of them via MCP client"),
-        ("ecosystem_gaps", "github_stars", 0.0, "stars",
-         "LangChain 118K, CrewAI 45.9K, IronClaw 11.6K — we have 0"),
-        ("ecosystem_gaps", "pypi_downloads", 0.0, "downloads",
-         "LangChain 47M — we have 0 (not yet published)"),
-        ("ecosystem_gaps", "production_executions", 0.0, "executions",
-         "CrewAI 2 BILLION (12M/day) — we have 0"),
-        ("ecosystem_gaps", "fortune_500_customers", 0.0, "customers",
-         "CrewAI: PepsiCo, J&J, PwC, DoD, etc. — we have 0"),
+        (
+            "ecosystem_gaps",
+            "skills_count",
+            argentor_skills as f64,
+            "skills",
+            "LangChain 500+, CrewAI 100+ — we have ~50 native + 5800 via MCP",
+        ),
+        (
+            "ecosystem_gaps",
+            "llm_providers",
+            argentor_llm_providers as f64,
+            "providers",
+            "LangChain 100+, OpenRouter 300+ — we have 19 (+ HF route to 100K+ models)",
+        ),
+        (
+            "ecosystem_gaps",
+            "vector_stores",
+            argentor_vector_stores as f64,
+            "stores",
+            "LangChain 200+ — we have 5 (Pinecone, Weaviate, Qdrant, pgvector, local)",
+        ),
+        (
+            "ecosystem_gaps",
+            "embedding_providers",
+            argentor_embedding_providers as f64,
+            "providers",
+            "LangChain 40+ — we have 10 (closed from 4)",
+        ),
+        (
+            "ecosystem_gaps",
+            "document_loaders",
+            argentor_document_loaders as f64,
+            "loaders",
+            "LangChain 50+ — we have 6 (was 0, gap closed by 6/50)",
+        ),
+        (
+            "ecosystem_gaps",
+            "intelligence_modules",
+            argentor_intelligence_modules as f64,
+            "modules",
+            "Most frameworks: 0-3 — we have 10 (UNIQUE in ecosystem)",
+        ),
+        (
+            "ecosystem_gaps",
+            "mcp_integrations_available",
+            argentor_mcp_integrations as f64,
+            "servers",
+            "Industry: 5,800+ MCP servers — we support ALL of them via MCP client",
+        ),
+        (
+            "ecosystem_gaps",
+            "github_stars",
+            0.0,
+            "stars",
+            "LangChain 118K, CrewAI 45.9K, IronClaw 11.6K — we have 0",
+        ),
+        (
+            "ecosystem_gaps",
+            "pypi_downloads",
+            0.0,
+            "downloads",
+            "LangChain 47M — we have 0 (not yet published)",
+        ),
+        (
+            "ecosystem_gaps",
+            "production_executions",
+            0.0,
+            "executions",
+            "CrewAI 2 BILLION (12M/day) — we have 0",
+        ),
+        (
+            "ecosystem_gaps",
+            "fortune_500_customers",
+            0.0,
+            "customers",
+            "CrewAI: PepsiCo, J&J, PwC, DoD, etc. — we have 0",
+        ),
     ];
 
     let mut measurements = Vec::new();
@@ -450,7 +525,10 @@ async fn scenario_mock_llm_loop() -> Vec<Measurement> {
             _system_prompt: Option<&str>,
             _messages: &[Message],
             _tools: &[SkillDescriptor],
-        ) -> ArgentorResult<(mpsc::Receiver<StreamEvent>, JoinHandle<ArgentorResult<LlmResponse>>)> {
+        ) -> ArgentorResult<(
+            mpsc::Receiver<StreamEvent>,
+            JoinHandle<ArgentorResult<LlmResponse>>,
+        )> {
             let (_tx, rx) = mpsc::channel(1);
             let handle = tokio::spawn(async {
                 tokio::time::sleep(Duration::from_millis(50)).await;
@@ -467,7 +545,9 @@ async fn scenario_mock_llm_loop() -> Vec<Measurement> {
     argentor_builtins::register_builtins(&mut registry);
     let registry = Arc::new(registry);
     let permissions = PermissionSet::new();
-    let audit = Arc::new(AuditLog::new(std::path::PathBuf::from("/tmp/argentor-bench-audit")));
+    let audit = Arc::new(AuditLog::new(std::path::PathBuf::from(
+        "/tmp/argentor-bench-audit",
+    )));
 
     let runner = argentor_agent::AgentRunner::from_backend(
         Box::new(MockLlmBackend),
@@ -520,7 +600,10 @@ async fn scenario_mock_llm_loop() -> Vec<Measurement> {
     };
     println!(
         "  {:<35} {:>10.1} rps ({} concurrent agents in {:.2}s)",
-        m_thru.metric, m_thru.value, CONCURRENT_REQUESTS, total.as_secs_f64()
+        m_thru.metric,
+        m_thru.value,
+        CONCURRENT_REQUESTS,
+        total.as_secs_f64()
     );
     println!("  Comparison: AutoAgents 4.97 rps, Rig 4.44 rps, LangChain 4.26 rps (DEV.to 2026)");
 
@@ -572,7 +655,10 @@ async fn scenario_multi_turn_loop() -> Vec<Measurement> {
             _: Option<&str>,
             _: &[Message],
             _: &[SkillDescriptor],
-        ) -> ArgentorResult<(mpsc::Receiver<StreamEvent>, JoinHandle<ArgentorResult<LlmResponse>>)> {
+        ) -> ArgentorResult<(
+            mpsc::Receiver<StreamEvent>,
+            JoinHandle<ArgentorResult<LlmResponse>>,
+        )> {
             let (_tx, rx) = mpsc::channel(1);
             let handle = tokio::spawn(async { Ok(LlmResponse::Done("stub".to_string())) });
             Ok((rx, handle))
@@ -650,30 +736,27 @@ async fn scenario_multi_turn_loop() -> Vec<Measurement> {
 
     let mut measurements = Vec::new();
 
-    let make_single_measure =
-        |metric: &str, value: f64, unit: &str| -> Measurement {
-            Measurement {
-                scenario: "multi_turn_loop".into(),
-                metric: metric.to_string(),
-                value,
-                unit: unit.to_string(),
-                samples: 1,
-                min: value,
-                max: value,
-                p50: value,
-                p95: value,
-                p99: value,
-            }
-        };
+    let make_single_measure = |metric: &str, value: f64, unit: &str| -> Measurement {
+        Measurement {
+            scenario: "multi_turn_loop".into(),
+            metric: metric.to_string(),
+            value,
+            unit: unit.to_string(),
+            samples: 1,
+            min: value,
+            max: value,
+            p50: value,
+            p95: value,
+            p99: value,
+        }
+    };
 
     for (i, lat) in per_turn_latencies_ms.iter().enumerate() {
         let metric = format!("turn_{}_latency_ms", i + 1);
         let m = make_single_measure(&metric, *lat, "ms");
         println!(
             "  {:<35} {:>10.3} ms (context: {} messages)",
-            m.metric,
-            m.value,
-            per_turn_context_msgs[i]
+            m.metric, m.value, per_turn_context_msgs[i]
         );
         measurements.push(m);
     }
@@ -709,11 +792,7 @@ async fn scenario_multi_turn_loop() -> Vec<Measurement> {
     );
     measurements.push(m_ctx);
 
-    let m_mem = make_single_measure(
-        "memory_growth_5_turns_kb",
-        mem_delta_kb as f64,
-        "KB",
-    );
+    let m_mem = make_single_measure("memory_growth_5_turns_kb", mem_delta_kb as f64, "KB");
     println!(
         "  {:<35} {:>10.0} KB (RSS {} → {} KB)",
         m_mem.metric, m_mem.value, mem_before_kb, mem_after_kb
@@ -759,10 +838,7 @@ async fn scenario_loc_complexity() -> Vec<Measurement> {
         p95: argentor_loc as f64,
         p99: argentor_loc as f64,
     };
-    println!(
-        "  {:<35} {:>10.0} lines",
-        m.metric, m.value
-    );
+    println!("  {:<35} {:>10.0} lines", m.metric, m.value);
     println!("  Comparison: Pydantic AI ~280 LOC, LangChain ~490 LOC (Nextbuild 2026)");
     vec![m]
 }

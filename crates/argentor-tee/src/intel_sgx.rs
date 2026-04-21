@@ -254,7 +254,10 @@ mod tests {
     async fn attestation_ok() {
         let p = IntelSgxProvider::new();
         let info = p.spawn_enclave(cfg()).await.unwrap();
-        let r = p.get_attestation(&info.enclave_id, "sgx-nonce").await.unwrap();
+        let r = p
+            .get_attestation(&info.enclave_id, "sgx-nonce")
+            .await
+            .unwrap();
         assert_eq!(r.kind, TeeKind::IntelSgx);
         assert_eq!(r.nonce, "sgx-nonce");
     }

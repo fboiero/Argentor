@@ -204,7 +204,10 @@ mod tests {
     async fn test_insert_count() {
         let store = WeaviateStore::new("https://x", "C");
         assert_eq!(store.count().await.unwrap(), 0);
-        store.insert(entry("hi", vec![1.0, 0.0], None)).await.unwrap();
+        store
+            .insert(entry("hi", vec![1.0, 0.0], None))
+            .await
+            .unwrap();
         assert_eq!(store.count().await.unwrap(), 1);
     }
 
@@ -314,8 +317,7 @@ mod tests {
     async fn test_metadata_preserved() {
         let store = WeaviateStore::new("https://x", "C");
         let mut e = entry("with-meta", vec![1.0], None);
-        e.metadata
-            .insert("k".to_string(), serde_json::json!("v"));
+        e.metadata.insert("k".to_string(), serde_json::json!("v"));
         let id = e.id;
         store.insert(e).await.unwrap();
         let all = store.list(None).await.unwrap();

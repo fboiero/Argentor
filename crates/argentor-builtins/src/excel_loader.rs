@@ -194,8 +194,10 @@ fn parse_sheet_xml(xml: &str, shared_strings: &[String]) -> Vec<Vec<String>> {
                 re.captures(attrs)
                     .map(|cap| {
                         (
-                            cap.get(1).map_or("A".to_string(), |m| m.as_str().to_string()),
-                            cap.get(2).map_or("1".to_string(), |m| m.as_str().to_string()),
+                            cap.get(1)
+                                .map_or("A".to_string(), |m| m.as_str().to_string()),
+                            cap.get(2)
+                                .map_or("1".to_string(), |m| m.as_str().to_string()),
                         )
                     })
                     .unwrap_or(("A".to_string(), "1".to_string()))
@@ -232,9 +234,7 @@ fn parse_sheet_xml(xml: &str, shared_strings: &[String]) -> Vec<Vec<String>> {
                 "inlineStr" => {
                     if let Ok(ref re) = is_text_re {
                         re.captures(inner)
-                            .and_then(|cap| {
-                                cap.get(1).map(|m| decode_xml_entities(m.as_str()))
-                            })
+                            .and_then(|cap| cap.get(1).map(|m| decode_xml_entities(m.as_str())))
                             .unwrap_or(raw_value)
                     } else {
                         raw_value
@@ -283,8 +283,14 @@ fn decode_xml_entities(s: &str) -> String {
 
 /// Parse a cell reference like "B3" into (col_idx, row_number_1indexed).
 fn parse_cell_ref(cell: &str) -> Option<(usize, usize)> {
-    let letters: String = cell.chars().take_while(|c| c.is_ascii_alphabetic()).collect();
-    let digits: String = cell.chars().skip_while(|c| c.is_ascii_alphabetic()).collect();
+    let letters: String = cell
+        .chars()
+        .take_while(|c| c.is_ascii_alphabetic())
+        .collect();
+    let digits: String = cell
+        .chars()
+        .skip_while(|c| c.is_ascii_alphabetic())
+        .collect();
     if letters.is_empty() || digits.is_empty() {
         return None;
     }
@@ -547,9 +553,7 @@ mod tests {
     async fn test_read_sheet() {
         let skill = ExcelLoaderSkill::new();
         let encoded = base64::engine::general_purpose::STANDARD.encode(build_sample_xlsx());
-        let call = make_call(
-            json!({"operation": "read_sheet", "data": encoded, "sheet": "Data"}),
-        );
+        let call = make_call(json!({"operation": "read_sheet", "data": encoded, "sheet": "Data"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error, "Result: {}", result.content);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();

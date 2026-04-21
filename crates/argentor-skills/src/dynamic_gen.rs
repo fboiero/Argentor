@@ -320,19 +320,21 @@ impl DynamicToolGenerator {
 
         // Build effective args with defaults.
         let effective_args = {
-            let tool = self.generated_tools.get(tool_name)
+            let tool = self
+                .generated_tools
+                .get(tool_name)
                 .ok_or_else(|| DynamicGenError::NotFound(tool_name.to_string()))?;
             self.build_effective_args(&tool.spec, args)
         };
 
         // Execute based on implementation type.
         let result = {
-            let tool = self.generated_tools.get(tool_name)
+            let tool = self
+                .generated_tools
+                .get(tool_name)
                 .ok_or_else(|| DynamicGenError::NotFound(tool_name.to_string()))?;
             match &tool.implementation {
-                ToolImplementation::Template(tmpl) => {
-                    self.execute_template(tmpl, &effective_args)
-                }
+                ToolImplementation::Template(tmpl) => self.execute_template(tmpl, &effective_args),
                 ToolImplementation::Expression(expr) => {
                     self.execute_expression(expr, &effective_args)
                 }
@@ -344,7 +346,9 @@ impl DynamicToolGenerator {
         };
 
         // Update stats.
-        let tool = self.generated_tools.get_mut(tool_name)
+        let tool = self
+            .generated_tools
+            .get_mut(tool_name)
             .ok_or_else(|| DynamicGenError::NotFound(tool_name.to_string()))?;
         tool.usage_count += 1;
         tool.last_used = Some(Utc::now());
@@ -609,11 +613,7 @@ impl DynamicToolGenerator {
     /// - `len(param)` — string length
     /// - `add(a, b)` / `sub(a, b)` / `mul(a, b)` — arithmetic
     /// - Raw string with `{{param}}` placeholders as fallback
-    fn execute_expression(
-        &self,
-        expr: &str,
-        args: &Value,
-    ) -> Result<String, DynamicGenError> {
+    fn execute_expression(&self, expr: &str, args: &Value) -> Result<String, DynamicGenError> {
         let expr = expr.trim();
 
         // concat(a, b)
@@ -696,10 +696,7 @@ impl DynamicToolGenerator {
             let mut step_args = serde_json::Map::new();
             for (tool_param, source_key) in &step.param_mapping {
                 if source_key == "_prev" || source_key == "prev_result" {
-                    step_args.insert(
-                        tool_param.clone(),
-                        Value::String(current_result.clone()),
-                    );
+                    step_args.insert(tool_param.clone(), Value::String(current_result.clone()));
                 } else if let Some(val) = pipeline_context.get(source_key) {
                     step_args.insert(tool_param.clone(), val.clone());
                 }
@@ -747,8 +744,9 @@ impl DynamicToolGenerator {
 
             TransformOp::Join(delimiter) => {
                 // Expect input to be a JSON array of strings.
-                let arr: Vec<String> = serde_json::from_str(input)
-                    .map_err(|e| DynamicGenError::TransformError(format!("Not a JSON array: {e}")))?;
+                let arr: Vec<String> = serde_json::from_str(input).map_err(|e| {
+                    DynamicGenError::TransformError(format!("Not a JSON array: {e}"))
+                })?;
                 Ok(arr.join(delimiter))
             }
 
@@ -757,11 +755,9 @@ impl DynamicToolGenerator {
                     .map_err(|e| DynamicGenError::TransformError(format!("Invalid JSON: {e}")))?;
                 let mut current = &val;
                 for key in path.split('.') {
-                    current = current
-                        .get(key)
-                        .ok_or_else(|| DynamicGenError::TransformError(format!(
-                            "Key '{key}' not found in JSON"
-                        )))?;
+                    current = current.get(key).ok_or_else(|| {
+                        DynamicGenError::TransformError(format!("Key '{key}' not found in JSON"))
+                    })?;
                 }
                 match current {
                     Value::String(s) => Ok(s.clone()),
@@ -957,7 +953,10 @@ mod tests {
         let spec = simple_spec("greet", "template: Hello, {{input}}!");
         let tool = gen.generate_tool(spec).unwrap();
         assert_eq!(tool.spec.name, "greet");
-        assert!(matches!(tool.implementation, ToolImplementation::Template(_)));
+        assert!(matches!(
+            tool.implementation,
+            ToolImplementation::Template(_)
+        ));
     }
 
     #[test]
@@ -987,7 +986,10 @@ mod tests {
         let mut gen = default_gen();
         let spec = simple_spec("echo", "just echo things");
         let tool = gen.generate_tool(spec).unwrap();
-        assert!(matches!(tool.implementation, ToolImplementation::Template(_)));
+        assert!(matches!(
+            tool.implementation,
+            ToolImplementation::Template(_)
+        ));
     }
 
     #[test]
@@ -1311,10 +1313,8 @@ mod tests {
         gen.generate_tool(spec2).unwrap();
 
         // Composite tool
-        let mut pipe_spec = simple_spec(
-            "pipe",
-            "pipeline: prefix(input=input); suffix(data=_prev)",
-        );
+        let mut pipe_spec =
+            simple_spec("pipe", "pipeline: prefix(input=input); suffix(data=_prev)");
         gen.generate_tool(pipe_spec).unwrap();
 
         let result = gen
@@ -1451,16 +1451,12 @@ mod tests {
     #[test]
     fn test_parse_pipeline_hint() {
         let gen = default_gen();
-        let steps =
-            gen.parse_pipeline_hint("pipeline: step1(a=x, b=y); step2(c=_prev)");
+        let steps = gen.parse_pipeline_hint("pipeline: step1(a=x, b=y); step2(c=_prev)");
         assert_eq!(steps.len(), 2);
         assert_eq!(steps[0].tool_name, "step1");
         assert_eq!(steps[0].param_mapping.get("a"), Some(&"x".to_string()));
         assert_eq!(steps[1].tool_name, "step2");
-        assert_eq!(
-            steps[1].param_mapping.get("c"),
-            Some(&"_prev".to_string())
-        );
+        assert_eq!(steps[1].param_mapping.get("c"), Some(&"_prev".to_string()));
     }
 
     // -- Template with numeric values ------------------------------------------

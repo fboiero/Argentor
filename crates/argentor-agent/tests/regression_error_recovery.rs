@@ -261,16 +261,15 @@ async fn test_skill_execution_error_in_middle() {
                 content: Some("calling three tools".into()),
                 tool_calls: calls,
             }),
-            Ok(LlmResponse::Done("Tools processed — second errored.".into())),
+            Ok(LlmResponse::Done(
+                "Tools processed — second errored.".into(),
+            )),
         ],
     );
 
     let agent = build_scripted_agent(backend, 5);
     let mut session = Session::new();
-    let response = agent
-        .run(&mut session, "do three things")
-        .await
-        .unwrap();
+    let response = agent.run(&mut session, "do three things").await.unwrap();
 
     assert!(
         response.contains("processed"),
@@ -421,10 +420,7 @@ async fn test_invalid_tool_call_gracefully_handled() {
 
     let agent = build_scripted_agent(backend, 5);
     let mut session = Session::new();
-    let response = agent
-        .run(&mut session, "use a broken tool")
-        .await
-        .unwrap();
+    let response = agent.run(&mut session, "use a broken tool").await.unwrap();
     assert!(
         response.contains("recovered"),
         "agent should recover and return final response: {response}"

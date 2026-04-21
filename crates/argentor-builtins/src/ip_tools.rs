@@ -104,7 +104,9 @@ fn classify_ip(ip: &IpAddr) -> Value {
 fn parse_cidr(cidr: &str) -> Result<Value, String> {
     let parts: Vec<&str> = cidr.split('/').collect();
     if parts.len() != 2 {
-        return Err(format!("Invalid CIDR notation: '{cidr}'. Expected format: IP/prefix"));
+        return Err(format!(
+            "Invalid CIDR notation: '{cidr}'. Expected format: IP/prefix"
+        ));
     }
 
     let ip: Ipv4Addr = parts[0]
@@ -172,15 +174,17 @@ fn ip_in_cidr(ip_str: &str, cidr: &str) -> Result<bool, String> {
     let prefix: u32 = parts[1]
         .parse()
         .map_err(|e| format!("Invalid prefix: {e}"))?;
-    let ip: Ipv4Addr = ip_str
-        .parse()
-        .map_err(|e| format!("Invalid IP: {e}"))?;
+    let ip: Ipv4Addr = ip_str.parse().map_err(|e| format!("Invalid IP: {e}"))?;
 
     if prefix > 32 {
         return Err("Prefix exceeds 32".to_string());
     }
 
-    let mask = if prefix == 0 { 0u32 } else { !0u32 << (32 - prefix) };
+    let mask = if prefix == 0 {
+        0u32
+    } else {
+        !0u32 << (32 - prefix)
+    };
     let network = u32::from(network_ip) & mask;
     let ip_network = u32::from(ip) & mask;
 
@@ -472,7 +476,9 @@ mod tests {
     #[tokio::test]
     async fn test_in_range_true() {
         let skill = IpToolsSkill::new();
-        let call = make_call(json!({"operation": "in_range", "ip": "192.168.1.50", "cidr": "192.168.1.0/24"}));
+        let call = make_call(
+            json!({"operation": "in_range", "ip": "192.168.1.50", "cidr": "192.168.1.0/24"}),
+        );
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -482,7 +488,8 @@ mod tests {
     #[tokio::test]
     async fn test_in_range_false() {
         let skill = IpToolsSkill::new();
-        let call = make_call(json!({"operation": "in_range", "ip": "10.0.0.1", "cidr": "192.168.1.0/24"}));
+        let call =
+            make_call(json!({"operation": "in_range", "ip": "10.0.0.1", "cidr": "192.168.1.0/24"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();

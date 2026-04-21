@@ -54,7 +54,10 @@ impl LlmBackend for MockLlmBackend {
         _system_prompt: Option<&str>,
         _messages: &[Message],
         _tools: &[SkillDescriptor],
-    ) -> ArgentorResult<(mpsc::Receiver<StreamEvent>, JoinHandle<ArgentorResult<LlmResponse>>)> {
+    ) -> ArgentorResult<(
+        mpsc::Receiver<StreamEvent>,
+        JoinHandle<ArgentorResult<LlmResponse>>,
+    )> {
         let (_tx, rx) = mpsc::channel(1);
         let handle = tokio::spawn(async {
             tokio::time::sleep(Duration::from_millis(10)).await;
@@ -71,7 +74,9 @@ impl LlmBackend for MockLlmBackend {
 fn make_runner() -> Arc<AgentRunner> {
     let registry = Arc::new(SkillRegistry::new());
     let permissions = PermissionSet::new();
-    let audit = Arc::new(AuditLog::new(std::env::temp_dir().join("argentor-scal-audit")));
+    let audit = Arc::new(AuditLog::new(
+        std::env::temp_dir().join("argentor-scal-audit"),
+    ));
     Arc::new(AgentRunner::from_backend(
         Box::new(MockLlmBackend),
         registry,
@@ -174,7 +179,10 @@ async fn test_concurrent_cache_hits_no_corruption() {
 
     let stats = cache.stats();
     // Hits must equal N exactly: no lost updates, no double counting.
-    assert_eq!(stats.hits, N as u64, "hit counter lost or duplicated updates");
+    assert_eq!(
+        stats.hits, N as u64,
+        "hit counter lost or duplicated updates"
+    );
     assert_eq!(stats.misses, 0);
     assert_eq!(stats.size, 1);
 }

@@ -253,7 +253,10 @@ mod tests {
     async fn attestation_ok() {
         let p = AmdSevProvider::new();
         let info = p.spawn_enclave(cfg()).await.unwrap();
-        let r = p.get_attestation(&info.enclave_id, "sev-nonce").await.unwrap();
+        let r = p
+            .get_attestation(&info.enclave_id, "sev-nonce")
+            .await
+            .unwrap();
         assert_eq!(r.kind, TeeKind::AmdSev);
         assert_eq!(r.nonce, "sev-nonce");
     }

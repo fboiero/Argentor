@@ -358,7 +358,10 @@ mod tests {
         store.insert(e).await.unwrap();
         let all = store.list(None).await.unwrap();
         let got = all.iter().find(|x| x.id == id).unwrap();
-        assert_eq!(got.metadata.get("tag").unwrap(), &serde_json::json!("important"));
+        assert_eq!(
+            got.metadata.get("tag").unwrap(),
+            &serde_json::json!("important")
+        );
     }
 
     #[tokio::test]

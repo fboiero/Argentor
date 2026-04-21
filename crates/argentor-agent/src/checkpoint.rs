@@ -266,8 +266,7 @@ impl CheckpointManager {
         let messages_added = to_msg_count.saturating_sub(from_msg_count);
         let messages_removed = from_msg_count.saturating_sub(to_msg_count);
 
-        let tool_calls_diff =
-            to.state.tool_call_count as i32 - from.state.tool_call_count as i32;
+        let tool_calls_diff = to.state.tool_call_count as i32 - from.state.tool_call_count as i32;
 
         let token_diff = to.state.total_tokens as i64 - from.state.total_tokens as i64;
 
@@ -276,15 +275,13 @@ impl CheckpointManager {
         if from.state.model_config_snapshot.provider != to.state.model_config_snapshot.provider {
             config_changes.push(format!(
                 "provider: {} -> {}",
-                from.state.model_config_snapshot.provider,
-                to.state.model_config_snapshot.provider
+                from.state.model_config_snapshot.provider, to.state.model_config_snapshot.provider
             ));
         }
         if from.state.model_config_snapshot.model_id != to.state.model_config_snapshot.model_id {
             config_changes.push(format!(
                 "model_id: {} -> {}",
-                from.state.model_config_snapshot.model_id,
-                to.state.model_config_snapshot.model_id
+                from.state.model_config_snapshot.model_id, to.state.model_config_snapshot.model_id
             ));
         }
         if (from.state.model_config_snapshot.temperature
@@ -561,7 +558,10 @@ mod tests {
         mgr.create("cp-2".to_string(), state2, 2);
 
         let diff = mgr.diff("cp-1", "cp-2").unwrap();
-        assert!(diff.config_changes.iter().any(|c| c.contains("temperature")));
+        assert!(diff
+            .config_changes
+            .iter()
+            .any(|c| c.contains("temperature")));
         assert!(diff.config_changes.iter().any(|c| c.contains("model_id")));
     }
 
@@ -724,10 +724,9 @@ mod tests {
     fn test_checkpoint_with_variables() {
         let mut mgr = CheckpointManager::with_defaults();
         let mut state = make_state(1, 0, 100);
-        state.variables.insert(
-            "current_file".to_string(),
-            serde_json::json!("src/main.rs"),
-        );
+        state
+            .variables
+            .insert("current_file".to_string(), serde_json::json!("src/main.rs"));
         state
             .variables
             .insert("iteration".to_string(), serde_json::json!(3));

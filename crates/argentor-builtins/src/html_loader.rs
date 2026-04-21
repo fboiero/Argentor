@@ -137,9 +137,9 @@ fn extract_metadata_internal(html: &str) -> Value {
     }
 
     // Meta keywords
-    if let Ok(re) = Regex::new(
-        r#"(?is)<meta\s[^>]*name=["']keywords["'][^>]*content=["']([^"']+)["'][^>]*/?>"#,
-    ) {
+    if let Ok(re) =
+        Regex::new(r#"(?is)<meta\s[^>]*name=["']keywords["'][^>]*content=["']([^"']+)["'][^>]*/?>"#)
+    {
         if let Some(caps) = re.captures(html) {
             if let Some(m) = caps.get(1) {
                 meta["keywords"] = Value::String(m.as_str().to_string());
@@ -277,7 +277,8 @@ mod tests {
     #[tokio::test]
     async fn test_strip_tags_alias() {
         let skill = HtmlLoaderSkill::new();
-        let call = make_call(json!({"operation": "strip_tags", "html": "<p>Hello <b>World</b></p>"}));
+        let call =
+            make_call(json!({"operation": "strip_tags", "html": "<p>Hello <b>World</b></p>"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();

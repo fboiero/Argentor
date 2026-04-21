@@ -190,10 +190,7 @@ impl TraceVisualizer {
         let end_time = trace.ended_at.unwrap_or_else(Utc::now);
         let total_duration_ms = trace.total_duration_ms.unwrap_or(0);
         let total_tokens = (trace.total_tokens.input + trace.total_tokens.output) as usize;
-        let total_cost_usd = compute_cost(
-            trace.total_tokens.input,
-            trace.total_tokens.output,
-        );
+        let total_cost_usd = compute_cost(trace.total_tokens.input, trace.total_tokens.output);
 
         let agent_name = trace
             .metadata
@@ -430,7 +427,10 @@ impl TraceVisualizer {
     fn build_summary(&self, steps: &[VisualStep], total_duration_ms: u64) -> TraceSummaryViz {
         let all_steps = flatten_steps(steps);
 
-        let total_llm_calls = all_steps.iter().filter(|s| s.step_type == "llm_call").count();
+        let total_llm_calls = all_steps
+            .iter()
+            .filter(|s| s.step_type == "llm_call")
+            .count();
         let total_tool_calls = all_steps
             .iter()
             .filter(|s| s.step_type == "tool_call")
@@ -460,7 +460,11 @@ impl TraceVisualizer {
 
         let most_expensive_step = all_steps
             .iter()
-            .max_by(|a, b| a.cost_usd.partial_cmp(&b.cost_usd).unwrap_or(std::cmp::Ordering::Equal))
+            .max_by(|a, b| {
+                a.cost_usd
+                    .partial_cmp(&b.cost_usd)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
             .map(|s| s.label.clone())
             .unwrap_or_default();
 
@@ -775,7 +779,9 @@ mod tests {
         let visual = viz.visualize(&trace);
 
         let all = flatten_steps(&visual.steps);
-        let error_step = all.iter().find(|s| matches!(s.status, StepStatus::Error { .. }));
+        let error_step = all
+            .iter()
+            .find(|s| matches!(s.status, StepStatus::Error { .. }));
         assert!(error_step.is_some());
     }
 
@@ -787,9 +793,7 @@ mod tests {
         let visual = viz.visualize(&trace);
 
         let all = flatten_steps(&visual.steps);
-        let cached_step = all
-            .iter()
-            .find(|s| s.status == StepStatus::Cached);
+        let cached_step = all.iter().find(|s| s.status == StepStatus::Cached);
         assert!(cached_step.is_some());
     }
 
@@ -1000,7 +1004,10 @@ mod tests {
         let visual = viz.visualize(&trace);
 
         let gantt = TraceVisualizer::to_mermaid_gantt(&visual);
-        assert!(gantt.contains("crit,"), "Error steps should have crit marker");
+        assert!(
+            gantt.contains("crit,"),
+            "Error steps should have crit marker"
+        );
     }
 
     // 30. Flame graph with nested steps uses semicolon separator

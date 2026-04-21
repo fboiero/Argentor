@@ -104,9 +104,7 @@ fn parse_field(field: &str, min: u32, max: u32) -> Result<CronField, String> {
             }
             values.extend(start..=end);
         } else {
-            let v: u32 = part
-                .parse()
-                .map_err(|_| format!("Invalid value: {part}"))?;
+            let v: u32 = part.parse().map_err(|_| format!("Invalid value: {part}"))?;
             if v < min || v > max {
                 return Err(format!("Value {v} out of bounds ({min}-{max})"));
             }

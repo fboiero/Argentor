@@ -20,7 +20,8 @@ impl YamlProcessorSkill {
         Self {
             descriptor: SkillDescriptor {
                 name: "yaml_processor".to_string(),
-                description: "YAML parse/stringify, validate, merge, and YAML/JSON conversion.".to_string(),
+                description: "YAML parse/stringify, validate, merge, and YAML/JSON conversion."
+                    .to_string(),
                 parameters_schema: json!({
                     "type": "object",
                     "properties": {
@@ -342,7 +343,8 @@ mod tests {
     #[tokio::test]
     async fn test_parse_simple() {
         let skill = YamlProcessorSkill::new();
-        let call = make_call(json!({"operation": "parse", "yaml": "name: Alice\nage: 30\nactive: true"}));
+        let call =
+            make_call(json!({"operation": "parse", "yaml": "name: Alice\nage: 30\nactive: true"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error, "Result: {}", result.content);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -390,7 +392,9 @@ mod tests {
     #[tokio::test]
     async fn test_validate_invalid() {
         let skill = YamlProcessorSkill::new();
-        let call = make_call(json!({"operation": "validate", "yaml": "this is not valid yaml at all :::"}));
+        let call = make_call(
+            json!({"operation": "validate", "yaml": "this is not valid yaml at all :::"}),
+        );
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -453,7 +457,9 @@ mod tests {
     #[tokio::test]
     async fn test_get_value() {
         let skill = YamlProcessorSkill::new();
-        let call = make_call(json!({"operation": "get_value", "yaml": "name: Bob\nage: 25", "key": "name"}));
+        let call = make_call(
+            json!({"operation": "get_value", "yaml": "name: Bob\nage: 25", "key": "name"}),
+        );
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -463,7 +469,8 @@ mod tests {
     #[tokio::test]
     async fn test_get_value_not_found() {
         let skill = YamlProcessorSkill::new();
-        let call = make_call(json!({"operation": "get_value", "yaml": "name: Bob", "key": "email"}));
+        let call =
+            make_call(json!({"operation": "get_value", "yaml": "name: Bob", "key": "email"}));
         let result = skill.execute(call).await.unwrap();
         assert!(result.is_error);
         assert!(result.content.contains("not found"));
@@ -483,7 +490,8 @@ mod tests {
     #[tokio::test]
     async fn test_boolean_values() {
         let skill = YamlProcessorSkill::new();
-        let call = make_call(json!({"operation": "parse", "yaml": "a: true\nb: false\nc: yes\nd: no"}));
+        let call =
+            make_call(json!({"operation": "parse", "yaml": "a: true\nb: false\nc: yes\nd: no"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -496,7 +504,8 @@ mod tests {
     #[tokio::test]
     async fn test_comments_ignored() {
         let skill = YamlProcessorSkill::new();
-        let call = make_call(json!({"operation": "parse", "yaml": "# comment\nkey: value\n# another"}));
+        let call =
+            make_call(json!({"operation": "parse", "yaml": "# comment\nkey: value\n# another"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();

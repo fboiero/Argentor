@@ -36,6 +36,7 @@ fn dead_model_config() -> ModelConfig {
         temperature: 0.0,
         max_tokens: 32,
         max_turns: 1,
+        max_context_tokens: 200_000,
         fallback_models: vec![],
         retry_policy: None,
     }
@@ -117,8 +118,8 @@ async fn test_100_concurrent_chat_requests() {
     for i in 0..N {
         let app = app.clone();
         handles.push(tokio::spawn(async move {
-            let body =
-                serde_json::json!({"message": format!("hello {i}"), "session_id": null}).to_string();
+            let body = serde_json::json!({"message": format!("hello {i}"), "session_id": null})
+                .to_string();
             let req = Request::builder()
                 .method("POST")
                 .uri("/api/v1/agent/chat")
@@ -245,7 +246,10 @@ async fn test_openapi_json_under_load() {
             let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
                 .await
                 .unwrap();
-            (status, serde_json::from_slice::<serde_json::Value>(&body).is_ok())
+            (
+                status,
+                serde_json::from_slice::<serde_json::Value>(&body).is_ok(),
+            )
         }));
     }
 
@@ -256,7 +260,10 @@ async fn test_openapi_json_under_load() {
             all_ok = false;
         }
     }
-    assert!(all_ok, "every /openapi.json response must be 200 + valid JSON");
+    assert!(
+        all_ok,
+        "every /openapi.json response must be 200 + valid JSON"
+    );
 }
 
 /// Graceful shutdown: register a hook that records it ran, then shut down

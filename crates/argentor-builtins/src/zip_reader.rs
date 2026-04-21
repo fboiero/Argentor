@@ -78,12 +78,9 @@ pub fn read_central_directory(bytes: &[u8]) -> Result<HashMap<String, ZipEntry>,
             bytes[cursor + 26],
             bytes[cursor + 27],
         ]);
-        let name_len =
-            u16::from_le_bytes([bytes[cursor + 28], bytes[cursor + 29]]) as usize;
-        let extra_len =
-            u16::from_le_bytes([bytes[cursor + 30], bytes[cursor + 31]]) as usize;
-        let comment_len =
-            u16::from_le_bytes([bytes[cursor + 32], bytes[cursor + 33]]) as usize;
+        let name_len = u16::from_le_bytes([bytes[cursor + 28], bytes[cursor + 29]]) as usize;
+        let extra_len = u16::from_le_bytes([bytes[cursor + 30], bytes[cursor + 31]]) as usize;
+        let comment_len = u16::from_le_bytes([bytes[cursor + 32], bytes[cursor + 33]]) as usize;
         let local_header_offset = u32::from_le_bytes([
             bytes[cursor + 42],
             bytes[cursor + 43],
@@ -221,7 +218,9 @@ fn find_last_signature(bytes: &[u8], sig: &[u8; 4]) -> Option<usize> {
     if bytes.len() < 4 {
         return None;
     }
-    (0..=bytes.len() - 4).rev().find(|&i| &bytes[i..i + 4] == sig)
+    (0..=bytes.len() - 4)
+        .rev()
+        .find(|&i| &bytes[i..i + 4] == sig)
 }
 
 // ---------------------------------------------------------------------------

@@ -160,64 +160,134 @@ pub struct ProcessRewardResult {
 
 /// Keywords indicating strong reasoning.
 const REASONING_POSITIVE: &[&str] = &[
-    "because", "therefore", "analysis", "consider", "evaluate", "compare",
-    "conclude", "evidence", "hypothesis", "deduce", "infer", "reason",
-    "logic", "think", "assess", "weigh",
+    "because",
+    "therefore",
+    "analysis",
+    "consider",
+    "evaluate",
+    "compare",
+    "conclude",
+    "evidence",
+    "hypothesis",
+    "deduce",
+    "infer",
+    "reason",
+    "logic",
+    "think",
+    "assess",
+    "weigh",
 ];
 
 /// Keywords indicating weak or absent reasoning.
 const REASONING_NEGATIVE: &[&str] = &[
-    "guess", "maybe", "random", "idk", "whatever", "just try",
-    "not sure", "no idea",
+    "guess", "maybe", "random", "idk", "whatever", "just try", "not sure", "no idea",
 ];
 
 /// Keywords indicating good tool selection.
 const TOOL_SELECTION_POSITIVE: &[&str] = &[
-    "appropriate", "best fit", "selected", "chose", "optimal",
-    "right tool", "suitable", "relevant",
+    "appropriate",
+    "best fit",
+    "selected",
+    "chose",
+    "optimal",
+    "right tool",
+    "suitable",
+    "relevant",
 ];
 
 /// Keywords indicating poor tool selection.
 const TOOL_SELECTION_NEGATIVE: &[&str] = &[
-    "wrong tool", "incorrect", "mismatched", "inappropriate",
-    "should have used", "bad choice",
+    "wrong tool",
+    "incorrect",
+    "mismatched",
+    "inappropriate",
+    "should have used",
+    "bad choice",
 ];
 
 /// Keywords indicating information gain.
 const INFO_GAIN_POSITIVE: &[&str] = &[
-    "found", "discovered", "learned", "revealed", "new information",
-    "insight", "result", "data", "output", "response",
+    "found",
+    "discovered",
+    "learned",
+    "revealed",
+    "new information",
+    "insight",
+    "result",
+    "data",
+    "output",
+    "response",
 ];
 
 /// Keywords indicating redundancy.
 const REDUNDANCY_KEYWORDS: &[&str] = &[
-    "again", "repeat", "already", "same", "duplicate", "redo",
-    "re-run", "retry same",
+    "again",
+    "repeat",
+    "already",
+    "same",
+    "duplicate",
+    "redo",
+    "re-run",
+    "retry same",
 ];
 
 /// Keywords indicating safety concerns.
 const SAFETY_NEGATIVE: &[&str] = &[
-    "delete", "drop", "destroy", "rm -rf", "format", "wipe",
-    "sudo", "root", "admin", "password", "secret", "credential",
-    "force", "override", "bypass", "hack", "exploit",
+    "delete",
+    "drop",
+    "destroy",
+    "rm -rf",
+    "format",
+    "wipe",
+    "sudo",
+    "root",
+    "admin",
+    "password",
+    "secret",
+    "credential",
+    "force",
+    "override",
+    "bypass",
+    "hack",
+    "exploit",
 ];
 
 /// Keywords indicating safe practices.
 const SAFETY_POSITIVE: &[&str] = &[
-    "validate", "check", "verify", "sandbox", "safe", "backup",
-    "confirm", "permission", "authorize", "audit", "log",
+    "validate",
+    "check",
+    "verify",
+    "sandbox",
+    "safe",
+    "backup",
+    "confirm",
+    "permission",
+    "authorize",
+    "audit",
+    "log",
 ];
 
 /// Keywords indicating efficiency.
 const EFFICIENCY_POSITIVE: &[&str] = &[
-    "direct", "efficient", "optimal", "fast", "minimal", "concise",
+    "direct",
+    "efficient",
+    "optimal",
+    "fast",
+    "minimal",
+    "concise",
     "streamlined",
 ];
 
 /// Keywords indicating inefficiency.
 const EFFICIENCY_NEGATIVE: &[&str] = &[
-    "workaround", "roundabout", "lengthy", "verbose", "unnecessary",
-    "brute force", "slow", "wasteful",
+    "workaround",
+    "roundabout",
+    "lengthy",
+    "verbose",
+    "unnecessary",
+    "brute force",
+    "slow",
+    "wasteful",
 ];
 
 // ---------------------------------------------------------------------------
@@ -246,10 +316,7 @@ impl ProcessRewardModel {
     /// Each step is a `(description, category)` pair. The model scores every
     /// step using heuristic keyword analysis and step-sequence patterns, then
     /// aggregates the scores according to the configured method.
-    pub fn score_trajectory(
-        &self,
-        steps: &[(String, StepCategory)],
-    ) -> ProcessRewardResult {
+    pub fn score_trajectory(&self, steps: &[(String, StepCategory)]) -> ProcessRewardResult {
         if steps.is_empty() {
             return ProcessRewardResult {
                 steps: vec![],
@@ -470,8 +537,7 @@ impl ProcessRewardModel {
         // High word overlap (Jaccard similarity > 0.8).
         let current_words: std::collections::HashSet<&str> =
             current_lower.split_whitespace().collect();
-        let prev_words: std::collections::HashSet<&str> =
-            prev_lower.split_whitespace().collect();
+        let prev_words: std::collections::HashSet<&str> = prev_lower.split_whitespace().collect();
 
         if current_words.is_empty() || prev_words.is_empty() {
             return false;
@@ -538,10 +604,7 @@ impl ProcessRewardModel {
                 }
             }
 
-            AggregateMethod::Min => steps
-                .iter()
-                .map(|s| s.score)
-                .fold(f32::INFINITY, f32::min),
+            AggregateMethod::Min => steps.iter().map(|s| s.score).fold(f32::INFINITY, f32::min),
 
             AggregateMethod::Product => {
                 let product: f32 = steps.iter().map(|s| s.score).product();
@@ -551,15 +614,9 @@ impl ProcessRewardModel {
     }
 
     /// Classify the overall trajectory quality from the aggregate score and flags.
-    fn classify_trajectory(
-        &self,
-        aggregate: f32,
-        steps: &[StepReward],
-    ) -> TrajectoryQuality {
+    fn classify_trajectory(&self, aggregate: f32, steps: &[StepReward]) -> TrajectoryQuality {
         // If any step is flagged as Risky, the trajectory is Harmful.
-        let has_risky = steps
-            .iter()
-            .any(|s| s.flags.contains(&RewardFlag::Risky));
+        let has_risky = steps.iter().any(|s| s.flags.contains(&RewardFlag::Risky));
         if has_risky {
             return TrajectoryQuality::Harmful;
         }
@@ -576,11 +633,7 @@ impl ProcessRewardModel {
     }
 
     /// Generate improvement recommendations based on scored steps.
-    fn generate_recommendations(
-        &self,
-        steps: &[StepReward],
-        flagged: &[usize],
-    ) -> Vec<String> {
+    fn generate_recommendations(&self, steps: &[StepReward], flagged: &[usize]) -> Vec<String> {
         let mut recs = Vec::new();
 
         if flagged.is_empty() && steps.iter().all(|s| s.score > 0.7) {
@@ -710,7 +763,10 @@ mod tests {
         )]);
         let result = model.score_trajectory(&steps);
         assert_eq!(result.steps.len(), 1);
-        assert!(result.steps[0].score > 0.5, "Positive reasoning should score > 0.5");
+        assert!(
+            result.steps[0].score > 0.5,
+            "Positive reasoning should score > 0.5"
+        );
     }
 
     #[test]
@@ -721,7 +777,10 @@ mod tests {
             StepCategory::Reasoning,
         )]);
         let result = model.score_trajectory(&steps);
-        assert!(result.steps[0].score < 0.6, "Negative reasoning should score lower");
+        assert!(
+            result.steps[0].score < 0.6,
+            "Negative reasoning should score lower"
+        );
     }
 
     #[test]
@@ -837,7 +896,10 @@ mod tests {
     fn test_similar_steps_detected_redundant() {
         let model = default_model();
         let steps = make_steps(&[
-            ("Read the file contents from the disk path", StepCategory::ToolUsage),
+            (
+                "Read the file contents from the disk path",
+                StepCategory::ToolUsage,
+            ),
             ("Read file contents from disk path", StepCategory::ToolUsage),
         ]);
         let result = model.score_trajectory(&steps);
@@ -854,7 +916,10 @@ mod tests {
         };
         let model = ProcessRewardModel::new(config);
         let steps = make_steps(&[
-            ("Good reasoning because analysis shows clear evidence.", StepCategory::Reasoning),
+            (
+                "Good reasoning because analysis shows clear evidence.",
+                StepCategory::Reasoning,
+            ),
             ("Neutral step with no keywords.", StepCategory::Coherence),
         ]);
         let result = model.score_trajectory(&steps);
@@ -871,12 +936,22 @@ mod tests {
         };
         let model = ProcessRewardModel::new(config);
         let steps = make_steps(&[
-            ("Excellent analysis because of thorough evidence and logic.", StepCategory::Reasoning),
-            ("I guess maybe random attempt not sure.", StepCategory::Reasoning),
+            (
+                "Excellent analysis because of thorough evidence and logic.",
+                StepCategory::Reasoning,
+            ),
+            (
+                "I guess maybe random attempt not sure.",
+                StepCategory::Reasoning,
+            ),
         ]);
         let result = model.score_trajectory(&steps);
         // Min should be the lower of the two.
-        let min_score = result.steps.iter().map(|s| s.score).fold(f32::INFINITY, f32::min);
+        let min_score = result
+            .steps
+            .iter()
+            .map(|s| s.score)
+            .fold(f32::INFINITY, f32::min);
         assert!((result.aggregate_score - min_score).abs() < f32::EPSILON);
     }
 
@@ -889,7 +964,10 @@ mod tests {
         let model = ProcessRewardModel::new(config);
         let steps = make_steps(&[
             ("Good reasoning because evidence.", StepCategory::Reasoning),
-            ("Found new data in the result output.", StepCategory::InformationGain),
+            (
+                "Found new data in the result output.",
+                StepCategory::InformationGain,
+            ),
         ]);
         let result = model.score_trajectory(&steps);
         let expected_product: f32 = result.steps.iter().map(|s| s.score).product();
@@ -917,8 +995,14 @@ mod tests {
         };
         let model = ProcessRewardModel::new(config);
         let steps = make_steps(&[
-            ("guess randomly maybe idk whatever just try not sure.", StepCategory::Reasoning),
-            ("guess randomly maybe idk whatever just try.", StepCategory::Reasoning),
+            (
+                "guess randomly maybe idk whatever just try not sure.",
+                StepCategory::Reasoning,
+            ),
+            (
+                "guess randomly maybe idk whatever just try.",
+                StepCategory::Reasoning,
+            ),
         ]);
         let result = model.score_trajectory(&steps);
         assert!(
@@ -937,10 +1021,7 @@ mod tests {
             StepCategory::Safety,
         )]);
         let result = model.score_trajectory(&steps);
-        let has_safety_rec = result
-            .recommendations
-            .iter()
-            .any(|r| r.contains("safety"));
+        let has_safety_rec = result.recommendations.iter().any(|r| r.contains("safety"));
         assert!(has_safety_rec);
     }
 
@@ -948,8 +1029,14 @@ mod tests {
     fn test_recommendations_for_redundant_steps() {
         let model = default_model();
         let steps = make_steps(&[
-            ("Repeat the same query again with duplicate data already retrieved.", StepCategory::InformationGain),
-            ("Repeat the same query again with duplicate data already retrieved.", StepCategory::InformationGain),
+            (
+                "Repeat the same query again with duplicate data already retrieved.",
+                StepCategory::InformationGain,
+            ),
+            (
+                "Repeat the same query again with duplicate data already retrieved.",
+                StepCategory::InformationGain,
+            ),
         ]);
         let result = model.score_trajectory(&steps);
         let has_redundancy_rec = result
@@ -980,14 +1067,16 @@ mod tests {
     #[test]
     fn test_natural_transition_no_penalty() {
         let model = default_model();
-        let penalty = model.coherence_penalty(&StepCategory::Reasoning, &StepCategory::ToolSelection);
+        let penalty =
+            model.coherence_penalty(&StepCategory::Reasoning, &StepCategory::ToolSelection);
         assert!((penalty - 0.0).abs() < f32::EPSILON);
     }
 
     #[test]
     fn test_backward_transition_penalty() {
         let model = default_model();
-        let penalty = model.coherence_penalty(&StepCategory::ToolSelection, &StepCategory::Reasoning);
+        let penalty =
+            model.coherence_penalty(&StepCategory::ToolSelection, &StepCategory::Reasoning);
         assert!(penalty > 0.0);
     }
 
@@ -1001,8 +1090,14 @@ mod tests {
         };
         let model = ProcessRewardModel::new(config);
         let steps = make_steps(&[
-            ("guess maybe idk not sure random whatever just try.", StepCategory::Reasoning),
-            ("Good analysis because evidence clearly shows the conclusion therefore we deduce.", StepCategory::Reasoning),
+            (
+                "guess maybe idk not sure random whatever just try.",
+                StepCategory::Reasoning,
+            ),
+            (
+                "Good analysis because evidence clearly shows the conclusion therefore we deduce.",
+                StepCategory::Reasoning,
+            ),
         ]);
         let result = model.score_trajectory(&steps);
         // The negative step should be flagged.
@@ -1073,9 +1168,6 @@ mod tests {
     #[test]
     fn test_is_redundant_different() {
         let model = default_model();
-        assert!(!model.is_redundant(
-            "read the configuration file",
-            "execute the shell command"
-        ));
+        assert!(!model.is_redundant("read the configuration file", "execute the shell command"));
     }
 }

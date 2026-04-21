@@ -456,7 +456,10 @@ impl ThinkingEngine {
         for step in steps {
             match step.step_type {
                 ThinkingStepType::Analyze => {
-                    plan_parts.push(format!("Understanding: {}", summarize_content(&step.content)));
+                    plan_parts.push(format!(
+                        "Understanding: {}",
+                        summarize_content(&step.content)
+                    ));
                 }
                 ThinkingStepType::Decompose => {
                     plan_parts.push(format!("Breakdown: {}", summarize_content(&step.content)));
@@ -620,28 +623,44 @@ fn match_tool_to_context(message_lower: &str, tool_name: &str) -> bool {
     let tool_lower = tool_name.to_lowercase();
 
     // File-related tasks
-    if (message_lower.contains("file") || message_lower.contains("read") || message_lower.contains("write"))
-        && (tool_lower.contains("file") || tool_lower.contains("read") || tool_lower.contains("write"))
+    if (message_lower.contains("file")
+        || message_lower.contains("read")
+        || message_lower.contains("write"))
+        && (tool_lower.contains("file")
+            || tool_lower.contains("read")
+            || tool_lower.contains("write"))
     {
         return true;
     }
 
     // Web/HTTP tasks
-    if (message_lower.contains("http") || message_lower.contains("fetch") || message_lower.contains("web") || message_lower.contains("url"))
-        && (tool_lower.contains("http") || tool_lower.contains("fetch") || tool_lower.contains("web") || tool_lower.contains("browser"))
+    if (message_lower.contains("http")
+        || message_lower.contains("fetch")
+        || message_lower.contains("web")
+        || message_lower.contains("url"))
+        && (tool_lower.contains("http")
+            || tool_lower.contains("fetch")
+            || tool_lower.contains("web")
+            || tool_lower.contains("browser"))
     {
         return true;
     }
 
     // Memory/search tasks
-    if (message_lower.contains("remember") || message_lower.contains("recall") || message_lower.contains("search") || message_lower.contains("memory"))
+    if (message_lower.contains("remember")
+        || message_lower.contains("recall")
+        || message_lower.contains("search")
+        || message_lower.contains("memory"))
         && (tool_lower.contains("memory") || tool_lower.contains("search"))
     {
         return true;
     }
 
     // Shell/command tasks
-    if (message_lower.contains("run") || message_lower.contains("execute") || message_lower.contains("command") || message_lower.contains("shell"))
+    if (message_lower.contains("run")
+        || message_lower.contains("execute")
+        || message_lower.contains("command")
+        || message_lower.contains("shell"))
         && (tool_lower.contains("shell") || tool_lower.contains("exec"))
     {
         return true;
@@ -712,7 +731,14 @@ fn extract_recommended_tools(steps: &[ThinkingStep], available_tools: &[&str]) -
 fn summarize_content(content: &str) -> String {
     content
         .lines()
-        .find(|l| !l.trim().is_empty() && !l.starts_with("Decomposition:") && !l.starts_with("Analysis") && !l.starts_with("Tool planning:") && !l.starts_with("Approach evaluation:") && !l.starts_with("Synthesized plan:"))
+        .find(|l| {
+            !l.trim().is_empty()
+                && !l.starts_with("Decomposition:")
+                && !l.starts_with("Analysis")
+                && !l.starts_with("Tool planning:")
+                && !l.starts_with("Approach evaluation:")
+                && !l.starts_with("Synthesized plan:")
+        })
         .unwrap_or(content.lines().next().unwrap_or(""))
         .trim()
         .to_string()
@@ -814,7 +840,9 @@ mod tests {
             depth: ThinkingDepth::Quick,
             ..ThinkingConfig::default()
         });
-        let result = engine.think("Read the config file", &default_tools()).unwrap();
+        let result = engine
+            .think("Read the config file", &default_tools())
+            .unwrap();
         assert_eq!(result.thinking_steps.len(), 1);
         assert_eq!(
             result.thinking_steps[0].step_type,
@@ -828,7 +856,9 @@ mod tests {
             depth: ThinkingDepth::Standard,
             ..ThinkingConfig::default()
         });
-        let result = engine.think("Read the config file", &default_tools()).unwrap();
+        let result = engine
+            .think("Read the config file", &default_tools())
+            .unwrap();
         assert_eq!(result.thinking_steps.len(), 2);
         assert_eq!(
             result.thinking_steps[0].step_type,
@@ -847,7 +877,10 @@ mod tests {
             ..ThinkingConfig::default()
         });
         let result = engine
-            .think("Read the config file and update the settings", &default_tools())
+            .think(
+                "Read the config file and update the settings",
+                &default_tools(),
+            )
             .unwrap();
         assert_eq!(result.thinking_steps.len(), 3);
         assert_eq!(
@@ -871,7 +904,10 @@ mod tests {
             ..ThinkingConfig::default()
         });
         let result = engine
-            .think("Read the config file and update the settings", &default_tools())
+            .think(
+                "Read the config file and update the settings",
+                &default_tools(),
+            )
             .unwrap();
         assert_eq!(result.thinking_steps.len(), 5);
         assert_eq!(
@@ -946,7 +982,9 @@ mod tests {
     #[test]
     fn test_confidence_within_range() {
         let engine = ThinkingEngine::with_defaults();
-        let result = engine.think("Hello, how are you?", &default_tools()).unwrap();
+        let result = engine
+            .think("Hello, how are you?", &default_tools())
+            .unwrap();
         assert!(result.confidence >= 0.0 && result.confidence <= 1.0);
     }
 
@@ -1014,7 +1052,9 @@ mod tests {
     #[test]
     fn test_total_thinking_tokens_positive() {
         let engine = ThinkingEngine::with_defaults();
-        let result = engine.think("Read a file for me please", &default_tools()).unwrap();
+        let result = engine
+            .think("Read a file for me please", &default_tools())
+            .unwrap();
         assert!(
             result.total_thinking_tokens > 0,
             "Total thinking tokens should be positive"
@@ -1024,7 +1064,9 @@ mod tests {
     #[test]
     fn test_step_tokens_populated() {
         let engine = ThinkingEngine::with_defaults();
-        let result = engine.think("Read a file for me please", &default_tools()).unwrap();
+        let result = engine
+            .think("Read a file for me please", &default_tools())
+            .unwrap();
         for step in &result.thinking_steps {
             assert!(
                 step.tokens_used > 0,
@@ -1104,7 +1146,10 @@ mod tests {
 
     #[test]
     fn test_classify_intent_procedural() {
-        assert_eq!(classify_intent("How to build a web server"), "procedural question");
+        assert_eq!(
+            classify_intent("How to build a web server"),
+            "procedural question"
+        );
     }
 
     #[test]
@@ -1164,13 +1209,22 @@ mod tests {
     #[test]
     fn test_match_tool_to_context_file() {
         assert!(match_tool_to_context("read the file contents", "file_read"));
-        assert!(!match_tool_to_context("read the file contents", "http_fetch"));
+        assert!(!match_tool_to_context(
+            "read the file contents",
+            "http_fetch"
+        ));
     }
 
     #[test]
     fn test_match_tool_to_context_web() {
-        assert!(match_tool_to_context("fetch data from the url", "http_fetch"));
-        assert!(!match_tool_to_context("fetch data from the url", "shell_exec"));
+        assert!(match_tool_to_context(
+            "fetch data from the url",
+            "http_fetch"
+        ));
+        assert!(!match_tool_to_context(
+            "fetch data from the url",
+            "shell_exec"
+        ));
     }
 
     #[test]
@@ -1180,7 +1234,10 @@ mod tests {
 
     #[test]
     fn test_match_tool_to_context_memory() {
-        assert!(match_tool_to_context("search my memory for context", "memory_search"));
+        assert!(match_tool_to_context(
+            "search my memory for context",
+            "memory_search"
+        ));
     }
 
     #[test]

@@ -24,7 +24,9 @@ impl MetricsCollectorSkill {
         Self {
             descriptor: SkillDescriptor {
                 name: "metrics_collector".to_string(),
-                description: "In-memory counter/gauge/histogram collection, format as Prometheus/JSON.".to_string(),
+                description:
+                    "In-memory counter/gauge/histogram collection, format as Prometheus/JSON."
+                        .to_string(),
                 parameters_schema: json!({
                     "type": "object",
                     "properties": {
@@ -316,9 +318,24 @@ mod tests {
     #[tokio::test]
     async fn test_counter_inc_multiple() {
         let skill = MetricsCollectorSkill::new();
-        skill.execute(make_call(json!({"operation": "counter_inc", "name": "hits"}))).await.unwrap();
-        skill.execute(make_call(json!({"operation": "counter_inc", "name": "hits"}))).await.unwrap();
-        let result = skill.execute(make_call(json!({"operation": "counter_inc", "name": "hits"}))).await.unwrap();
+        skill
+            .execute(make_call(
+                json!({"operation": "counter_inc", "name": "hits"}),
+            ))
+            .await
+            .unwrap();
+        skill
+            .execute(make_call(
+                json!({"operation": "counter_inc", "name": "hits"}),
+            ))
+            .await
+            .unwrap();
+        let result = skill
+            .execute(make_call(
+                json!({"operation": "counter_inc", "name": "hits"}),
+            ))
+            .await
+            .unwrap();
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         assert_eq!(parsed["value"], 3.0);
     }
@@ -326,7 +343,12 @@ mod tests {
     #[tokio::test]
     async fn test_counter_inc_custom_value() {
         let skill = MetricsCollectorSkill::new();
-        let result = skill.execute(make_call(json!({"operation": "counter_inc", "name": "bytes", "value": 1024}))).await.unwrap();
+        let result = skill
+            .execute(make_call(
+                json!({"operation": "counter_inc", "name": "bytes", "value": 1024}),
+            ))
+            .await
+            .unwrap();
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         assert_eq!(parsed["value"], 1024.0);
     }
@@ -334,8 +356,16 @@ mod tests {
     #[tokio::test]
     async fn test_counter_get() {
         let skill = MetricsCollectorSkill::new();
-        skill.execute(make_call(json!({"operation": "counter_inc", "name": "x", "value": 5}))).await.unwrap();
-        let result = skill.execute(make_call(json!({"operation": "counter_get", "name": "x"}))).await.unwrap();
+        skill
+            .execute(make_call(
+                json!({"operation": "counter_inc", "name": "x", "value": 5}),
+            ))
+            .await
+            .unwrap();
+        let result = skill
+            .execute(make_call(json!({"operation": "counter_get", "name": "x"})))
+            .await
+            .unwrap();
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         assert_eq!(parsed["value"], 5.0);
     }
@@ -343,7 +373,12 @@ mod tests {
     #[tokio::test]
     async fn test_counter_get_nonexistent() {
         let skill = MetricsCollectorSkill::new();
-        let result = skill.execute(make_call(json!({"operation": "counter_get", "name": "nope"}))).await.unwrap();
+        let result = skill
+            .execute(make_call(
+                json!({"operation": "counter_get", "name": "nope"}),
+            ))
+            .await
+            .unwrap();
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         assert_eq!(parsed["value"], 0.0);
     }
@@ -351,8 +386,16 @@ mod tests {
     #[tokio::test]
     async fn test_gauge_set_and_get() {
         let skill = MetricsCollectorSkill::new();
-        skill.execute(make_call(json!({"operation": "gauge_set", "name": "temp", "value": 42.5}))).await.unwrap();
-        let result = skill.execute(make_call(json!({"operation": "gauge_get", "name": "temp"}))).await.unwrap();
+        skill
+            .execute(make_call(
+                json!({"operation": "gauge_set", "name": "temp", "value": 42.5}),
+            ))
+            .await
+            .unwrap();
+        let result = skill
+            .execute(make_call(json!({"operation": "gauge_get", "name": "temp"})))
+            .await
+            .unwrap();
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         assert_eq!(parsed["value"], 42.5);
     }
@@ -360,9 +403,24 @@ mod tests {
     #[tokio::test]
     async fn test_gauge_inc_dec() {
         let skill = MetricsCollectorSkill::new();
-        skill.execute(make_call(json!({"operation": "gauge_set", "name": "conn", "value": 10}))).await.unwrap();
-        skill.execute(make_call(json!({"operation": "gauge_inc", "name": "conn", "value": 5}))).await.unwrap();
-        let result = skill.execute(make_call(json!({"operation": "gauge_dec", "name": "conn", "value": 3}))).await.unwrap();
+        skill
+            .execute(make_call(
+                json!({"operation": "gauge_set", "name": "conn", "value": 10}),
+            ))
+            .await
+            .unwrap();
+        skill
+            .execute(make_call(
+                json!({"operation": "gauge_inc", "name": "conn", "value": 5}),
+            ))
+            .await
+            .unwrap();
+        let result = skill
+            .execute(make_call(
+                json!({"operation": "gauge_dec", "name": "conn", "value": 3}),
+            ))
+            .await
+            .unwrap();
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         assert_eq!(parsed["value"], 12.0);
     }
@@ -371,9 +429,19 @@ mod tests {
     async fn test_histogram_observe_and_get() {
         let skill = MetricsCollectorSkill::new();
         for v in &[0.1, 0.2, 0.3, 0.15, 0.5] {
-            skill.execute(make_call(json!({"operation": "histogram_observe", "name": "latency", "value": v}))).await.unwrap();
+            skill
+                .execute(make_call(
+                    json!({"operation": "histogram_observe", "name": "latency", "value": v}),
+                ))
+                .await
+                .unwrap();
         }
-        let result = skill.execute(make_call(json!({"operation": "histogram_get", "name": "latency"}))).await.unwrap();
+        let result = skill
+            .execute(make_call(
+                json!({"operation": "histogram_get", "name": "latency"}),
+            ))
+            .await
+            .unwrap();
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         assert_eq!(parsed["stats"]["count"], 5);
         assert_eq!(parsed["stats"]["min"], 0.1);
@@ -383,9 +451,22 @@ mod tests {
     #[tokio::test]
     async fn test_export_json() {
         let skill = MetricsCollectorSkill::new();
-        skill.execute(make_call(json!({"operation": "counter_inc", "name": "reqs"}))).await.unwrap();
-        skill.execute(make_call(json!({"operation": "gauge_set", "name": "mem", "value": 256}))).await.unwrap();
-        let result = skill.execute(make_call(json!({"operation": "export_json"}))).await.unwrap();
+        skill
+            .execute(make_call(
+                json!({"operation": "counter_inc", "name": "reqs"}),
+            ))
+            .await
+            .unwrap();
+        skill
+            .execute(make_call(
+                json!({"operation": "gauge_set", "name": "mem", "value": 256}),
+            ))
+            .await
+            .unwrap();
+        let result = skill
+            .execute(make_call(json!({"operation": "export_json"})))
+            .await
+            .unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         assert_eq!(parsed["total_metrics"], 2);
@@ -394,8 +475,16 @@ mod tests {
     #[tokio::test]
     async fn test_export_prometheus() {
         let skill = MetricsCollectorSkill::new();
-        skill.execute(make_call(json!({"operation": "counter_inc", "name": "http_requests_total", "value": 100}))).await.unwrap();
-        let result = skill.execute(make_call(json!({"operation": "export_prometheus"}))).await.unwrap();
+        skill
+            .execute(make_call(
+                json!({"operation": "counter_inc", "name": "http_requests_total", "value": 100}),
+            ))
+            .await
+            .unwrap();
+        let result = skill
+            .execute(make_call(json!({"operation": "export_prometheus"})))
+            .await
+            .unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         let prom = parsed["prometheus"].as_str().unwrap();
@@ -406,9 +495,18 @@ mod tests {
     #[tokio::test]
     async fn test_reset() {
         let skill = MetricsCollectorSkill::new();
-        skill.execute(make_call(json!({"operation": "counter_inc", "name": "x"}))).await.unwrap();
-        skill.execute(make_call(json!({"operation": "reset"}))).await.unwrap();
-        let result = skill.execute(make_call(json!({"operation": "counter_get", "name": "x"}))).await.unwrap();
+        skill
+            .execute(make_call(json!({"operation": "counter_inc", "name": "x"})))
+            .await
+            .unwrap();
+        skill
+            .execute(make_call(json!({"operation": "reset"})))
+            .await
+            .unwrap();
+        let result = skill
+            .execute(make_call(json!({"operation": "counter_get", "name": "x"})))
+            .await
+            .unwrap();
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         assert_eq!(parsed["value"], 0.0);
     }
@@ -416,9 +514,20 @@ mod tests {
     #[tokio::test]
     async fn test_list() {
         let skill = MetricsCollectorSkill::new();
-        skill.execute(make_call(json!({"operation": "counter_inc", "name": "c1"}))).await.unwrap();
-        skill.execute(make_call(json!({"operation": "gauge_set", "name": "g1", "value": 1}))).await.unwrap();
-        let result = skill.execute(make_call(json!({"operation": "list"}))).await.unwrap();
+        skill
+            .execute(make_call(json!({"operation": "counter_inc", "name": "c1"})))
+            .await
+            .unwrap();
+        skill
+            .execute(make_call(
+                json!({"operation": "gauge_set", "name": "g1", "value": 1}),
+            ))
+            .await
+            .unwrap();
+        let result = skill
+            .execute(make_call(json!({"operation": "list"})))
+            .await
+            .unwrap();
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
         assert_eq!(parsed["total"], 2);
     }

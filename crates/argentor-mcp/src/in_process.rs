@@ -378,7 +378,13 @@ impl InProcessMcpServer {
         let tool_meta: Vec<(String, String, serde_json::Value)> = self
             .tools
             .iter()
-            .map(|t| (t.name.clone(), t.description.clone(), t.input_schema.clone()))
+            .map(|t| {
+                (
+                    t.name.clone(),
+                    t.description.clone(),
+                    t.input_schema.clone(),
+                )
+            })
             .collect();
 
         let server = Arc::new(self);
@@ -440,7 +446,11 @@ impl Skill for InProcessMcpSkill {
     }
 
     async fn execute(&self, call: ToolCall) -> ArgentorResult<ToolResult> {
-        match self.server.call_tool(&self.tool_name, &call.arguments).await {
+        match self
+            .server
+            .call_tool(&self.tool_name, &call.arguments)
+            .await
+        {
             Ok(text) => Ok(ToolResult::success(&call.id, text)),
             Err(e) => Ok(ToolResult::error(&call.id, e.to_string())),
         }
@@ -673,12 +683,9 @@ mod tests {
             .add_tool("sync_tool", "A sync tool", serde_json::json!({}), |_| {
                 Ok("sync result".to_string())
             })
-            .add_async_tool(
-                "async_tool",
-                "An async tool",
-                serde_json::json!({}),
-                |_| Box::pin(async { Ok("async result".to_string()) }),
-            );
+            .add_async_tool("async_tool", "An async tool", serde_json::json!({}), |_| {
+                Box::pin(async { Ok("async result".to_string()) })
+            });
 
         assert_eq!(server.tool_count(), 2);
 
@@ -721,11 +728,7 @@ mod tests {
             "async_fail",
             "Always fails async",
             serde_json::json!({}),
-            |_| {
-                Box::pin(async {
-                    Err(ArgentorError::Skill("async handler exploded".to_string()))
-                })
-            },
+            |_| Box::pin(async { Err(ArgentorError::Skill("async handler exploded".to_string())) }),
         );
 
         let err = server
@@ -1042,7 +1045,9 @@ mod tests {
         server.register_skills(&mut registry);
 
         // Dashes and dots should be replaced with underscores
-        assert!(registry.get("mcp__my_special_server_tool_with_dashes").is_some());
+        assert!(registry
+            .get("mcp__my_special_server_tool_with_dashes")
+            .is_some());
     }
 
     #[tokio::test]

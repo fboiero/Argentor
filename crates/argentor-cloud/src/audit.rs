@@ -116,10 +116,7 @@ impl AuditLog {
 
     /// Snapshot all events (expensive — tests + export only).
     pub fn all(&self) -> Vec<AuditEvent> {
-        self.events
-            .read()
-            .map(|g| g.clone())
-            .unwrap_or_default()
+        self.events.read().map(|g| g.clone()).unwrap_or_default()
     }
 
     /// Events for a specific tenant.
@@ -172,7 +169,12 @@ mod tests {
     #[test]
     fn append_increments_length() {
         let log = AuditLog::new();
-        log.append(AuditEvent::new(AuditEventKind::TenantCreated, "t1", "admin", "created"));
+        log.append(AuditEvent::new(
+            AuditEventKind::TenantCreated,
+            "t1",
+            "admin",
+            "created",
+        ));
         assert_eq!(log.len(), 1);
     }
 
@@ -180,7 +182,12 @@ mod tests {
     fn all_returns_snapshot() {
         let log = AuditLog::new();
         log.append(AuditEvent::new(AuditEventKind::RunStarted, "t1", "api", ""));
-        log.append(AuditEvent::new(AuditEventKind::RunCompleted, "t1", "api", ""));
+        log.append(AuditEvent::new(
+            AuditEventKind::RunCompleted,
+            "t1",
+            "api",
+            "",
+        ));
         assert_eq!(log.all().len(), 2);
     }
 

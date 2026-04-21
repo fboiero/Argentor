@@ -107,10 +107,7 @@ impl MultimodalMessage {
     ///
     /// The media type is inferred from the file extension. Unrecognized
     /// extensions default to `"image/png"`.
-    pub fn with_image_file(
-        mut self,
-        path: impl AsRef<Path>,
-    ) -> Result<Self, std::io::Error> {
+    pub fn with_image_file(mut self, path: impl AsRef<Path>) -> Result<Self, std::io::Error> {
         let path = path.as_ref();
         let bytes = std::fs::read(path)?;
 
@@ -376,7 +373,9 @@ mod tests {
         match &m.images[0] {
             ImageInput::Base64 { data, .. } => {
                 use base64::Engine;
-                let decoded = base64::engine::general_purpose::STANDARD.decode(data).unwrap();
+                let decoded = base64::engine::general_purpose::STANDARD
+                    .decode(data)
+                    .unwrap();
                 assert_eq!(decoded, TINY_PNG);
             }
             _ => panic!("expected base64 variant"),

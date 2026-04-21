@@ -84,7 +84,9 @@ fn test_credential_vault_tamper_detection() {
     assert!(
         result.is_err(),
         "CRITICAL: single-bit tamper must be detected by auth tag (got: {:?})",
-        result.as_ref().map(|v| String::from_utf8_lossy(v).to_string())
+        result
+            .as_ref()
+            .map(|v| String::from_utf8_lossy(v).to_string())
     );
 
     // The error must specifically mention authentication / tampering, not a
@@ -180,8 +182,14 @@ fn test_constant_time_checksum_comparison() {
     // Both error messages should look the same — no detail like "tag byte 5
     // differed" must leak.
     let err = wrong.unwrap_err();
-    assert!(!err.contains("byte"), "Error must not reveal which byte differed");
-    assert!(!err.contains("position"), "Error must not reveal byte position");
+    assert!(
+        !err.contains("byte"),
+        "Error must not reveal which byte differed"
+    );
+    assert!(
+        !err.contains("position"),
+        "Error must not reveal byte position"
+    );
 }
 
 /// CWE-532 / CWE-200: Stored secrets must NOT appear in audit logs in cleartext.
@@ -253,7 +261,10 @@ fn test_kdf_salt_separation() {
 fn test_encrypts_empty_plaintext() {
     let key = derive_key("empty-test", b"salt");
     let ct = encrypt_value(&key, b"").unwrap();
-    assert!(!ct.is_empty(), "Even empty plaintext must produce non-empty ciphertext (salt+nonce+tag)");
+    assert!(
+        !ct.is_empty(),
+        "Even empty plaintext must produce non-empty ciphertext (salt+nonce+tag)"
+    );
 
     let pt = decrypt_value(&key, &ct).unwrap();
     assert!(pt.is_empty());

@@ -37,12 +37,12 @@ pub mod data_validator;
 pub mod datetime_tool;
 /// Text diff generation and patching skill.
 pub mod diff_tool;
-/// DOCX (Microsoft Word) document loader skill.
-pub mod docx_loader;
 /// DNS lookup, reverse resolution, and connectivity checks.
 pub mod dns_lookup;
 /// Docker-sandboxed shell execution.
 pub mod docker_sandbox;
+/// DOCX (Microsoft Word) document loader skill.
+pub mod docx_loader;
 /// Encoding/decoding skill (Base64, hex, URL, HTML, JWT).
 pub mod encode_decode;
 /// Environment variable management and .env file parsing skill.
@@ -119,10 +119,10 @@ pub mod uuid_generator;
 pub mod web_scraper;
 /// Web search skill using DuckDuckGo HTML endpoint.
 pub mod web_search;
-/// YAML processing skill (parse, stringify, validate, merge, conversion).
-pub mod yaml_processor;
 /// XcapitSFF backend integration skills.
 pub mod xcapitsff_skills;
+/// YAML processing skill (parse, stringify, validate, merge, conversion).
+pub mod yaml_processor;
 /// Internal minimal ZIP archive reader for OOXML loaders.
 pub mod zip_reader;
 
@@ -181,11 +181,11 @@ pub use text_transform::TextTransformSkill;
 pub use uuid_generator::UuidGeneratorSkill;
 pub use web_scraper::WebScraperSkill;
 pub use web_search::{SearchProvider, WebSearchSkill};
-pub use yaml_processor::YamlProcessorSkill;
 pub use xcapitsff_skills::{
     register_xcapitsff_skills, XcapitCustomer360Skill, XcapitKbSearchSkill, XcapitLeadInfoSkill,
     XcapitSearchSkill, XcapitTicketInfoSkill,
 };
+pub use yaml_processor::YamlProcessorSkill;
 
 pub use docker_sandbox::{DockerSandboxConfig, ExecResult};
 

@@ -276,7 +276,10 @@ mod tests {
     #[test]
     fn check_can_run_unknown_tenant_errors() {
         let q = QuotaEnforcer::new();
-        assert!(matches!(q.check_can_run("ghost"), Err(QuotaError::NotFound(_))));
+        assert!(matches!(
+            q.check_can_run("ghost"),
+            Err(QuotaError::NotFound(_))
+        ));
     }
 
     #[test]

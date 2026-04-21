@@ -288,9 +288,8 @@ mod tests {
     #[tokio::test]
     async fn test_extract_text_xml_mode() {
         let skill = DocxLoaderSkill::new();
-        let call = make_call(
-            json!({"operation": "extract_text", "data": SAMPLE_XML, "encoding": "xml"}),
-        );
+        let call =
+            make_call(json!({"operation": "extract_text", "data": SAMPLE_XML, "encoding": "xml"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error, "Result: {}", result.content);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -336,9 +335,8 @@ mod tests {
     #[tokio::test]
     async fn test_count_words() {
         let skill = DocxLoaderSkill::new();
-        let call = make_call(
-            json!({"operation": "count_words", "data": SAMPLE_XML, "encoding": "xml"}),
-        );
+        let call =
+            make_call(json!({"operation": "count_words", "data": SAMPLE_XML, "encoding": "xml"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -384,8 +382,7 @@ mod tests {
     #[tokio::test]
     async fn test_invalid_zip() {
         let skill = DocxLoaderSkill::new();
-        let encoded =
-            base64::engine::general_purpose::STANDARD.encode(b"not a zip archive at all");
+        let encoded = base64::engine::general_purpose::STANDARD.encode(b"not a zip archive at all");
         let call = make_call(json!({"operation": "extract_text", "data": encoded}));
         let result = skill.execute(call).await.unwrap();
         assert!(result.is_error);
@@ -417,9 +414,8 @@ mod tests {
     async fn test_no_tables() {
         let skill = DocxLoaderSkill::new();
         let xml = "<w:p><w:r><w:t>No tables here</w:t></w:r></w:p>";
-        let call = make_call(
-            json!({"operation": "extract_tables", "data": xml, "encoding": "xml"}),
-        );
+        let call =
+            make_call(json!({"operation": "extract_tables", "data": xml, "encoding": "xml"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();

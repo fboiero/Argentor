@@ -254,10 +254,7 @@ impl LearningEngine {
         let keywords = Self::extract_keywords(&feedback.query_context);
         let decay = self.config.decay_factor;
         for kw in &keywords {
-            let entry = stats
-                .context_success_rates
-                .entry(kw.clone())
-                .or_insert(0.5);
+            let entry = stats.context_success_rates.entry(kw.clone()).or_insert(0.5);
             let outcome = if feedback.success { 1.0 } else { 0.0 };
             *entry = decay * (*entry) + (1.0 - decay) * outcome;
         }
@@ -325,9 +322,7 @@ impl LearningEngine {
                     let context_score = self.context_match_score(stats, &query_keywords);
                     if context_score.abs() > 0.01 {
                         adjustment += context_score * 0.2;
-                        reasons.push(format!(
-                            "Context match: {context_score:.2}"
-                        ));
+                        reasons.push(format!("Context match: {context_score:.2}"));
                     }
 
                     // Trend adjustment.
@@ -360,22 +355,15 @@ impl LearningEngine {
                     continue;
                 }
 
-                let relevance =
-                    kw_overlap as f32 / pattern.query_keywords.len().max(1) as f32;
+                let relevance = kw_overlap as f32 / pattern.query_keywords.len().max(1) as f32;
 
                 if pattern.recommended_tools.contains(&tool_name.to_string()) {
                     adjustment += relevance * pattern.confidence * 0.15;
-                    reasons.push(format!(
-                        "Pattern match (rec): {}",
-                        pattern.pattern_id
-                    ));
+                    reasons.push(format!("Pattern match (rec): {}", pattern.pattern_id));
                 }
                 if pattern.avoid_tools.contains(&tool_name.to_string()) {
                     adjustment -= relevance * pattern.confidence * 0.15;
-                    reasons.push(format!(
-                        "Pattern match (avoid): {}",
-                        pattern.pattern_id
-                    ));
+                    reasons.push(format!("Pattern match (avoid): {}", pattern.pattern_id));
                 }
             }
 
@@ -424,23 +412,13 @@ impl LearningEngine {
             .map(|s| (s.tool_name.clone(), s.success_rate()))
             .collect();
 
-        tools_by_rate.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
+        tools_by_rate.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
-        let top_performing = tools_by_rate
-            .iter()
-            .take(5)
-            .cloned()
-            .collect();
+        let top_performing = tools_by_rate.iter().take(5).cloned().collect();
 
         let underperforming = {
             let mut worst = tools_by_rate.clone();
-            worst.sort_by(|a, b| {
-                a.1.partial_cmp(&b.1)
-                    .unwrap_or(std::cmp::Ordering::Equal)
-            });
+            worst.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
             worst.into_iter().take(5).collect()
         };
 
@@ -534,10 +512,7 @@ impl LearningEngine {
             let pattern_id = format!("auto_{keyword}");
 
             // Check if we already have this pattern and update it.
-            if let Some(existing) = new_patterns
-                .iter_mut()
-                .find(|p| p.pattern_id == pattern_id)
-            {
+            if let Some(existing) = new_patterns.iter_mut().find(|p| p.pattern_id == pattern_id) {
                 existing.recommended_tools.extend(recommended);
                 existing.avoid_tools.extend(avoid);
                 existing.sample_count += total_samples;
@@ -599,9 +574,9 @@ impl LearningEngine {
     /// Extract keywords from a query context (lowercase, > 2 chars, no stopwords).
     fn extract_keywords(text: &str) -> Vec<String> {
         const STOPWORDS: &[&str] = &[
-            "the", "and", "for", "are", "but", "not", "you", "all", "can", "had",
-            "her", "was", "one", "our", "out", "has", "have", "from", "with", "they",
-            "been", "this", "that", "will", "each", "make", "like", "use", "into",
+            "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "her", "was",
+            "one", "our", "out", "has", "have", "from", "with", "they", "been", "this", "that",
+            "will", "each", "make", "like", "use", "into",
         ];
 
         text.to_lowercase()
@@ -614,11 +589,7 @@ impl LearningEngine {
 
     /// Compute a context match score for a tool given query keywords.
     /// Returns a value in [-1.0, 1.0]: positive means good match, negative means poor.
-    fn context_match_score(
-        &self,
-        stats: &ToolLearningStats,
-        query_keywords: &[String],
-    ) -> f32 {
+    fn context_match_score(&self, stats: &ToolLearningStats, query_keywords: &[String]) -> f32 {
         if query_keywords.is_empty() || stats.context_success_rates.is_empty() {
             return 0.0;
         }
@@ -718,11 +689,7 @@ mod tests {
             success,
             execution_time_ms: time_ms,
             tokens_used: tokens,
-            error_type: if success {
-                None
-            } else {
-                Some("error".into())
-            },
+            error_type: if success { None } else { Some("error".into()) },
         }
     }
 

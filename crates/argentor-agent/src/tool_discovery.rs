@@ -378,11 +378,7 @@ impl ToolDiscoveryEngine {
     // --- Strategy scoring implementations ---
 
     /// Score tools by keyword overlap.
-    fn score_keyword_match(
-        &self,
-        query: &str,
-        tools: &[ToolEntry],
-    ) -> Vec<(usize, f32, String)> {
+    fn score_keyword_match(&self, query: &str, tools: &[ToolEntry]) -> Vec<(usize, f32, String)> {
         let query_tokens: HashSet<String> = tokenize(query).into_iter().collect();
 
         tools
@@ -501,17 +497,16 @@ impl ToolDiscoveryEngine {
                 let success_rate = record.success_rate();
 
                 // Check if query keywords match historically associated keywords
-                let keyword_overlap = if query_keywords.is_empty()
-                    || record.associated_keywords.is_empty()
-                {
-                    0.0
-                } else {
-                    let matches = query_keywords
-                        .iter()
-                        .filter(|kw| record.associated_keywords.contains(kw))
-                        .count();
-                    matches as f32 / query_keywords.len().max(1) as f32
-                };
+                let keyword_overlap =
+                    if query_keywords.is_empty() || record.associated_keywords.is_empty() {
+                        0.0
+                    } else {
+                        let matches = query_keywords
+                            .iter()
+                            .filter(|kw| record.associated_keywords.contains(kw))
+                            .count();
+                        matches as f32 / query_keywords.len().max(1) as f32
+                    };
 
                 // Frequency bonus (log scale to prevent domination)
                 let frequency_bonus = (record.total_uses as f32).ln_1p() / 10.0;
@@ -795,7 +790,11 @@ mod tests {
         let result = engine
             .discover("read the configuration file", &sample_tools())
             .unwrap();
-        let names: Vec<&str> = result.selected_tools.iter().map(|t| t.name.as_str()).collect();
+        let names: Vec<&str> = result
+            .selected_tools
+            .iter()
+            .map(|t| t.name.as_str())
+            .collect();
         assert!(
             names.contains(&"file_read"),
             "file_read should be selected for file reading, got: {names:?}"
@@ -811,7 +810,11 @@ mod tests {
         let result = engine
             .discover("fetch data from the API endpoint", &sample_tools())
             .unwrap();
-        let names: Vec<&str> = result.selected_tools.iter().map(|t| t.name.as_str()).collect();
+        let names: Vec<&str> = result
+            .selected_tools
+            .iter()
+            .map(|t| t.name.as_str())
+            .collect();
         assert!(
             names.contains(&"http_fetch"),
             "http_fetch should be selected for HTTP tasks, got: {names:?}"
@@ -863,9 +866,7 @@ mod tests {
             strategy: DiscoveryStrategy::TfIdf,
             ..DiscoveryConfig::default()
         });
-        let result = engine
-            .discover("read a file", &sample_tools())
-            .unwrap();
+        let result = engine.discover("read a file", &sample_tools()).unwrap();
         // Without vocabulary, all scores should be 0 => nothing above threshold
         assert!(
             result.selected_tools.is_empty(),
@@ -889,8 +890,15 @@ mod tests {
 
         let result = engine.discover("read file contents", &tools).unwrap();
         assert!(!result.selected_tools.is_empty());
-        let names: Vec<&str> = result.selected_tools.iter().map(|t| t.name.as_str()).collect();
-        assert!(names.contains(&"file_read"), "Expected file_read, got: {names:?}");
+        let names: Vec<&str> = result
+            .selected_tools
+            .iter()
+            .map(|t| t.name.as_str())
+            .collect();
+        assert!(
+            names.contains(&"file_read"),
+            "Expected file_read, got: {names:?}"
+        );
     }
 
     #[test]
@@ -955,7 +963,11 @@ mod tests {
         let result = engine
             .discover("read a file from disk", &sample_tools())
             .unwrap();
-        let names: Vec<&str> = result.selected_tools.iter().map(|t| t.name.as_str()).collect();
+        let names: Vec<&str> = result
+            .selected_tools
+            .iter()
+            .map(|t| t.name.as_str())
+            .collect();
         assert!(
             names.contains(&"calculator"),
             "Always-included tool should be present, got: {names:?}"
@@ -969,7 +981,11 @@ mod tests {
             ..DiscoveryConfig::default()
         });
         let result = engine.discover("test query", &sample_tools()).unwrap();
-        let names: Vec<&str> = result.selected_tools.iter().map(|t| t.name.as_str()).collect();
+        let names: Vec<&str> = result
+            .selected_tools
+            .iter()
+            .map(|t| t.name.as_str())
+            .collect();
         assert!(
             !names.contains(&"nonexistent_tool"),
             "Nonexistent tool should not be included"
@@ -1112,7 +1128,10 @@ mod tests {
     fn test_contextual_similarity_bonus_file() {
         let tool = ToolEntry::new("file_read", "Read a file");
         let bonus = contextual_similarity_bonus("read the file", &tool);
-        assert!(bonus > 0.0, "File-related query should get bonus, got {bonus}");
+        assert!(
+            bonus > 0.0,
+            "File-related query should get bonus, got {bonus}"
+        );
     }
 
     #[test]

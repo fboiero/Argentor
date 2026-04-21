@@ -57,8 +57,10 @@ impl LlmBackend for FastMockBackend {
         _system_prompt: Option<&str>,
         _messages: &[Message],
         _tools: &[SkillDescriptor],
-    ) -> ArgentorResult<(mpsc::Receiver<StreamEvent>, JoinHandle<ArgentorResult<LlmResponse>>)>
-    {
+    ) -> ArgentorResult<(
+        mpsc::Receiver<StreamEvent>,
+        JoinHandle<ArgentorResult<LlmResponse>>,
+    )> {
         let (_tx, rx) = mpsc::channel(1);
         let handle = tokio::spawn(async { Ok(LlmResponse::Done("ok".to_string())) });
         Ok((rx, handle))
@@ -96,8 +98,10 @@ impl LlmBackend for BudgetedBackend {
         _system_prompt: Option<&str>,
         _messages: &[Message],
         _tools: &[SkillDescriptor],
-    ) -> ArgentorResult<(mpsc::Receiver<StreamEvent>, JoinHandle<ArgentorResult<LlmResponse>>)>
-    {
+    ) -> ArgentorResult<(
+        mpsc::Receiver<StreamEvent>,
+        JoinHandle<ArgentorResult<LlmResponse>>,
+    )> {
         let (_tx, rx) = mpsc::channel(1);
         let handle = tokio::spawn(async { Ok(LlmResponse::Done("ok".to_string())) });
         Ok((rx, handle))
@@ -247,7 +251,9 @@ async fn test_streaming_backpressure() {
 
     let producer = tokio::spawn(async move {
         for i in 0..1000 {
-            tx.send(i).await.expect("channel must accept item with backpressure");
+            tx.send(i)
+                .await
+                .expect("channel must accept item with backpressure");
         }
     });
 

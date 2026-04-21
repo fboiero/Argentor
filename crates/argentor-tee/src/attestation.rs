@@ -166,8 +166,7 @@ impl AttestationVerifier {
 
         // 2. Freshness check.
         let age = report.age_seconds();
-        let timestamp_within_validity =
-            age >= 0 && (age as u64) <= self.expected.max_age_seconds;
+        let timestamp_within_validity = age >= 0 && (age as u64) <= self.expected.max_age_seconds;
         if !timestamp_within_validity {
             return VerificationResult {
                 valid: false,

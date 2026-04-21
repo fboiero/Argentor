@@ -12,9 +12,7 @@
 //! - /metrics Prometheus format
 
 use argentor_agent::{AgentRunner, LlmProvider, ModelConfig};
-use argentor_gateway::{
-    AuthConfig, ControlPlaneState, GatewayServer, RestApiState,
-};
+use argentor_gateway::{AuthConfig, ControlPlaneState, GatewayServer, RestApiState};
 use argentor_security::observability::AgentMetricsCollector;
 use argentor_security::{AuditLog, PermissionSet};
 use argentor_session::{FileSessionStore, Session, SessionStore};
@@ -145,7 +143,9 @@ async fn start_full_server() -> (
 #[tokio::test]
 async fn test_health_endpoint_returns_200_basic() {
     let (addr, _tmp) = start_basic_server().await;
-    let resp = reqwest::get(&format!("http://{addr}/health")).await.unwrap();
+    let resp = reqwest::get(&format!("http://{addr}/health"))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
     let body: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(body["status"], "ok");
@@ -169,11 +169,7 @@ async fn test_health_endpoint_returns_503_when_unready() {
         .unwrap();
     // readiness checks require rest_api + control_plane — neither is mounted
     // on the basic builder, so it must report not-ready.
-    assert_eq!(
-        resp.status(),
-        503,
-        "basic server should report not-ready"
-    );
+    assert_eq!(resp.status(), 503, "basic server should report not-ready");
     let body: serde_json::Value = resp.json().await.unwrap();
     assert_eq!(body["status"], "not_ready");
     assert!(body["checks"]["rest_api"].is_string());
@@ -309,18 +305,11 @@ async fn test_api_v1_agent_chat_full_roundtrip() {
     // Either 200 (if the request managed to bubble through) or 5xx (LLM fail)
     // — both prove the endpoint is wired up.
     let status = resp.status();
-    assert!(
-        status.as_u16() >= 200,
-        "unexpected status: {}",
-        status
-    );
+    assert!(status.as_u16() >= 200, "unexpected status: {}", status);
     // Content-type should be JSON regardless
     let ct = resp.headers().get("content-type").cloned();
     assert!(
-        ct.map(|v| v
-            .to_str()
-            .unwrap_or("")
-            .contains("json"))
+        ct.map(|v| v.to_str().unwrap_or("").contains("json"))
             .unwrap_or(false),
         "expected JSON response from chat endpoint"
     );
@@ -481,7 +470,9 @@ async fn test_prometheus_metrics_format() {
         let _ = reqwest::get(&format!("http://{addr}/health")).await;
     }
 
-    let resp = reqwest::get(&format!("http://{addr}/metrics")).await.unwrap();
+    let resp = reqwest::get(&format!("http://{addr}/metrics"))
+        .await
+        .unwrap();
     assert_eq!(resp.status(), 200);
     let ct = resp
         .headers()
@@ -500,9 +491,7 @@ async fn test_prometheus_metrics_format() {
     // and lines like `metric_name{labels} value [timestamp]`.
     let has_help = body.lines().any(|l| l.starts_with("# HELP"));
     let has_type = body.lines().any(|l| l.starts_with("# TYPE"));
-    let has_metric = body
-        .lines()
-        .any(|l| !l.is_empty() && !l.starts_with('#'));
+    let has_metric = body.lines().any(|l| !l.is_empty() && !l.starts_with('#'));
     assert!(
         has_help || has_type || has_metric,
         "body does not look like Prometheus format:\n{body}"

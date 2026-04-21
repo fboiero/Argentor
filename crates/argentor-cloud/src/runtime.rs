@@ -250,8 +250,7 @@ mod tests {
     async fn run_quota_exceeded_errors() {
         let tenants = Arc::new(TenantManager::new());
         let quotas = Arc::new(QuotaEnforcer::new());
-        let t =
-            tenants.create_tenant("Acme".into(), TenantPlan::Free, DataRegion::UsEast);
+        let t = tenants.create_tenant("Acme".into(), TenantPlan::Free, DataRegion::UsEast);
         tenants.activate(&t.id).unwrap();
         quotas.register(t.id.clone(), TenantPlan::Free);
         for _ in 0..1_000 {

@@ -793,10 +793,7 @@ impl Default for EmbeddingConfig {
 /// Used by all new providers when the `http-embeddings` feature is disabled,
 /// so tests and offline usage still get a usable L2-normalized vector.
 /// Also exercised by unit tests even when the HTTP feature is on.
-#[cfg_attr(
-    all(feature = "http-embeddings", not(test)),
-    allow(dead_code)
-)]
+#[cfg_attr(all(feature = "http-embeddings", not(test)), allow(dead_code))]
 fn stub_embedding(text: &str, dimensions: usize) -> Vec<f32> {
     let dim = dimensions.max(1);
     let mut v = vec![0.0f32; dim];
@@ -1096,9 +1093,10 @@ impl EmbeddingProvider for NomicEmbedProvider {
             )));
         }
 
-        let json: serde_json::Value = response.json().await.map_err(|e| {
-            ArgentorError::Http(format!("Failed to read Nomic response body: {e}"))
-        })?;
+        let json: serde_json::Value = response
+            .json()
+            .await
+            .map_err(|e| ArgentorError::Http(format!("Failed to read Nomic response body: {e}")))?;
 
         // Nomic response shape: { "embeddings": [[...]] }
         let embeddings = json
@@ -1233,13 +1231,11 @@ impl EmbeddingProvider for SentenceTransformersProvider {
                 let first = arr.first().cloned().ok_or_else(|| {
                     ArgentorError::Agent("HuggingFace response empty".to_string())
                 })?;
-                serde_json::from_value(first).map_err(|e| {
-                    ArgentorError::Agent(format!("Failed to parse HF vector: {e}"))
-                })
+                serde_json::from_value(first)
+                    .map_err(|e| ArgentorError::Agent(format!("Failed to parse HF vector: {e}")))
             }
-            serde_json::Value::Array(_) => serde_json::from_value(json).map_err(|e| {
-                ArgentorError::Agent(format!("Failed to parse HF vector: {e}"))
-            }),
+            serde_json::Value::Array(_) => serde_json::from_value(json)
+                .map_err(|e| ArgentorError::Agent(format!("Failed to parse HF vector: {e}"))),
             _ => Err(ArgentorError::Agent(
                 "HuggingFace response is not an array".to_string(),
             )),
@@ -1276,11 +1272,7 @@ pub struct TogetherEmbedProvider {
 impl TogetherEmbedProvider {
     /// Create a new Together provider with the default BERT retrieval model.
     pub fn new(api_key: impl Into<String>) -> Self {
-        Self::with_model(
-            api_key,
-            "togethercomputer/m2-bert-80M-32k-retrieval",
-            768,
-        )
+        Self::with_model(api_key, "togethercomputer/m2-bert-80M-32k-retrieval", 768)
     }
 
     /// Create with an explicit model and dimension override.
@@ -1455,9 +1447,7 @@ impl EmbeddingProvider for CohereEmbedV4Provider {
             .json(&payload)
             .send()
             .await
-            .map_err(|e| {
-                ArgentorError::Http(format!("Cohere v4 embedding request failed: {e}"))
-            })?;
+            .map_err(|e| ArgentorError::Http(format!("Cohere v4 embedding request failed: {e}")))?;
 
         let status = response.status();
         if !status.is_success() {
@@ -2200,7 +2190,8 @@ mod tests {
 
     #[test]
     fn test_sentence_transformers_unknown_model_fallback() {
-        let dims = SentenceTransformersProvider::default_dimensions("sentence-transformers/unknown");
+        let dims =
+            SentenceTransformersProvider::default_dimensions("sentence-transformers/unknown");
         assert_eq!(dims, 384);
     }
 
@@ -2225,8 +2216,8 @@ mod tests {
 
     #[test]
     fn test_sentence_transformers_with_base_url() {
-        let p = SentenceTransformersProvider::new("k")
-            .with_base_url("https://self-hosted.hf/embed");
+        let p =
+            SentenceTransformersProvider::new("k").with_base_url("https://self-hosted.hf/embed");
         assert_eq!(p.dimension(), 384);
     }
 
@@ -2269,7 +2260,10 @@ mod tests {
     fn test_together_build_payload_shape() {
         let p = TogetherEmbedProvider::new("k");
         let payload = p.build_payload(&["x".to_string(), "y".to_string()]);
-        assert_eq!(payload["model"], "togethercomputer/m2-bert-80M-32k-retrieval");
+        assert_eq!(
+            payload["model"],
+            "togethercomputer/m2-bert-80M-32k-retrieval"
+        );
         assert_eq!(payload["input"][0], "x");
         assert_eq!(payload["input"][1], "y");
     }

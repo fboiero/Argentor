@@ -21,28 +21,26 @@ pub mod backends;
 pub mod batch_processor;
 /// Agent benchmark suite for measuring performance, quality, and cost.
 pub mod benchmark;
+/// State checkpointing for save/restore of complete agent state (LangGraph-style time-travel).
+pub mod checkpoint;
 /// Circuit breaker for LLM provider resilience.
 pub mod circuit_breaker;
 /// Lightweight code structure analysis: symbols, dependencies, call graph.
 pub mod code_graph;
 /// Implementation planning with dependency ordering and risk assessment.
 pub mod code_planner;
+/// Automatic context compaction — summarizes conversation when approaching token limits.
+pub mod compaction;
 /// Model and provider configuration.
 pub mod config;
-/// Multimodal message types (text + images) for vision-capable LLMs.
-pub mod multimodal;
-/// Vision-capable LLM backends (Claude, OpenAI, Gemini).
-pub mod vision_backends;
-/// Voice (STT/TTS) types and traits.
-pub mod voice;
-/// Voice backends (Whisper, Deepgram, OpenAI TTS, ElevenLabs).
-pub mod voice_backends;
 /// Token-aware context windowing.
 pub mod context;
 /// Automatic system prompt assembly from project context (git, config files, tools).
 pub mod context_assembly;
 /// Intelligent cost optimization for LLM routing.
 pub mod cost_optimizer;
+/// Self-critique loop — Reflexion pattern for reviewing and revising agent responses.
+pub mod critique;
 /// Debug recorder for step-by-step agent reasoning traces.
 pub mod debug_recorder;
 /// Precise diff generation, application, and validation.
@@ -59,10 +57,14 @@ pub mod guardrails;
 pub mod hooks;
 /// Agent identity, personality, session commands, and context compaction.
 pub mod identity;
+/// Learning feedback loop — tool selector that improves over time with execution outcomes.
+pub mod learning;
 /// LLM client trait and HTTP transport.
 pub mod llm;
 /// Cost-aware model routing for multi-tier LLM selection.
 pub mod model_router;
+/// Multimodal message types (text + images) for vision-capable LLMs.
+pub mod multimodal;
 /// Permission modes for global agent tool authorization control.
 pub mod permission_mode;
 /// Versioned prompt template management with A/B testing and chains.
@@ -77,6 +79,8 @@ pub mod react;
 pub mod response_cache;
 /// Multi-dimensional code review engine (security, performance, style, correctness).
 pub mod review_engine;
+/// Process reward scoring — scores each reasoning step, not just the final output.
+pub mod reward;
 /// Agent runner and agentic loop.
 pub mod runner;
 /// Streaming event types.
@@ -85,16 +89,6 @@ pub mod stream;
 pub mod structured_output;
 /// Test output parsing and TDD loop automation.
 pub mod test_oracle;
-/// State checkpointing for save/restore of complete agent state (LangGraph-style time-travel).
-pub mod checkpoint;
-/// Automatic context compaction — summarizes conversation when approaching token limits.
-pub mod compaction;
-/// Self-critique loop — Reflexion pattern for reviewing and revising agent responses.
-pub mod critique;
-/// Learning feedback loop — tool selector that improves over time with execution outcomes.
-pub mod learning;
-/// Process reward scoring — scores each reasoning step, not just the final output.
-pub mod reward;
 /// Extended thinking mode — test-time compute scaling for deeper reasoning.
 pub mod thinking;
 /// Token counting and cost estimation for different LLM providers.
@@ -103,33 +97,13 @@ pub mod token_counter;
 pub mod tool_discovery;
 /// Smart tool selection to reduce token waste and improve relevance.
 pub mod tool_selector;
+/// Vision-capable LLM backends (Claude, OpenAI, Gemini).
+pub mod vision_backends;
+/// Voice (STT/TTS) types and traits.
+pub mod voice;
+/// Voice backends (Whisper, Deepgram, OpenAI TTS, ElevenLabs).
+pub mod voice_backends;
 
-pub use checkpoint::{
-    AgentState, Checkpoint, CheckpointConfig, CheckpointDiff, CheckpointManager,
-    CheckpointMessage, ModelSnapshot, ToolCallSnapshot,
-};
-pub use compaction::{
-    CompactedMessage, CompactionConfig, CompactionResult, CompactionStrategy,
-    ContextCompactorEngine,
-};
-pub use critique::{
-    Critique, CritiqueConfig, CritiqueDimension, CritiqueEngine, CritiqueResult,
-};
-pub use learning::{
-    LearnedPattern, LearningConfig, LearningEngine, LearningFeedback, LearningReport,
-    ToolLearningStats, ToolRecommendation, Trend,
-};
-pub use reward::{
-    AggregateMethod, ProcessRewardModel, ProcessRewardResult, RewardConfig, RewardFlag,
-    StepCategory, StepReward, TrajectoryQuality,
-};
-pub use thinking::{
-    ThinkingConfig, ThinkingDepth, ThinkingEngine, ThinkingResult, ThinkingStep,
-    ThinkingStepType,
-};
-pub use tool_discovery::{
-    DiscoveredTool, DiscoveryConfig, DiscoveryResult, DiscoveryStrategy, ToolDiscoveryEngine,
-};
 pub use adaptive_memory::{
     AdaptiveMemory, AdaptiveMemoryConfig, MemoryEntry, MemoryKind, RecallResult,
 };
@@ -142,6 +116,10 @@ pub use benchmark::{
     BenchmarkCase, BenchmarkCategory, BenchmarkComparisonReport, BenchmarkReport, BenchmarkResult,
     BenchmarkSuite, CategoryStats, MockBenchmarkBackend, Regression,
 };
+pub use checkpoint::{
+    AgentState, Checkpoint, CheckpointConfig, CheckpointDiff, CheckpointManager, CheckpointMessage,
+    ModelSnapshot, ToolCallSnapshot,
+};
 pub use circuit_breaker::{
     CircuitBreaker, CircuitBreakerRegistry, CircuitBreakerStatus, CircuitConfig, CircuitState,
 };
@@ -153,16 +131,11 @@ pub use code_planner::{
     AgentRole as PlannerRole, CodePlanner, Effort, FileOperation, ImplementationPlan, PlanStep,
     PlannerConfig, RiskAssessment, TaskType, TestStrategy,
 };
+pub use compaction::{
+    CompactedMessage, CompactionConfig, CompactionResult, CompactionStrategy,
+    ContextCompactorEngine,
+};
 pub use config::{LlmProvider, ModelConfig};
-pub use multimodal::{ImageInput, MultimodalMessage, VisionBackend, VisionCapability};
-pub use vision_backends::{ClaudeVisionBackend, GeminiVisionBackend, OpenAiVisionBackend};
-pub use voice::{
-    AudioFormat, AudioInput, SttBackend, TranscriptSegment, TranscriptionRequest,
-    TranscriptionResult, TtsBackend, VoiceConfig,
-};
-pub use voice_backends::{
-    DeepgramSttBackend, ElevenLabsTtsBackend, OpenAiTtsBackend, OpenAiWhisperBackend,
-};
 pub use context::ContextWindow;
 pub use context_assembly::{AssembledContext, ContextAssembler, GitContext};
 pub use cost_optimizer::{
@@ -170,6 +143,7 @@ pub use cost_optimizer::{
     OptimizationStrategy, RoutingDecision as CostRoutingDecision, SpendingSummary,
     TaskComplexity as CostTaskComplexity,
 };
+pub use critique::{Critique, CritiqueConfig, CritiqueDimension, CritiqueEngine, CritiqueResult};
 pub use debug_recorder::{
     DebugRecorder, DebugStep, DebugTrace, StepType, TokenUsage, TraceSummary,
 };
@@ -192,11 +166,16 @@ pub use guardrails::{
 };
 pub use hooks::{hook_fn, Hook, HookChain, HookDecision, HookEvent};
 pub use identity::{AgentPersonality, ContextCompactor, SessionCommand, ThinkingLevel};
+pub use learning::{
+    LearnedPattern, LearningConfig, LearningEngine, LearningFeedback, LearningReport,
+    ToolLearningStats, ToolRecommendation, Trend,
+};
 pub use llm::LlmClient;
 pub use model_router::{
     ModelCost, ModelOption, ModelRouter, ModelTier, RoutingDecision, RoutingStrategy,
     TaskComplexity,
 };
+pub use multimodal::{ImageInput, MultimodalMessage, VisionBackend, VisionCapability};
 pub use permission_mode::{CapturedCall, PermissionDecision, PermissionEvaluator, PermissionMode};
 pub use prompt_manager::{
     outreach_composer_v1, register_xcapit_templates, sales_qualifier_v1, support_responder_v1,
@@ -218,6 +197,10 @@ pub use review_engine::{
     DimensionScore, FindingSeverity, ReviewConfig, ReviewDimension, ReviewEngine, ReviewFinding,
     ReviewReport, ReviewVerdict,
 };
+pub use reward::{
+    AggregateMethod, ProcessRewardModel, ProcessRewardResult, RewardConfig, RewardFlag,
+    StepCategory, StepReward, TrajectoryQuality,
+};
 pub use runner::AgentRunner;
 pub use stream::StreamEvent;
 pub use structured_output::{
@@ -228,5 +211,19 @@ pub use test_oracle::{
     ErrorType, FailureAnalysis, FixStrategy, TddCycle, TddPhase, TestCase, TestFramework,
     TestOracle, TestRunSummary, TestStatus,
 };
+pub use thinking::{
+    ThinkingConfig, ThinkingDepth, ThinkingEngine, ThinkingResult, ThinkingStep, ThinkingStepType,
+};
 pub use token_counter::{TokenCounter, TokenEstimate, UsageTracker};
+pub use tool_discovery::{
+    DiscoveredTool, DiscoveryConfig, DiscoveryResult, DiscoveryStrategy, ToolDiscoveryEngine,
+};
 pub use tool_selector::{SelectionStrategy, ToolSelection, ToolSelector, ToolStats};
+pub use vision_backends::{ClaudeVisionBackend, GeminiVisionBackend, OpenAiVisionBackend};
+pub use voice::{
+    AudioFormat, AudioInput, SttBackend, TranscriptSegment, TranscriptionRequest,
+    TranscriptionResult, TtsBackend, VoiceConfig,
+};
+pub use voice_backends::{
+    DeepgramSttBackend, ElevenLabsTtsBackend, OpenAiTtsBackend, OpenAiWhisperBackend,
+};

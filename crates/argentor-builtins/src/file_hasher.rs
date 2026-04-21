@@ -145,9 +145,7 @@ impl Skill for FileHasherSkill {
             }
         };
 
-        let algorithm = call.arguments["algorithm"]
-            .as_str()
-            .unwrap_or("sha256");
+        let algorithm = call.arguments["algorithm"].as_str().unwrap_or("sha256");
 
         match operation {
             "hash" => {

@@ -432,8 +432,11 @@ impl AgentRunner {
                     ),
                     None,
                 );
-                let selected_names: std::collections::HashSet<_> =
-                    result.selected_tools.iter().map(|t| t.name.as_str()).collect();
+                let selected_names: std::collections::HashSet<_> = result
+                    .selected_tools
+                    .iter()
+                    .map(|t| t.name.as_str())
+                    .collect();
                 self.skills
                     .list_descriptors()
                     .into_iter()
@@ -441,10 +444,18 @@ impl AgentRunner {
                     .cloned()
                     .collect()
             } else {
-                self.skills.list_descriptors().into_iter().cloned().collect()
+                self.skills
+                    .list_descriptors()
+                    .into_iter()
+                    .cloned()
+                    .collect()
             }
         } else {
-            self.skills.list_descriptors().into_iter().cloned().collect()
+            self.skills
+                .list_descriptors()
+                .into_iter()
+                .cloned()
+                .collect()
         };
 
         // --- Intelligence: Extended Thinking ---
@@ -463,11 +474,8 @@ impl AgentRunner {
                     None,
                 );
                 if let Some(plan) = &think_result.plan {
-                    let plan_msg = Message::new(
-                        Role::System,
-                        format!("[Agent Plan] {plan}"),
-                        session_id,
-                    );
+                    let plan_msg =
+                        Message::new(Role::System, format!("[Agent Plan] {plan}"), session_id);
                     context.push(plan_msg);
                 }
             }

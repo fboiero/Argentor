@@ -287,7 +287,10 @@ mod tests {
     #[test]
     fn mark_paid_missing_errors() {
         let m = UsageMeter::new();
-        assert!(matches!(m.mark_paid("nope"), Err(BillingError::NotFound(_))));
+        assert!(matches!(
+            m.mark_paid("nope"),
+            Err(BillingError::NotFound(_))
+        ));
     }
 
     #[test]

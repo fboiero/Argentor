@@ -150,10 +150,19 @@ fn test_rejects_oversized_wasm() {
 #[test]
 fn test_rejects_invalid_wasm_magic() {
     let evil_payloads: &[(&str, Vec<u8>)] = &[
-        ("ELF binary", vec![0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00]),
-        ("Mach-O binary", vec![0xfe, 0xed, 0xfa, 0xce, 0x07, 0x00, 0x00, 0x01]),
+        (
+            "ELF binary",
+            vec![0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00],
+        ),
+        (
+            "Mach-O binary",
+            vec![0xfe, 0xed, 0xfa, 0xce, 0x07, 0x00, 0x00, 0x01],
+        ),
         ("Shell script", b"#!/bin/sh\nrm -rf /\n".to_vec()),
-        ("ZIP file", vec![0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00]),
+        (
+            "ZIP file",
+            vec![0x50, 0x4b, 0x03, 0x04, 0x00, 0x00, 0x00, 0x00],
+        ),
     ];
 
     for (label, payload) in evil_payloads {
@@ -180,8 +189,7 @@ fn test_rejects_excessive_capabilities() {
     // Request a capability that the operator has explicitly blocked
     manifest.capabilities = vec!["shell_exec".into(), "file_write".into()];
 
-    let vetter = SkillVetter::new()
-        .with_blocked_capabilities(vec!["shell_exec".into()]);
+    let vetter = SkillVetter::new().with_blocked_capabilities(vec!["shell_exec".into()]);
 
     let result = vetter.vet(&manifest, &wasm);
     assert!(

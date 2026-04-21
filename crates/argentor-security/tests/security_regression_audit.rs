@@ -236,13 +236,31 @@ async fn test_audit_searchable_by_tenant() {
     let tenant_c = Uuid::new_v4();
 
     for _ in 0..5 {
-        audit.log_action(tenant_a, "login", None, serde_json::json!({}), AuditOutcome::Success);
+        audit.log_action(
+            tenant_a,
+            "login",
+            None,
+            serde_json::json!({}),
+            AuditOutcome::Success,
+        );
     }
     for _ in 0..3 {
-        audit.log_action(tenant_b, "login", None, serde_json::json!({}), AuditOutcome::Success);
+        audit.log_action(
+            tenant_b,
+            "login",
+            None,
+            serde_json::json!({}),
+            AuditOutcome::Success,
+        );
     }
     for _ in 0..7 {
-        audit.log_action(tenant_c, "login", None, serde_json::json!({}), AuditOutcome::Success);
+        audit.log_action(
+            tenant_c,
+            "login",
+            None,
+            serde_json::json!({}),
+            AuditOutcome::Success,
+        );
     }
 
     flush().await;
@@ -253,9 +271,21 @@ async fn test_audit_searchable_by_tenant() {
     let only_b = query_audit_log(&log_file, &AuditFilter::for_session(tenant_b)).unwrap();
     let only_c = query_audit_log(&log_file, &AuditFilter::for_session(tenant_c)).unwrap();
 
-    assert_eq!(only_a.entries.len(), 5, "tenant A must see exactly 5 events");
-    assert_eq!(only_b.entries.len(), 3, "tenant B must see exactly 3 events");
-    assert_eq!(only_c.entries.len(), 7, "tenant C must see exactly 7 events");
+    assert_eq!(
+        only_a.entries.len(),
+        5,
+        "tenant A must see exactly 5 events"
+    );
+    assert_eq!(
+        only_b.entries.len(),
+        3,
+        "tenant B must see exactly 3 events"
+    );
+    assert_eq!(
+        only_c.entries.len(),
+        7,
+        "tenant C must see exactly 7 events"
+    );
 
     // Cross-tenant leakage check: every entry returned must match the requested session
     for entry in &only_a.entries {

@@ -40,12 +40,12 @@ pub mod attestation;
 pub mod provider;
 pub mod types;
 
+#[cfg(feature = "amd-sev")]
+pub mod amd_sev;
 #[cfg(feature = "aws-nitro")]
 pub mod aws_nitro;
 #[cfg(feature = "intel-sgx")]
 pub mod intel_sgx;
-#[cfg(feature = "amd-sev")]
-pub mod amd_sev;
 
 pub use attestation::{
     AttestationReport, AttestationVerifier, ExpectedMeasurements, VerificationResult,

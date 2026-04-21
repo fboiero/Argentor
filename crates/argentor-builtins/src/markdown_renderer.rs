@@ -472,7 +472,9 @@ fn main() {
     #[tokio::test]
     async fn test_no_code_blocks() {
         let skill = MarkdownRendererSkill::new();
-        let call = make_call(json!({"operation": "extract_code_blocks", "markdown": "# Just a heading\nParagraph."}));
+        let call = make_call(
+            json!({"operation": "extract_code_blocks", "markdown": "# Just a heading\nParagraph."}),
+        );
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();

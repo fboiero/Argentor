@@ -185,30 +185,25 @@ impl ConversationTree {
         }
 
         // Advance the branch head.
-        self.branches
-            .insert(self.active_branch.clone(), node_id);
+        self.branches.insert(self.active_branch.clone(), node_id);
         self.updated_at = now;
 
         node_id
     }
 
     /// Fork: create a new branch starting from a specific node.
-    pub fn fork(
-        &mut self,
-        from_node: Uuid,
-        branch_name: impl Into<String>,
-    ) -> ArgentorResult<()> {
+    pub fn fork(&mut self, from_node: Uuid, branch_name: impl Into<String>) -> ArgentorResult<()> {
         let name = branch_name.into();
 
         if self.branches.contains_key(&name) {
-            return Err(ArgentorError::Session(
-                format!("branch '{name}' already exists"),
-            ));
+            return Err(ArgentorError::Session(format!(
+                "branch '{name}' already exists"
+            )));
         }
         if !self.nodes.contains_key(&from_node) {
-            return Err(ArgentorError::Session(
-                format!("node {from_node} not found"),
-            ));
+            return Err(ArgentorError::Session(format!(
+                "node {from_node} not found"
+            )));
         }
 
         self.branches.insert(name.clone(), from_node);
@@ -226,9 +221,9 @@ impl ConversationTree {
     /// Switch the active branch.
     pub fn checkout(&mut self, branch: &str) -> ArgentorResult<()> {
         if !self.branches.contains_key(branch) {
-            return Err(ArgentorError::Session(
-                format!("branch '{branch}' does not exist"),
-            ));
+            return Err(ArgentorError::Session(format!(
+                "branch '{branch}' does not exist"
+            )));
         }
         self.active_branch = branch.to_string();
         self.updated_at = Utc::now();
@@ -237,15 +232,11 @@ impl ConversationTree {
 
     /// Merge another branch into the current branch by appending a summary message.
     /// Returns the ID of the newly created merge node.
-    pub fn merge_branch(
-        &mut self,
-        source_branch: &str,
-        summary: &str,
-    ) -> ArgentorResult<Uuid> {
+    pub fn merge_branch(&mut self, source_branch: &str, summary: &str) -> ArgentorResult<Uuid> {
         if !self.branches.contains_key(source_branch) {
-            return Err(ArgentorError::Session(
-                format!("branch '{source_branch}' does not exist"),
-            ));
+            return Err(ArgentorError::Session(format!(
+                "branch '{source_branch}' does not exist"
+            )));
         }
         if source_branch == self.active_branch {
             return Err(ArgentorError::Session(
@@ -286,9 +277,9 @@ impl ConversationTree {
             ));
         }
         if self.branches.remove(branch).is_none() {
-            return Err(ArgentorError::Session(
-                format!("branch '{branch}' does not exist"),
-            ));
+            return Err(ArgentorError::Session(format!(
+                "branch '{branch}' does not exist"
+            )));
         }
         self.updated_at = Utc::now();
         Ok(())
@@ -326,10 +317,7 @@ impl ConversationTree {
 
                 let head_node = &self.nodes[&head_id];
                 // message_count excludes the root sentinel
-                let message_count = history
-                    .iter()
-                    .filter(|&&nid| nid != self.root_id)
-                    .count();
+                let message_count = history.iter().filter(|&&nid| nid != self.root_id).count();
 
                 BranchInfo {
                     name: name.clone(),
@@ -344,11 +332,7 @@ impl ConversationTree {
     }
 
     /// Compare two branches, producing unique and shared node lists.
-    pub fn compare_branches(
-        &self,
-        branch_a: &str,
-        branch_b: &str,
-    ) -> BranchComparison {
+    pub fn compare_branches(&self, branch_a: &str, branch_b: &str) -> BranchComparison {
         let empty = BranchComparison {
             common_ancestor: None,
             branch_a_unique: Vec::new(),
@@ -394,10 +378,7 @@ impl ConversationTree {
             .collect();
 
         // Common messages excludes the root sentinel.
-        let common_messages = common_set
-            .iter()
-            .filter(|&&id| id != self.root_id)
-            .count();
+        let common_messages = common_set.iter().filter(|&&id| id != self.root_id).count();
 
         BranchComparison {
             common_ancestor,
@@ -409,11 +390,7 @@ impl ConversationTree {
     }
 
     /// Get the common ancestor of two branches, if both exist.
-    pub fn common_ancestor(
-        &self,
-        branch_a: &str,
-        branch_b: &str,
-    ) -> Option<Uuid> {
+    pub fn common_ancestor(&self, branch_a: &str, branch_b: &str) -> Option<Uuid> {
         let head_a = *self.branches.get(branch_a)?;
         let head_b = *self.branches.get(branch_b)?;
 
@@ -822,7 +799,9 @@ mod tests {
         tree.add_message(asst_msg(&tree, "experiment result"));
 
         tree.checkout("main").unwrap();
-        let merge_id = tree.merge_branch("experiment", "Best result from experiment").unwrap();
+        let merge_id = tree
+            .merge_branch("experiment", "Best result from experiment")
+            .unwrap();
 
         let node = tree.get_node(&merge_id).unwrap();
         assert!(node.message.content.contains("merge from 'experiment'"));

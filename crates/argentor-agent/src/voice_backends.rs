@@ -371,7 +371,10 @@ impl TtsBackend for OpenAiTtsBackend {
     }
 
     fn available_voices(&self) -> Vec<String> {
-        Self::AVAILABLE_VOICES.iter().map(|v| v.to_string()).collect()
+        Self::AVAILABLE_VOICES
+            .iter()
+            .map(|v| v.to_string())
+            .collect()
     }
 
     async fn synthesize(&self, _text: &str, _config: &VoiceConfig) -> ArgentorResult<Vec<u8>> {
@@ -576,8 +579,8 @@ mod tests {
     #[test]
     fn whisper_payload_with_language() {
         let b = OpenAiWhisperBackend::new("k");
-        let req = TranscriptionRequest::new(AudioInput::Url("https://x".into()))
-            .with_language("es");
+        let req =
+            TranscriptionRequest::new(AudioInput::Url("https://x".into())).with_language("es");
         let p = b.build_request_payload(&req);
         assert_eq!(p["language"], "es");
     }
@@ -585,8 +588,8 @@ mod tests {
     #[test]
     fn whisper_payload_with_prompt() {
         let b = OpenAiWhisperBackend::new("k");
-        let req = TranscriptionRequest::new(AudioInput::Url("https://x".into()))
-            .with_prompt("Medical.");
+        let req =
+            TranscriptionRequest::new(AudioInput::Url("https://x".into())).with_prompt("Medical.");
         let p = b.build_request_payload(&req);
         assert_eq!(p["prompt"], "Medical.");
     }
@@ -615,8 +618,8 @@ mod tests {
     #[tokio::test]
     async fn whisper_transcribe_stub_returns_ok() {
         let b = OpenAiWhisperBackend::new("k");
-        let req = TranscriptionRequest::new(AudioInput::Url("https://x".into()))
-            .with_language("en");
+        let req =
+            TranscriptionRequest::new(AudioInput::Url("https://x".into())).with_language("en");
         let res = b.transcribe(req).await.unwrap();
         assert!(res.text.contains("stt-stub"));
         assert_eq!(res.language_detected.as_deref(), Some("en"));

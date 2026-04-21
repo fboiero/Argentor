@@ -274,9 +274,7 @@ impl ContextAssembler {
 
         // Project instructions
         if let Some(instructions) = instructions {
-            prompt.push_str(&format!(
-                "\n# Project Instructions\n{instructions}\n"
-            ));
+            prompt.push_str(&format!("\n# Project Instructions\n{instructions}\n"));
         }
 
         // Custom instructions
@@ -285,10 +283,7 @@ impl ContextAssembler {
         }
 
         // Available tools
-        prompt.push_str(&format!(
-            "\n# Available Tools ({})\n",
-            tools.len()
-        ));
+        prompt.push_str(&format!("\n# Available Tools ({})\n", tools.len()));
         if tools.is_empty() {
             prompt.push_str("No tools available.\n");
         } else {
@@ -430,7 +425,10 @@ fn extract_repo_name(url: &str) -> Option<String> {
     let url = url.trim();
 
     // Try HTTPS format: https://github.com/user/repo.git
-    if let Some(path) = url.strip_prefix("https://").or_else(|| url.strip_prefix("http://")) {
+    if let Some(path) = url
+        .strip_prefix("https://")
+        .or_else(|| url.strip_prefix("http://"))
+    {
         let parts: Vec<&str> = path.split('/').collect();
         if parts.len() >= 3 {
             let name = parts[parts.len() - 1].trim_end_matches(".git");
@@ -657,7 +655,11 @@ mod tests {
     fn test_read_claude_md_fallback() {
         let tmp = tempfile::tempdir().unwrap();
         // No ARGENTOR.md, but CLAUDE.md exists
-        fs::write(tmp.path().join("CLAUDE.md"), "# Claude Config\nStyle: concise.").unwrap();
+        fs::write(
+            tmp.path().join("CLAUDE.md"),
+            "# Claude Config\nStyle: concise.",
+        )
+        .unwrap();
 
         let assembler = ContextAssembler::new(tmp.path());
         let instructions = assembler.read_project_instructions();
@@ -775,8 +777,7 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         let assembler = ContextAssembler::new(tmp.path());
         let instructions = Some("Always respond in Spanish.".to_string());
-        let prompt =
-            assembler.build_system_prompt(&None, &instructions, &[], "claude-4");
+        let prompt = assembler.build_system_prompt(&None, &instructions, &[], "claude-4");
         assert!(prompt.contains("Always respond in Spanish"));
         assert!(prompt.contains("Project Instructions"));
     }
@@ -798,9 +799,11 @@ mod tests {
         let tmp = tempfile::tempdir().unwrap();
         fs::write(tmp.path().join("ARGENTOR.md"), "# Rules\nBe safe.").unwrap();
 
-        let ctx = ContextAssembler::new(tmp.path())
-            .with_git(false)
-            .assemble(&["echo".into()], "claude-4", "sandboxed");
+        let ctx = ContextAssembler::new(tmp.path()).with_git(false).assemble(
+            &["echo".into()],
+            "claude-4",
+            "sandboxed",
+        );
 
         assert!(ctx.system_prompt.contains("Be safe"));
         assert!(ctx.system_prompt.contains("echo"));

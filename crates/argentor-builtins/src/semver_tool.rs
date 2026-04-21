@@ -527,7 +527,8 @@ mod tests {
     #[tokio::test]
     async fn test_compare_greater() {
         let skill = SemverToolSkill::new();
-        let call = make_call(json!({"operation": "compare", "version_a": "2.0.0", "version_b": "1.0.0"}));
+        let call =
+            make_call(json!({"operation": "compare", "version_a": "2.0.0", "version_b": "1.0.0"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -538,7 +539,8 @@ mod tests {
     #[tokio::test]
     async fn test_compare_less() {
         let skill = SemverToolSkill::new();
-        let call = make_call(json!({"operation": "compare", "version_a": "1.0.0", "version_b": "1.1.0"}));
+        let call =
+            make_call(json!({"operation": "compare", "version_a": "1.0.0", "version_b": "1.1.0"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -548,7 +550,8 @@ mod tests {
     #[tokio::test]
     async fn test_compare_equal() {
         let skill = SemverToolSkill::new();
-        let call = make_call(json!({"operation": "compare", "version_a": "1.0.0", "version_b": "1.0.0"}));
+        let call =
+            make_call(json!({"operation": "compare", "version_a": "1.0.0", "version_b": "1.0.0"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -558,7 +561,8 @@ mod tests {
     #[tokio::test]
     async fn test_bump_major() {
         let skill = SemverToolSkill::new();
-        let call = make_call(json!({"operation": "bump", "version": "1.2.3", "bump_type": "major"}));
+        let call =
+            make_call(json!({"operation": "bump", "version": "1.2.3", "bump_type": "major"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -568,7 +572,8 @@ mod tests {
     #[tokio::test]
     async fn test_bump_minor() {
         let skill = SemverToolSkill::new();
-        let call = make_call(json!({"operation": "bump", "version": "1.2.3", "bump_type": "minor"}));
+        let call =
+            make_call(json!({"operation": "bump", "version": "1.2.3", "bump_type": "minor"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -578,7 +583,8 @@ mod tests {
     #[tokio::test]
     async fn test_bump_patch() {
         let skill = SemverToolSkill::new();
-        let call = make_call(json!({"operation": "bump", "version": "1.2.3", "bump_type": "patch"}));
+        let call =
+            make_call(json!({"operation": "bump", "version": "1.2.3", "bump_type": "patch"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -595,13 +601,17 @@ mod tests {
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
-        assert_eq!(parsed["sorted"], json!(["1.0.0", "2.0.0", "2.1.0", "3.0.0"]));
+        assert_eq!(
+            parsed["sorted"],
+            json!(["1.0.0", "2.0.0", "2.1.0", "3.0.0"])
+        );
     }
 
     #[tokio::test]
     async fn test_satisfies_caret() {
         let skill = SemverToolSkill::new();
-        let call = make_call(json!({"operation": "satisfies", "version": "1.5.0", "range": "^1.2.0"}));
+        let call =
+            make_call(json!({"operation": "satisfies", "version": "1.5.0", "range": "^1.2.0"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -611,7 +621,8 @@ mod tests {
     #[tokio::test]
     async fn test_satisfies_caret_fail() {
         let skill = SemverToolSkill::new();
-        let call = make_call(json!({"operation": "satisfies", "version": "2.0.0", "range": "^1.2.0"}));
+        let call =
+            make_call(json!({"operation": "satisfies", "version": "2.0.0", "range": "^1.2.0"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -621,7 +632,8 @@ mod tests {
     #[tokio::test]
     async fn test_satisfies_tilde() {
         let skill = SemverToolSkill::new();
-        let call = make_call(json!({"operation": "satisfies", "version": "1.2.5", "range": "~1.2.0"}));
+        let call =
+            make_call(json!({"operation": "satisfies", "version": "1.2.5", "range": "~1.2.0"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -631,7 +643,8 @@ mod tests {
     #[tokio::test]
     async fn test_satisfies_gte() {
         let skill = SemverToolSkill::new();
-        let call = make_call(json!({"operation": "satisfies", "version": "2.0.0", "range": ">=1.0.0"}));
+        let call =
+            make_call(json!({"operation": "satisfies", "version": "2.0.0", "range": ">=1.0.0"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();

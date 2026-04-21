@@ -114,8 +114,7 @@ fn parse_opf(opf: &str, opf_dir: &str) -> (Value, Vec<String>) {
 
     // Build id -> href map from <manifest>
     let mut id_to_href: HashMap<String, String> = HashMap::new();
-    if let Ok(re) =
-        Regex::new(r#"(?is)<item\s[^>]*id=["']([^"']+)["'][^>]*href=["']([^"']+)["']"#)
+    if let Ok(re) = Regex::new(r#"(?is)<item\s[^>]*id=["']([^"']+)["'][^>]*href=["']([^"']+)["']"#)
     {
         for c in re.captures_iter(opf) {
             if let (Some(id), Some(href)) = (c.get(1), c.get(2)) {
@@ -124,8 +123,7 @@ fn parse_opf(opf: &str, opf_dir: &str) -> (Value, Vec<String>) {
         }
     }
     // Same but with href before id
-    if let Ok(re) =
-        Regex::new(r#"(?is)<item\s[^>]*href=["']([^"']+)["'][^>]*id=["']([^"']+)["']"#)
+    if let Ok(re) = Regex::new(r#"(?is)<item\s[^>]*href=["']([^"']+)["'][^>]*id=["']([^"']+)["']"#)
     {
         for c in re.captures_iter(opf) {
             if let (Some(href), Some(id)) = (c.get(1), c.get(2)) {
@@ -403,8 +401,7 @@ mod tests {
     #[tokio::test]
     async fn test_not_a_zip() {
         let skill = EpubLoaderSkill::new();
-        let encoded =
-            base64::engine::general_purpose::STANDARD.encode(b"just plain text content");
+        let encoded = base64::engine::general_purpose::STANDARD.encode(b"just plain text content");
         let call = make_call(json!({"operation": "extract_text", "data": encoded}));
         let result = skill.execute(call).await.unwrap();
         assert!(result.is_error);

@@ -337,11 +337,15 @@ impl CritiqueEngine {
         let mut issues = Vec::new();
 
         // Penalize excessive hedging (suggests uncertainty)
-        let hedge_words = ["maybe", "perhaps", "might", "possibly", "i think", "i believe"];
-        let hedge_count = hedge_words
-            .iter()
-            .filter(|w| lower.contains(**w))
-            .count();
+        let hedge_words = [
+            "maybe",
+            "perhaps",
+            "might",
+            "possibly",
+            "i think",
+            "i believe",
+        ];
+        let hedge_count = hedge_words.iter().filter(|w| lower.contains(**w)).count();
         if hedge_count > 2 {
             score -= 0.2;
             issues.push("Excessive hedging suggests uncertainty");
@@ -689,10 +693,7 @@ impl CritiqueEngine {
         let score = if references_tools { 0.9 } else { 0.6 };
 
         let feedback = if references_tools {
-            format!(
-                "Good use of tools: {}",
-                tool_names_used.join(", ")
-            )
+            format!("Good use of tools: {}", tool_names_used.join(", "))
         } else {
             "Tools were used but their results may not be well-integrated into the response"
                 .to_string()
@@ -772,10 +773,10 @@ impl CritiqueEngine {
 /// Extract significant words from text (>3 chars, no stopwords).
 fn extract_significant_words(text: &str) -> Vec<String> {
     let stopwords: HashSet<&str> = [
-        "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "was", "one",
-        "our", "out", "has", "have", "from", "with", "they", "been", "this", "that", "will",
-        "each", "make", "like", "use", "into", "what", "how", "does", "just", "please",
-        "could", "would", "should", "about", "when", "then", "than",
+        "the", "and", "for", "are", "but", "not", "you", "all", "can", "had", "was", "one", "our",
+        "out", "has", "have", "from", "with", "they", "been", "this", "that", "will", "each",
+        "make", "like", "use", "into", "what", "how", "does", "just", "please", "could", "would",
+        "should", "about", "when", "then", "than",
     ]
     .into_iter()
     .collect();
@@ -1008,7 +1009,11 @@ mod tests {
     fn test_completeness_short_response() {
         let engine = CritiqueEngine::with_defaults();
         let result = engine
-            .critique("What is Rust and why is it popular?", "Rust is a language.", &[])
+            .critique(
+                "What is Rust and why is it popular?",
+                "Rust is a language.",
+                &[],
+            )
             .unwrap();
         let completeness = result
             .critiques
@@ -1309,8 +1314,7 @@ mod tests {
             feedback: "Too short".to_string(),
             suggestion: Some("Add more detail".to_string()),
         }];
-        let prompt =
-            engine.build_revision_prompt("What is Rust?", "Rust is good.", &critiques);
+        let prompt = engine.build_revision_prompt("What is Rust?", "Rust is good.", &critiques);
         assert!(prompt.contains("Too short"));
         assert!(prompt.contains("Add more detail"));
     }
@@ -1342,7 +1346,9 @@ mod tests {
     #[test]
     fn test_poor_response_low_score() {
         let engine = CritiqueEngine::with_defaults();
-        let result = engine.critique("Explain Rust's ownership", "ok", &[]).unwrap();
+        let result = engine
+            .critique("Explain Rust's ownership", "ok", &[])
+            .unwrap();
         assert!(
             result.final_score < 0.8,
             "Poor response should score below 0.8, got {}",

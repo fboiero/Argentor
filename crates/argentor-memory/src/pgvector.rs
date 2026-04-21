@@ -366,7 +366,10 @@ mod tests {
             .into_iter()
             .find(|x| x.id == id)
             .unwrap();
-        assert_eq!(got.metadata.get("source").unwrap(), &serde_json::json!("manual"));
+        assert_eq!(
+            got.metadata.get("source").unwrap(),
+            &serde_json::json!("manual")
+        );
     }
 
     #[tokio::test]

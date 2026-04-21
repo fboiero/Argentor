@@ -319,7 +319,10 @@ mod tests {
         let mgr = TenantManager::new();
         let t = mgr.create_tenant("Acme".into(), TenantPlan::Free, DataRegion::UsEast);
         mgr.suspend(&t.id).unwrap();
-        assert_eq!(mgr.get_tenant(&t.id).unwrap().status, TenantStatus::Suspended);
+        assert_eq!(
+            mgr.get_tenant(&t.id).unwrap().status,
+            TenantStatus::Suspended
+        );
     }
 
     #[test]
@@ -349,8 +352,10 @@ mod tests {
     fn add_allowed_origin_dedupes() {
         let mgr = TenantManager::new();
         let t = mgr.create_tenant("Acme".into(), TenantPlan::Free, DataRegion::UsEast);
-        mgr.add_allowed_origin(&t.id, "https://app.acme.com".into()).unwrap();
-        mgr.add_allowed_origin(&t.id, "https://app.acme.com".into()).unwrap();
+        mgr.add_allowed_origin(&t.id, "https://app.acme.com".into())
+            .unwrap();
+        mgr.add_allowed_origin(&t.id, "https://app.acme.com".into())
+            .unwrap();
         let fetched = mgr.get_tenant(&t.id).unwrap();
         assert_eq!(fetched.allowed_origins.len(), 1);
     }

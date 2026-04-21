@@ -536,13 +536,11 @@ mod tests {
     #[test]
     fn test_matcher_filters_by_tool_name() {
         let mut chain = HookChain::new();
-        chain.add(hook_fn(
-            "shell-only",
-            Some("^shell$".to_string()),
-            |_| HookDecision::Deny {
+        chain.add(hook_fn("shell-only", Some("^shell$".to_string()), |_| {
+            HookDecision::Deny {
                 reason: "no shell".into(),
-            },
-        ));
+            }
+        }));
 
         // Shell is denied
         let d = chain.evaluate(&pre_tool("shell", json!({})));
@@ -569,9 +567,7 @@ mod tests {
         ));
 
         assert!(chain.evaluate(&pre_tool("file_read", json!({}))).is_deny());
-        assert!(chain
-            .evaluate(&pre_tool("file_write", json!({})))
-            .is_deny());
+        assert!(chain.evaluate(&pre_tool("file_write", json!({}))).is_deny());
         assert!(chain.evaluate(&pre_tool("shell", json!({}))).is_allow());
     }
 
@@ -584,9 +580,7 @@ mod tests {
 
         assert!(chain.evaluate(&pre_tool("shell", json!({}))).is_deny());
         assert!(chain.evaluate(&pre_tool("echo", json!({}))).is_deny());
-        assert!(chain
-            .evaluate(&pre_tool("file_read", json!({})))
-            .is_deny());
+        assert!(chain.evaluate(&pre_tool("file_read", json!({}))).is_deny());
     }
 
     // ---- Non-tool events bypass matcher ------------------------------------
@@ -696,8 +690,7 @@ mod tests {
         }
 
         fn on_event(&self, _event: &HookEvent) -> HookDecision {
-            self.count
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             HookDecision::Continue
         }
     }

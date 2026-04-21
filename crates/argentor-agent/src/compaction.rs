@@ -635,14 +635,13 @@ fn generate_extractive_summary(messages: &[&CompactableMessage]) -> String {
             break;
         }
         // Take the first sentence of each message
-        let first_sentence = msg
-            .content
-            .split('.')
-            .next()
-            .unwrap_or("")
-            .trim();
+        let first_sentence = msg.content.split('.').next().unwrap_or("").trim();
         if first_sentence.len() > 10 {
-            sentences.push(format!("[{}] {}", msg.role, truncate_content(first_sentence, 100)));
+            sentences.push(format!(
+                "[{}] {}",
+                msg.role,
+                truncate_content(first_sentence, 100)
+            ));
         }
     }
 
@@ -724,7 +723,9 @@ mod tests {
             "Let me read that file for you using file_read.",
             true,
         ));
-        msgs.push(CompactableMessage::tool("File contents: config.toml has database settings."));
+        msgs.push(CompactableMessage::tool(
+            "File contents: config.toml has database settings.",
+        ));
 
         // Add a few more messages
         for i in 0..5 {
@@ -1034,10 +1035,7 @@ mod tests {
             .preserved_messages
             .iter()
             .any(|m| m.role == "tool" || m.content.contains("file_read"));
-        assert!(
-            has_tool,
-            "Hybrid should preserve tool call messages"
-        );
+        assert!(has_tool, "Hybrid should preserve tool call messages");
     }
 
     // -----------------------------------------------------------------------

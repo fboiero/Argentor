@@ -83,6 +83,13 @@ pub struct ModelConfig {
     /// Maximum agentic loop turns before stopping. Default: 20.
     #[serde(default = "default_max_turns")]
     pub max_turns: u32,
+    /// Total context window size for the model in tokens.
+    ///
+    /// Used by the adaptive compaction trigger to compute the percentage
+    /// threshold at which to summarise conversation history.
+    /// Defaults to 200 000 (Claude's context window).
+    #[serde(default = "default_max_context_tokens")]
+    pub max_context_tokens: u64,
     /// Fallback model configs tried in order if the primary fails.
     #[serde(default)]
     pub fallback_models: Vec<ModelConfig>,
@@ -101,6 +108,10 @@ fn default_max_tokens() -> u32 {
 
 fn default_max_turns() -> u32 {
     20
+}
+
+fn default_max_context_tokens() -> u64 {
+    200_000
 }
 
 impl ModelConfig {

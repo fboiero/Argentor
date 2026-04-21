@@ -341,8 +341,7 @@ mod tests {
     async fn test_extract_speaker_notes() {
         let skill = PptxLoaderSkill::new();
         let encoded = base64::engine::general_purpose::STANDARD.encode(build_sample_pptx());
-        let call =
-            make_call(json!({"operation": "extract_speaker_notes", "data": encoded}));
+        let call = make_call(json!({"operation": "extract_speaker_notes", "data": encoded}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();

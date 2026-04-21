@@ -289,7 +289,8 @@ mod tests {
     #[tokio::test]
     async fn test_check_nonexistent() {
         let skill = EnvManagerSkill::new();
-        let call = make_call(json!({"operation": "check", "name": "ARGENTOR_NONEXISTENT_VAR_12345"}));
+        let call =
+            make_call(json!({"operation": "check", "name": "ARGENTOR_NONEXISTENT_VAR_12345"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -309,7 +310,8 @@ mod tests {
     #[tokio::test]
     async fn test_parse_dotenv() {
         let skill = EnvManagerSkill::new();
-        let content = "# Comment\nDB_HOST=localhost\nDB_PORT=5432\nDB_NAME=\"mydb\"\nSECRET='s3cret'";
+        let content =
+            "# Comment\nDB_HOST=localhost\nDB_PORT=5432\nDB_NAME=\"mydb\"\nSECRET='s3cret'";
         let call = make_call(json!({"operation": "parse_dotenv", "content": content}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
@@ -324,7 +326,8 @@ mod tests {
     #[tokio::test]
     async fn test_parse_dotenv_empty() {
         let skill = EnvManagerSkill::new();
-        let call = make_call(json!({"operation": "parse_dotenv", "content": "# only comments\n\n"}));
+        let call =
+            make_call(json!({"operation": "parse_dotenv", "content": "# only comments\n\n"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();
@@ -378,7 +381,8 @@ mod tests {
     async fn test_has_prefix() {
         let skill = EnvManagerSkill::new();
         // Use a prefix that likely won't match
-        let call = make_call(json!({"operation": "has_prefix", "prefix": "ARGENTOR_NONEXISTENT_PREFIX_"}));
+        let call =
+            make_call(json!({"operation": "has_prefix", "prefix": "ARGENTOR_NONEXISTENT_PREFIX_"}));
         let result = skill.execute(call).await.unwrap();
         assert!(!result.is_error);
         let parsed: Value = serde_json::from_str(&result.content).unwrap();

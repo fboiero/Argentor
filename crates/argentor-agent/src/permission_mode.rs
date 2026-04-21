@@ -140,11 +140,7 @@ impl std::fmt::Debug for PermissionEvaluator {
             .field("denied_tools", &self.denied_tools)
             .field(
                 "captured_calls_count",
-                &self
-                    .captured_calls
-                    .lock()
-                    .map(|c| c.len())
-                    .unwrap_or(0),
+                &self.captured_calls.lock().map(|c| c.len()).unwrap_or(0),
             )
             .field("has_callback", &self.approval_callback.is_some())
             .finish()
@@ -233,9 +229,7 @@ impl PermissionEvaluator {
         // Unknown tools require approval
         PermissionDecision::RequiresApproval {
             tool_name: tool_name.to_string(),
-            description: format!(
-                "Tool '{tool_name}' is not in the allowlist; approval required"
-            ),
+            description: format!("Tool '{tool_name}' is not in the allowlist; approval required"),
         }
     }
 
@@ -245,9 +239,7 @@ impl PermissionEvaluator {
             PermissionDecision::Allow
         } else {
             PermissionDecision::Deny {
-                reason: format!(
-                    "Tool '{tool_name}' is not in the allowlist (strict mode)"
-                ),
+                reason: format!("Tool '{tool_name}' is not in the allowlist (strict mode)"),
             }
         }
     }
@@ -288,9 +280,7 @@ impl PermissionEvaluator {
         // Check if it matches a write pattern
         if WRITE_PATTERNS.iter().any(|p| lower.contains(p)) {
             return PermissionDecision::Deny {
-                reason: format!(
-                    "Tool '{tool_name}' looks like a write operation (read-only mode)"
-                ),
+                reason: format!("Tool '{tool_name}' looks like a write operation (read-only mode)"),
             };
         }
         // Unknown tools are denied in read-only mode for safety
@@ -302,20 +292,14 @@ impl PermissionEvaluator {
     }
 
     /// Custom mode: call the approval callback.
-    fn check_custom(
-        &self,
-        tool_name: &str,
-        arguments: &serde_json::Value,
-    ) -> PermissionDecision {
+    fn check_custom(&self, tool_name: &str, arguments: &serde_json::Value) -> PermissionDecision {
         match &self.approval_callback {
             Some(callback) => {
                 if callback(tool_name, arguments) {
                     PermissionDecision::Allow
                 } else {
                     PermissionDecision::Deny {
-                        reason: format!(
-                            "Tool '{tool_name}' denied by custom approval callback"
-                        ),
+                        reason: format!("Tool '{tool_name}' denied by custom approval callback"),
                     }
                 }
             }
@@ -439,22 +423,40 @@ mod tests {
 
     #[test]
     fn test_pattern_exact_match() {
-        assert!(PermissionEvaluator::matches_pattern("file_read", "file_read"));
-        assert!(!PermissionEvaluator::matches_pattern("file_read", "file_write"));
+        assert!(PermissionEvaluator::matches_pattern(
+            "file_read",
+            "file_read"
+        ));
+        assert!(!PermissionEvaluator::matches_pattern(
+            "file_read",
+            "file_write"
+        ));
     }
 
     #[test]
     fn test_pattern_prefix_wildcard() {
         assert!(PermissionEvaluator::matches_pattern("file_*", "file_read"));
         assert!(PermissionEvaluator::matches_pattern("file_*", "file_write"));
-        assert!(!PermissionEvaluator::matches_pattern("file_*", "shell_exec"));
+        assert!(!PermissionEvaluator::matches_pattern(
+            "file_*",
+            "shell_exec"
+        ));
     }
 
     #[test]
     fn test_pattern_suffix_wildcard() {
-        assert!(PermissionEvaluator::matches_pattern("*_search", "memory_search"));
-        assert!(PermissionEvaluator::matches_pattern("*_search", "web_search"));
-        assert!(!PermissionEvaluator::matches_pattern("*_search", "memory_store"));
+        assert!(PermissionEvaluator::matches_pattern(
+            "*_search",
+            "memory_search"
+        ));
+        assert!(PermissionEvaluator::matches_pattern(
+            "*_search",
+            "web_search"
+        ));
+        assert!(!PermissionEvaluator::matches_pattern(
+            "*_search",
+            "memory_store"
+        ));
     }
 
     #[test]
@@ -491,8 +493,14 @@ mod tests {
 
     #[test]
     fn test_pattern_no_match_partial() {
-        assert!(!PermissionEvaluator::matches_pattern("file_read", "file_reader"));
-        assert!(!PermissionEvaluator::matches_pattern("file_read", "the_file_read"));
+        assert!(!PermissionEvaluator::matches_pattern(
+            "file_read",
+            "file_reader"
+        ));
+        assert!(!PermissionEvaluator::matches_pattern(
+            "file_read",
+            "the_file_read"
+        ));
     }
 
     // -----------------------------------------------------------------------
@@ -512,7 +520,10 @@ mod tests {
         let eval = PermissionEvaluator::new(PermissionMode::Default)
             .with_allowed(vec!["echo".to_string()]);
         let decision = eval.check("shell_exec", &serde_json::json!({}));
-        assert!(matches!(decision, PermissionDecision::RequiresApproval { .. }));
+        assert!(matches!(
+            decision,
+            PermissionDecision::RequiresApproval { .. }
+        ));
     }
 
     #[test]
@@ -544,8 +555,8 @@ mod tests {
 
     #[test]
     fn test_strict_mode_denied_unlisted() {
-        let eval = PermissionEvaluator::new(PermissionMode::Strict)
-            .with_allowed(vec!["echo".to_string()]);
+        let eval =
+            PermissionEvaluator::new(PermissionMode::Strict).with_allowed(vec!["echo".to_string()]);
         let decision = eval.check("shell_exec", &serde_json::json!({}));
         assert!(matches!(decision, PermissionDecision::Deny { .. }));
         if let PermissionDecision::Deny { reason } = decision {
@@ -661,7 +672,9 @@ mod tests {
 
         let captured = eval.captured_calls();
         assert!(captured[0].would_require.contains(&"file_read".to_string()));
-        assert!(captured[1].would_require.contains(&"shell_exec".to_string()));
+        assert!(captured[1]
+            .would_require
+            .contains(&"shell_exec".to_string()));
     }
 
     #[test]
@@ -774,11 +787,12 @@ mod tests {
 
     #[test]
     fn test_custom_mode_callback_uses_arguments() {
-        let eval = PermissionEvaluator::new(PermissionMode::Custom)
-            .with_approval_callback(|_name, args| {
+        let eval = PermissionEvaluator::new(PermissionMode::Custom).with_approval_callback(
+            |_name, args| {
                 // Only allow if "safe" flag is true
                 args.get("safe").and_then(|v| v.as_bool()).unwrap_or(false)
-            });
+            },
+        );
         assert!(matches!(
             eval.check("any_tool", &serde_json::json!({"safe": true})),
             PermissionDecision::Allow
