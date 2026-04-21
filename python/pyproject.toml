@@ -1,0 +1,45 @@
+# SPDX-License-Identifier: AGPL-3.0-only
+# Argentor Python SDK — pure-Python client for the Argentor agent framework.
+#
+# Install: pip install -e python/
+# Or:      python3 -m pip install -e python/ --break-system-packages
+#
+# For the compiled Rust extension (PyO3/maturin bindings):
+#   pip install maturin && cd crates/argentor-python && maturin develop
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "argentor"
+version = "0.1.0"
+description = "Python SDK for the Argentor AI agent framework"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "AGPL-3.0-only" }
+keywords = ["ai", "agent", "framework", "llm", "orchestration"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
+]
+dependencies = [
+    "httpx>=0.24",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=7", "pytest-asyncio>=0.21"]
+
+[project.urls]
+Homepage = "https://github.com/fboiero/Argentor"
+Repository = "https://github.com/fboiero/Argentor"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["argentor*"]

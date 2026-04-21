@@ -62,6 +62,7 @@ wasmtime-wasi = "28"
 
 # Text processing
 regex = "1"
+unicode-normalization = "0.1"
 
 # Crypto & Encoding
 sha2 = "0.10"
