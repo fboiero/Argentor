@@ -1454,6 +1454,376 @@ pub fn builtin_catalog_entries() -> Vec<MarketplaceEntry> {
 }
 
 // ---------------------------------------------------------------------------
+// SkillCache — local ~/.argentor/skills/ directory for downloaded WASM binaries
+// ---------------------------------------------------------------------------
+
+/// A locally cached skill entry downloaded from the marketplace registry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct InstalledSkill {
+    /// Skill name.
+    pub name: String,
+    /// Installed semantic version.
+    pub version: String,
+    /// Absolute path to the cached WASM binary.
+    pub wasm_path: PathBuf,
+    /// SHA-256 checksum of the cached binary.
+    pub checksum: String,
+    /// Registry URL the skill was downloaded from.
+    pub registry_url: String,
+    /// RFC 3339 timestamp when the skill was installed.
+    pub installed_at: String,
+}
+
+/// A lightweight view of a catalog entry for search results.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CatalogEntry {
+    /// Skill name.
+    pub name: String,
+    /// Current version.
+    pub version: String,
+    /// Human-readable description.
+    pub description: String,
+    /// Rating (0.0–5.0).
+    pub rating: f32,
+    /// Total download count.
+    pub downloads: u64,
+    /// Category list.
+    pub categories: Vec<String>,
+    /// Keyword tags.
+    pub keywords: Vec<String>,
+}
+
+impl From<&MarketplaceEntry> for CatalogEntry {
+    fn from(e: &MarketplaceEntry) -> Self {
+        Self {
+            name: e.manifest.name.clone(),
+            version: e.manifest.version.clone(),
+            description: e.manifest.description.clone(),
+            rating: e.rating,
+            downloads: e.downloads,
+            categories: e.categories.clone(),
+            keywords: e.keywords.clone(),
+        }
+    }
+}
+
+/// Local skill cache backed by `~/.argentor/skills/`.
+///
+/// Stores WASM binaries on disk and tracks them in a JSON index file
+/// (`~/.argentor/skills/cache-index.json`).  All operations are purely local
+/// (no HTTP).  Download from a registry is handled by
+/// [`MarketplaceCatalog::download_skill`].
+///
+/// # Default cache directory
+///
+/// `~/.argentor/skills/` — created automatically when first used.
+///
+/// # Registry URL format
+///
+/// `{registry_url}/skills/{name}/{version}/{name}.wasm`
+pub struct SkillCache {
+    /// Root directory for cached WASM binaries.
+    pub cache_dir: PathBuf,
+    /// Base URL of the skill registry (no trailing slash).
+    pub registry_url: String,
+    /// In-memory index of installed skills (mirrors the on-disk JSON).
+    installed: Vec<InstalledSkill>,
+}
+
+impl SkillCache {
+    /// Default registry URL used when no override is provided.
+    pub const DEFAULT_REGISTRY: &'static str = "https://registry.argentor.dev";
+
+    /// Create a new cache rooted at `~/.argentor/skills/` with the default registry.
+    ///
+    /// Returns an error if the home directory cannot be determined or the cache
+    /// directory cannot be created.
+    pub fn new() -> ArgentorResult<Self> {
+        let home = home_dir().ok_or_else(|| {
+            argentor_core::ArgentorError::Config(
+                "Cannot determine home directory for skill cache".into(),
+            )
+        })?;
+        Self::with_dir_and_registry(
+            home.join(".argentor").join("skills"),
+            Self::DEFAULT_REGISTRY,
+        )
+    }
+
+    /// Create a cache at a custom directory with the default registry.
+    pub fn with_dir(cache_dir: impl Into<PathBuf>) -> ArgentorResult<Self> {
+        Self::with_dir_and_registry(cache_dir, Self::DEFAULT_REGISTRY)
+    }
+
+    /// Create a cache at a custom directory and a custom registry URL.
+    pub fn with_dir_and_registry(
+        cache_dir: impl Into<PathBuf>,
+        registry_url: impl Into<String>,
+    ) -> ArgentorResult<Self> {
+        let cache_dir = cache_dir.into();
+        std::fs::create_dir_all(&cache_dir).map_err(|e| {
+            argentor_core::ArgentorError::Config(format!(
+                "Failed to create skill cache dir {}: {e}",
+                cache_dir.display()
+            ))
+        })?;
+        let mut cache = Self {
+            cache_dir,
+            registry_url: registry_url.into().trim_end_matches('/').to_string(),
+            installed: Vec::new(),
+        };
+        cache.load_index()?;
+        Ok(cache)
+    }
+
+    /// Return the download URL for a skill.
+    ///
+    /// Format: `{registry_url}/skills/{name}/{version}/{name}.wasm`
+    pub fn download_url(&self, name: &str, version: &str) -> String {
+        format!(
+            "{}/skills/{}/{}/{}.wasm",
+            self.registry_url, name, version, name
+        )
+    }
+
+    /// Return the local path where a skill WASM binary is (or would be) cached.
+    pub fn wasm_path(&self, name: &str, version: &str) -> PathBuf {
+        self.cache_dir.join(format!("{name}-{version}.wasm"))
+    }
+
+    /// Check whether a specific version of a skill is already cached.
+    pub fn is_cached(&self, name: &str, version: &str) -> bool {
+        self.installed
+            .iter()
+            .any(|s| s.name == name && s.version == version && s.wasm_path.exists())
+    }
+
+    /// Return the cache entry for a skill if it is installed.
+    pub fn get(&self, name: &str) -> Option<&InstalledSkill> {
+        self.installed.iter().find(|s| s.name == name)
+    }
+
+    /// List all locally cached skills.
+    pub fn list(&self) -> &[InstalledSkill] {
+        &self.installed
+    }
+
+    /// Register a WASM binary in the local cache.
+    ///
+    /// Writes `wasm_bytes` to disk and updates the index.  Replaces any
+    /// previously cached version of the same skill.
+    pub fn store(
+        &mut self,
+        name: &str,
+        version: &str,
+        wasm_bytes: &[u8],
+    ) -> ArgentorResult<PathBuf> {
+        use sha2::{Digest, Sha256};
+
+        let path = self.wasm_path(name, version);
+        std::fs::write(&path, wasm_bytes).map_err(|e| {
+            argentor_core::ArgentorError::Config(format!(
+                "Failed to write cached WASM for {name}-{version}: {e}"
+            ))
+        })?;
+
+        let mut hasher = Sha256::new();
+        hasher.update(wasm_bytes);
+        let checksum = hex::encode(hasher.finalize());
+
+        // Replace any existing entry for the same skill name
+        self.installed.retain(|s| s.name != name);
+        self.installed.push(InstalledSkill {
+            name: name.to_string(),
+            version: version.to_string(),
+            wasm_path: path.clone(),
+            checksum,
+            registry_url: self.registry_url.clone(),
+            installed_at: chrono::Utc::now().to_rfc3339(),
+        });
+
+        self.save_index()?;
+        Ok(path)
+    }
+
+    /// Remove a cached skill from disk and the index.
+    ///
+    /// Returns `true` if an entry was found and removed.
+    pub fn remove(&mut self, name: &str) -> ArgentorResult<bool> {
+        if let Some(pos) = self.installed.iter().position(|s| s.name == name) {
+            let entry = self.installed.remove(pos);
+            if entry.wasm_path.exists() {
+                std::fs::remove_file(&entry.wasm_path).map_err(|e| {
+                    argentor_core::ArgentorError::Config(format!(
+                        "Failed to remove cached WASM {}: {e}",
+                        entry.wasm_path.display()
+                    ))
+                })?;
+            }
+            self.save_index()?;
+            Ok(true)
+        } else {
+            Ok(false)
+        }
+    }
+
+    // -- private helpers --
+
+    fn index_path(&self) -> PathBuf {
+        self.cache_dir.join("cache-index.json")
+    }
+
+    fn load_index(&mut self) -> ArgentorResult<()> {
+        let path = self.index_path();
+        if !path.exists() {
+            return Ok(());
+        }
+        let content = std::fs::read_to_string(&path).map_err(|e| {
+            argentor_core::ArgentorError::Config(format!("Failed to read cache index: {e}"))
+        })?;
+        self.installed = serde_json::from_str(&content).map_err(|e| {
+            argentor_core::ArgentorError::Config(format!("Failed to parse cache index: {e}"))
+        })?;
+        Ok(())
+    }
+
+    fn save_index(&self) -> ArgentorResult<()> {
+        let path = self.index_path();
+        let content = serde_json::to_string_pretty(&self.installed).map_err(|e| {
+            argentor_core::ArgentorError::Config(format!("Failed to serialize cache index: {e}"))
+        })?;
+        let tmp = path.with_extension("tmp");
+        std::fs::write(&tmp, content).map_err(|e| {
+            argentor_core::ArgentorError::Config(format!("Failed to write cache index tmp: {e}"))
+        })?;
+        std::fs::rename(&tmp, &path).map_err(|e| {
+            argentor_core::ArgentorError::Config(format!("Failed to rename cache index: {e}"))
+        })?;
+        Ok(())
+    }
+}
+
+/// Return the user's home directory, cross-platform.
+fn home_dir() -> Option<PathBuf> {
+    // std::env::home_dir() is deprecated but still works; use HOME env var as primary.
+    std::env::var("HOME")
+        .ok()
+        .map(PathBuf::from)
+        .or_else(|| std::env::var("USERPROFILE").ok().map(PathBuf::from))
+}
+
+// ---------------------------------------------------------------------------
+// MarketplaceCatalog — download, install, search extensions
+// ---------------------------------------------------------------------------
+
+impl MarketplaceCatalog {
+    /// Search the catalog by free-text query across name, description, and keywords.
+    ///
+    /// Returns lightweight [`CatalogEntry`] views sorted by relevance (download count).
+    pub fn search_entries(&self, query: &str) -> Vec<CatalogEntry> {
+        let q = query.to_lowercase();
+        let mut results: Vec<&MarketplaceEntry> = self
+            .entries
+            .iter()
+            .filter(|e| {
+                e.manifest.name.to_lowercase().contains(&q)
+                    || e.manifest.description.to_lowercase().contains(&q)
+                    || e.keywords.iter().any(|k| k.to_lowercase().contains(&q))
+                    || e.manifest
+                        .tags
+                        .iter()
+                        .any(|t| t.to_lowercase().contains(&q))
+            })
+            .collect();
+        results.sort_by(|a, b| b.downloads.cmp(&a.downloads));
+        results.iter().map(|e| CatalogEntry::from(*e)).collect()
+    }
+
+    /// Download a WASM skill binary from the registry into the provided [`SkillCache`].
+    ///
+    /// Returns the local [`PathBuf`] of the cached `.wasm` file.
+    ///
+    /// This method is **always available** (no feature flag required) because it
+    /// uses only `std::fs` and the cache directory.  The HTTP download is delegated
+    /// to the caller via the `fetch_bytes` callback so the core crate stays free of
+    /// network dependencies.
+    ///
+    /// # Parameters
+    ///
+    /// - `name` — skill name (must match a catalog entry)
+    /// - `version` — exact semver string (e.g. `"1.0.0"`)
+    /// - `cache` — mutable reference to the local [`SkillCache`]
+    /// - `fetch_bytes` — async-compatible closure `async fn(url: &str) -> ArgentorResult<Vec<u8>>`
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the skill is not found in the catalog, if the download
+    /// fails, or if writing to the cache directory fails.
+    pub async fn download_skill<F, Fut>(
+        &self,
+        name: &str,
+        version: &str,
+        cache: &mut SkillCache,
+        fetch_bytes: F,
+    ) -> ArgentorResult<PathBuf>
+    where
+        F: FnOnce(String) -> Fut,
+        Fut: std::future::Future<Output = ArgentorResult<Vec<u8>>>,
+    {
+        // Fast-path: already cached
+        if cache.is_cached(name, version) {
+            return Ok(cache.wasm_path(name, version));
+        }
+
+        // Look up catalog entry to get the download URL
+        let entry = self.get(name).ok_or_else(|| {
+            argentor_core::ArgentorError::Config(format!("Skill '{name}' not found in catalog"))
+        })?;
+
+        let url = entry
+            .download_url
+            .clone()
+            .unwrap_or_else(|| cache.download_url(name, version));
+
+        let bytes = fetch_bytes(url).await?;
+        let path = cache.store(name, version, &bytes)?;
+        Ok(path)
+    }
+
+    /// Install a skill: download it (if needed) and return its [`InstalledSkill`] record.
+    ///
+    /// This is the high-level API that combines `download_skill` with registration in
+    /// the cache index.  After calling this, `cache.get(name)` will return the entry.
+    ///
+    /// The `fetch_bytes` callback follows the same contract as in [`download_skill`].
+    pub async fn install_skill<F, Fut>(
+        &self,
+        name: &str,
+        version: &str,
+        cache: &mut SkillCache,
+        fetch_bytes: F,
+    ) -> ArgentorResult<InstalledSkill>
+    where
+        F: FnOnce(String) -> Fut,
+        Fut: std::future::Future<Output = ArgentorResult<Vec<u8>>>,
+    {
+        let _ = self
+            .download_skill(name, version, cache, fetch_bytes)
+            .await?;
+        cache.get(name).cloned().ok_or_else(|| {
+            argentor_core::ArgentorError::Config(format!(
+                "Skill '{name}' was downloaded but not found in cache index"
+            ))
+        })
+    }
+
+    /// List all skills currently present in the local cache.
+    pub fn installed_skills(cache: &SkillCache) -> Vec<InstalledSkill> {
+        cache.list().to_vec()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -2834,5 +3204,221 @@ mod tests {
     #[test]
     fn urlencoded_preserves_safe_chars() {
         assert_eq!(urlencoded("a-b_c.d~e"), "a-b_c.d~e");
+    }
+
+    // ---------------------------------------------------------------------------
+    // SkillCache tests
+    // ---------------------------------------------------------------------------
+
+    #[test]
+    fn skill_cache_store_and_retrieve() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut cache = SkillCache::with_dir(tmp.path()).unwrap();
+
+        let wasm = b"\x00asm\x01\x00\x00\x00hello";
+        let path = cache.store("my_skill", "1.0.0", wasm).unwrap();
+        assert!(path.exists(), "WASM file should exist after store");
+        assert_eq!(cache.list().len(), 1);
+
+        let entry = cache.get("my_skill").unwrap();
+        assert_eq!(entry.name, "my_skill");
+        assert_eq!(entry.version, "1.0.0");
+        assert!(!entry.checksum.is_empty());
+    }
+
+    #[test]
+    fn skill_cache_is_cached() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut cache = SkillCache::with_dir(tmp.path()).unwrap();
+
+        assert!(!cache.is_cached("echo", "1.0.0"));
+        cache.store("echo", "1.0.0", b"\x00asm").unwrap();
+        assert!(cache.is_cached("echo", "1.0.0"));
+    }
+
+    #[test]
+    fn skill_cache_remove() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut cache = SkillCache::with_dir(tmp.path()).unwrap();
+
+        cache.store("calc", "2.0.0", b"\x00asm").unwrap();
+        assert!(cache.is_cached("calc", "2.0.0"));
+
+        let removed = cache.remove("calc").unwrap();
+        assert!(removed, "remove should return true for existing skill");
+        assert!(!cache.is_cached("calc", "2.0.0"));
+        assert!(cache.list().is_empty());
+
+        // Removing again should return false, not error
+        let removed_again = cache.remove("calc").unwrap();
+        assert!(!removed_again);
+    }
+
+    #[test]
+    fn skill_cache_index_persists_across_reload() {
+        let tmp = tempfile::tempdir().unwrap();
+        {
+            let mut cache = SkillCache::with_dir(tmp.path()).unwrap();
+            cache.store("hello", "1.2.3", b"\x00asmhello").unwrap();
+        }
+        // Reload from disk
+        let cache2 = SkillCache::with_dir(tmp.path()).unwrap();
+        assert_eq!(cache2.list().len(), 1);
+        let e = cache2.get("hello").unwrap();
+        assert_eq!(e.version, "1.2.3");
+    }
+
+    #[test]
+    fn skill_cache_replaces_existing_version() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut cache = SkillCache::with_dir(tmp.path()).unwrap();
+
+        cache.store("sk", "1.0.0", b"v1").unwrap();
+        cache.store("sk", "2.0.0", b"v2").unwrap();
+        // Only the latest should remain in the index
+        assert_eq!(cache.list().len(), 1);
+        assert_eq!(cache.get("sk").unwrap().version, "2.0.0");
+    }
+
+    #[test]
+    fn skill_cache_download_url_format() {
+        let tmp = tempfile::tempdir().unwrap();
+        let cache =
+            SkillCache::with_dir_and_registry(tmp.path(), "https://registry.example.com").unwrap();
+        let url = cache.download_url("echo", "1.0.0");
+        assert_eq!(
+            url,
+            "https://registry.example.com/skills/echo/1.0.0/echo.wasm"
+        );
+    }
+
+    #[tokio::test]
+    async fn catalog_download_skill_uses_fetch_callback() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut cache = SkillCache::with_dir(tmp.path()).unwrap();
+
+        let mut catalog = MarketplaceCatalog::new();
+        let entry = make_entry("echo", "1.0.0");
+        catalog.add(entry);
+
+        let fake_wasm = b"\x00asmFAKE".to_vec();
+        let result = catalog
+            .download_skill("echo", "1.0.0", &mut cache, |_url| async {
+                Ok(b"\x00asmFAKE".to_vec())
+            })
+            .await
+            .unwrap();
+
+        assert!(result.exists());
+        let contents = std::fs::read(&result).unwrap();
+        assert_eq!(contents, fake_wasm);
+    }
+
+    #[tokio::test]
+    async fn catalog_download_skill_fast_path_if_cached() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut cache = SkillCache::with_dir(tmp.path()).unwrap();
+        cache.store("echo", "1.0.0", b"\x00asmCACHED").unwrap();
+
+        let mut catalog = MarketplaceCatalog::new();
+        catalog.add(make_entry("echo", "1.0.0"));
+
+        // fetch_bytes should NOT be called because it's already cached
+        let result = catalog
+            .download_skill("echo", "1.0.0", &mut cache, |_url| async {
+                // The real assertion is that the returned path contains the originally
+                // cached bytes — i.e., this fetch_bytes closure was NOT invoked.
+                Ok(b"\x00asmNEW".to_vec())
+            })
+            .await
+            .unwrap();
+
+        let contents = std::fs::read(&result).unwrap();
+        // Should still be the originally cached bytes
+        assert_eq!(contents, b"\x00asmCACHED");
+    }
+
+    #[tokio::test]
+    async fn catalog_download_skill_error_on_missing() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut cache = SkillCache::with_dir(tmp.path()).unwrap();
+        let catalog = MarketplaceCatalog::new(); // empty catalog
+
+        let err = catalog
+            .download_skill("nonexistent", "1.0.0", &mut cache, |_url| async {
+                Ok(vec![])
+            })
+            .await
+            .unwrap_err();
+
+        assert!(err.to_string().contains("nonexistent"));
+    }
+
+    #[tokio::test]
+    async fn catalog_install_skill_returns_installed_skill() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut cache = SkillCache::with_dir(tmp.path()).unwrap();
+
+        let mut catalog = MarketplaceCatalog::new();
+        catalog.add(make_entry("calc", "1.0.0"));
+
+        let installed = catalog
+            .install_skill("calc", "1.0.0", &mut cache, |_url| async {
+                Ok(b"\x00asmCALC".to_vec())
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(installed.name, "calc");
+        assert_eq!(installed.version, "1.0.0");
+        assert!(installed.wasm_path.exists());
+    }
+
+    #[test]
+    fn catalog_installed_skills_delegates_to_cache() {
+        let tmp = tempfile::tempdir().unwrap();
+        let mut cache = SkillCache::with_dir(tmp.path()).unwrap();
+        cache.store("a", "1.0.0", b"a").unwrap();
+        cache.store("b", "2.0.0", b"b").unwrap();
+
+        let installed = MarketplaceCatalog::installed_skills(&cache);
+        assert_eq!(installed.len(), 2);
+        assert!(installed.iter().any(|s| s.name == "a"));
+        assert!(installed.iter().any(|s| s.name == "b"));
+    }
+
+    #[test]
+    fn catalog_search_entries_by_name() {
+        let mut catalog = MarketplaceCatalog::new();
+        catalog.add(make_entry("calculator", "1.0.0"));
+        catalog.add(make_entry("web_search", "1.0.0"));
+        catalog.add(make_entry("calc_plus", "1.0.0"));
+
+        let results = catalog.search_entries("calc");
+        assert_eq!(results.len(), 2);
+        assert!(results.iter().any(|e| e.name == "calculator"));
+        assert!(results.iter().any(|e| e.name == "calc_plus"));
+    }
+
+    #[test]
+    fn catalog_search_entries_by_keyword() {
+        let mut catalog = MarketplaceCatalog::new();
+        let mut entry = make_entry("my_tool", "1.0.0");
+        entry.keywords = vec!["arithmetic".to_string(), "math".to_string()];
+        catalog.add(entry);
+        catalog.add(make_entry("other", "1.0.0"));
+
+        let results = catalog.search_entries("arithmetic");
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].name, "my_tool");
+    }
+
+    #[test]
+    fn catalog_entry_from_marketplace_entry() {
+        let entry = make_entry("echo", "1.5.0");
+        let cat: CatalogEntry = CatalogEntry::from(&entry);
+        assert_eq!(cat.name, "echo");
+        assert_eq!(cat.version, "1.5.0");
+        assert_eq!(cat.rating, 4.0);
     }
 }
