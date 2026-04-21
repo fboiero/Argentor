@@ -13,7 +13,7 @@
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tokio::io::AsyncWriteExt;
 use tokio::sync::mpsc;
 use tracing::info;
@@ -161,7 +161,7 @@ impl AuditLog {
 // ---------------------------------------------------------------------------
 
 /// Returns `true` when `path` exists and is at least `max_bytes` in size.
-async fn should_rotate(path: &PathBuf, max_bytes: u64) -> bool {
+async fn should_rotate(path: &Path, max_bytes: u64) -> bool {
     match tokio::fs::metadata(path).await {
         Ok(meta) => meta.len() >= max_bytes,
         Err(_) => false,
@@ -169,7 +169,7 @@ async fn should_rotate(path: &PathBuf, max_bytes: u64) -> bool {
 }
 
 /// Build the path for a rotated log file: `<base>.N`.
-fn rotated_path(base: &PathBuf, n: u32) -> PathBuf {
+fn rotated_path(base: &Path, n: u32) -> PathBuf {
     let mut p = base.as_os_str().to_owned();
     p.push(format!(".{n}"));
     PathBuf::from(p)
@@ -180,7 +180,7 @@ fn rotated_path(base: &PathBuf, n: u32) -> PathBuf {
 /// - Delete `base.max_rotated` if it exists.
 /// - Rename `base.N` -> `base.(N+1)` for N = max_rotated-1 downto 1.
 /// - Rename `base` -> `base.1`.
-async fn rotate_logs(base: &PathBuf, max_rotated: u32) {
+async fn rotate_logs(base: &Path, max_rotated: u32) {
     if max_rotated == 0 {
         // Rotation disabled -- just truncate the active file.
         let _ = tokio::fs::remove_file(base).await;

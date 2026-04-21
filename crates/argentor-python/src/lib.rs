@@ -201,8 +201,8 @@ impl PySkillRegistry {
     /// Create a new registry with all built-in skills registered.
     #[new]
     fn new() -> PyResult<Self> {
-        let mut registry = argentor_skills::SkillRegistry::new();
-        argentor_builtins::register_builtins(&mut registry);
+        let registry = argentor_skills::SkillRegistry::new();
+        argentor_builtins::register_builtins(&registry);
 
         let rt = tokio::runtime::Runtime::new()
             .map_err(|e| pyo3::exceptions::PyRuntimeError::new_err(format!("Failed to create tokio runtime: {e}")))?;
@@ -601,8 +601,8 @@ fn version() -> &'static str {
 /// Return a sorted list of all available built-in skill names.
 #[pyfunction]
 fn available_skills() -> Vec<String> {
-    let mut registry = argentor_skills::SkillRegistry::new();
-    argentor_builtins::register_builtins(&mut registry);
+    let registry = argentor_skills::SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
     let mut names: Vec<String> = registry
         .list_descriptors()
         .iter()

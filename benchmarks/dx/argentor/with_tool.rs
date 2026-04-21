@@ -28,7 +28,7 @@ impl Skill for GetWeatherSkill {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     registry.register(Box::new(GetWeatherSkill));
 
     let config = ModelConfig {

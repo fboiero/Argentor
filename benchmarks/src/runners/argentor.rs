@@ -206,8 +206,8 @@ impl Runner for ArgentorRunner {
         }
 
         // Wire up registry with all builtins
-        let mut registry = SkillRegistry::new();
-        argentor_builtins::register_builtins(&mut registry);
+        let registry = SkillRegistry::new();
+        argentor_builtins::register_builtins(&registry);
         let skills = Arc::new(registry);
         let permissions = PermissionSet::new();
         let tmp = std::env::temp_dir().join(format!("argentor-bench-{}", task.id));
