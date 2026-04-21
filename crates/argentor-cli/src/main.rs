@@ -262,7 +262,7 @@ fn expand_env_vars(input: &str) -> String {
 async fn load_markdown_skills(
     config: &ArgentorConfig,
     config_dir: &std::path::Path,
-    registry: &mut SkillRegistry,
+    registry: &SkillRegistry,
 ) -> String {
     let dir = match &config.markdown_skills_dir {
         Some(d) => {
@@ -299,7 +299,7 @@ async fn load_markdown_skills(
 }
 
 /// Register custom tool groups from config.
-fn load_tool_groups(config: &ArgentorConfig, registry: &mut SkillRegistry) {
+fn load_tool_groups(config: &ArgentorConfig, registry: &SkillRegistry) {
     if !config.tool_groups.is_empty() {
         registry.register_groups(config.tool_groups.clone());
         info!(
@@ -501,25 +501,25 @@ async fn main() -> anyhow::Result<()> {
             info!("Vector memory initialized");
 
             // Load skills: builtins (with memory) first, then WASM skills from config
-            let mut registry = SkillRegistry::new();
-            argentor_builtins::register_builtins_with_memory(&mut registry, vector_store, embedder);
+            let registry = SkillRegistry::new();
+            argentor_builtins::register_builtins_with_memory(&registry, vector_store, embedder);
             info!(count = registry.skill_count(), "Built-in skills registered");
 
             if !config.skills.is_empty() {
                 let loader = SkillLoader::new()?;
-                let loaded = loader.load_all(&config.skills, &config_dir, &mut registry)?;
+                let loaded = loader.load_all(&config.skills, &config_dir, &registry)?;
                 info!(count = loaded, "WASM skills loaded from config");
             }
 
             // Load markdown skills and tool groups
-            let _prompt_injection = load_markdown_skills(&config, &config_dir, &mut registry).await;
-            load_tool_groups(&config, &mut registry);
+            let _prompt_injection = load_markdown_skills(&config, &config_dir, &registry).await;
+            load_tool_groups(&config, &registry);
 
             // Connect to MCP servers and register their tools as skills
             let mcp_manager = Arc::new(argentor_mcp::McpServerManager::new());
             if !config.mcp_servers.is_empty() {
                 let errors = mcp_manager
-                    .connect_all(&config.mcp_servers, &mut registry)
+                    .connect_all(&config.mcp_servers, &registry)
                     .await;
                 if !errors.is_empty() {
                     tracing::warn!(failed = errors.len(), "Some MCP servers failed to connect");
@@ -626,14 +626,14 @@ async fn main() -> anyhow::Result<()> {
         Commands::Skill { action } => match action {
             SkillAction::List => {
                 // Load all skills: builtins + config + markdown
-                let mut registry = SkillRegistry::new();
-                argentor_builtins::register_builtins(&mut registry);
+                let registry = SkillRegistry::new();
+                argentor_builtins::register_builtins(&registry);
                 if !config.skills.is_empty() {
                     let loader = SkillLoader::new()?;
-                    let _ = loader.load_all(&config.skills, &config_dir, &mut registry);
+                    let _ = loader.load_all(&config.skills, &config_dir, &registry);
                 }
-                let _ = load_markdown_skills(&config, &config_dir, &mut registry).await;
-                load_tool_groups(&config, &mut registry);
+                let _ = load_markdown_skills(&config, &config_dir, &registry).await;
+                load_tool_groups(&config, &registry);
 
                 let skills = registry.list_descriptors();
                 if skills.is_empty() {
@@ -700,25 +700,25 @@ async fn main() -> anyhow::Result<()> {
             let audit = Arc::new(AuditLog::new(config.data_dir.join("audit")));
 
             // Load skills: builtins + config + markdown
-            let mut registry = SkillRegistry::new();
+            let registry = SkillRegistry::new();
             if interactive_approval {
                 let channel = Arc::new(argentor_builtins::StdinApprovalChannel::new(
                     std::time::Duration::from_secs(approval_timeout),
                 ));
-                argentor_builtins::register_builtins_with_approval(&mut registry, channel);
+                argentor_builtins::register_builtins_with_approval(&registry, channel);
                 info!(
                     "Interactive approval enabled (timeout: {}s)",
                     approval_timeout
                 );
             } else {
-                argentor_builtins::register_builtins(&mut registry);
+                argentor_builtins::register_builtins(&registry);
             }
             if !config.skills.is_empty() {
                 let loader = SkillLoader::new()?;
-                let _ = loader.load_all(&config.skills, &config_dir, &mut registry);
+                let _ = loader.load_all(&config.skills, &config_dir, &registry);
             }
-            let _prompt_injection = load_markdown_skills(&config, &config_dir, &mut registry).await;
-            load_tool_groups(&config, &mut registry);
+            let _prompt_injection = load_markdown_skills(&config, &config_dir, &registry).await;
+            load_tool_groups(&config, &registry);
 
             // Build permissions
             let mut permissions = PermissionSet::new();

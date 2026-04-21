@@ -124,7 +124,7 @@ impl SkillLoader {
         &self,
         configs: &[SkillConfig],
         base_dir: &Path,
-        registry: &mut SkillRegistry,
+        registry: &SkillRegistry,
     ) -> ArgentorResult<usize> {
         let mut loaded = 0;
 
@@ -148,7 +148,7 @@ impl SkillLoader {
         &self,
         config: &SkillConfig,
         base_dir: &Path,
-        registry: &mut SkillRegistry,
+        registry: &SkillRegistry,
     ) -> ArgentorResult<()> {
         match config.skill_type {
             SkillType::Wasm => {

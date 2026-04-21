@@ -144,7 +144,7 @@ async fn test_register_and_list_echo_skill() {
         )
         .expect("failed to load echo skill");
 
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     registry.register(Arc::new(skill));
 
     // Verify the skill count
@@ -180,7 +180,7 @@ async fn test_registry_execute_echo_skill() {
         )
         .expect("failed to load echo skill");
 
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     registry.register(Arc::new(skill));
 
     let call = ToolCall {
@@ -247,7 +247,7 @@ async fn test_register_multiple_skills_and_list() {
         )
         .expect("failed to load skill b");
 
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     registry.register(Arc::new(skill_a));
     registry.register(Arc::new(skill_b));
 

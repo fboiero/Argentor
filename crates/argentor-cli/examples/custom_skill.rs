@@ -76,7 +76,7 @@ impl Skill for ReverseSkill {
 #[tokio::main]
 async fn main() {
     // 1. Register the custom skill.
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     registry.register(Arc::new(ReverseSkill::new()));
 
     println!("Custom skill registered: 'reverse'");

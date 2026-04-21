@@ -24,7 +24,6 @@ impl ToolDiscovery {
             .list_descriptors()
             .into_iter()
             .filter(|d| allowed_set.contains(d.name.as_str()))
-            .cloned()
             .collect()
     }
 
@@ -34,7 +33,7 @@ impl ToolDiscovery {
         context_keywords: &[&str],
     ) -> Vec<SkillDescriptor> {
         if context_keywords.is_empty() {
-            return registry.list_descriptors().into_iter().cloned().collect();
+            return registry.list_descriptors();
         }
 
         registry
@@ -48,7 +47,6 @@ impl ToolDiscovery {
                     name_lower.contains(&kw_lower) || desc_lower.contains(&kw_lower)
                 })
             })
-            .cloned()
             .collect()
     }
 
@@ -99,7 +97,7 @@ mod tests {
     }
 
     fn make_registry() -> SkillRegistry {
-        let mut registry = SkillRegistry::new();
+        let registry = SkillRegistry::new();
         registry.register(Arc::new(DummySkill::new(
             "memory_store",
             "Store text in memory",

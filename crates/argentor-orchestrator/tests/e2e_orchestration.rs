@@ -327,8 +327,8 @@ async fn test_e2e_monitor_tracking() {
 async fn test_e2e_progressive_disclosure() {
     let tmp = tempfile::tempdir().unwrap();
     let audit = Arc::new(AuditLog::new(tmp.path().join("audit")));
-    let mut registry = SkillRegistry::new();
-    argentor_builtins::register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
     let total_skills = registry.skill_count();
     let skills = Arc::new(registry);
     let permissions = PermissionSet::new();

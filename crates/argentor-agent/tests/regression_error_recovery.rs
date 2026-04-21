@@ -140,8 +140,8 @@ impl LlmBackend for ScriptedBackend {
 fn build_scripted_agent(backend: ScriptedBackend, max_turns: u32) -> AgentRunner {
     let tmp = tempfile::tempdir().unwrap();
     let audit = Arc::new(AuditLog::new(tmp.path().join("audit")));
-    let mut registry = SkillRegistry::new();
-    argentor_builtins::register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
     let skills = Arc::new(registry);
     let permissions = PermissionSet::new();
     AgentRunner::from_backend(Box::new(backend), skills, permissions, audit, max_turns)

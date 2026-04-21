@@ -817,7 +817,7 @@ async fn execute_agent(
         .await;
 
     let session = Session::new();
-    let tool_descriptors: Vec<_> = registry.list_descriptors().into_iter().cloned().collect();
+    let tool_descriptors = registry.list_descriptors();
 
     let mut turns = 0u32;
     let mut tool_calls_count = 0u32;
@@ -966,8 +966,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let audit_dir = temp_dir.join("audit");
 
     // ── Setup infrastructure ────────────────────────────────────
-    let mut registry = SkillRegistry::new();
-    register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    register_builtins(&registry);
 
     let mut permissions = PermissionSet::new();
     permissions.grant(Capability::ShellExec {

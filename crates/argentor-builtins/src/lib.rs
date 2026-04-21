@@ -209,7 +209,7 @@ use std::sync::Arc;
 /// **Web & Network:** web_search, web_scraper, rss_reader, dns_lookup, ip_tools
 /// **Security & AI:** prompt_guard, secret_scanner, diff_tool, summarizer
 /// **Observability:** metrics_collector, color_converter
-pub fn register_utility_skills(registry: &mut SkillRegistry) {
+pub fn register_utility_skills(registry: &SkillRegistry) {
     // Data & Text
     registry.register(Arc::new(CalculatorSkill::default()));
     registry.register(Arc::new(TextTransformSkill::default()));
@@ -257,7 +257,7 @@ pub fn register_utility_skills(registry: &mut SkillRegistry) {
 /// Register all built-in skills into the given registry.
 /// Uses the provided vector store and embedding provider for memory skills.
 pub fn register_builtins_with_memory(
-    registry: &mut SkillRegistry,
+    registry: &SkillRegistry,
     store: Arc<dyn VectorStore>,
     embedder: Arc<dyn EmbeddingProvider>,
 ) {
@@ -279,7 +279,7 @@ pub fn register_builtins_with_memory(
 }
 
 /// Register built-in skills without memory (backwards compatible).
-pub fn register_builtins(registry: &mut SkillRegistry) {
+pub fn register_builtins(registry: &SkillRegistry) {
     registry.register(Arc::new(ShellSkill::new()));
     registry.register(Arc::new(FileReadSkill::new()));
     registry.register(Arc::new(FileWriteSkill::new()));
@@ -294,7 +294,7 @@ pub fn register_builtins(registry: &mut SkillRegistry) {
 
 /// Register built-in skills with a custom approval channel for HITL.
 pub fn register_builtins_with_approval(
-    registry: &mut SkillRegistry,
+    registry: &SkillRegistry,
     approval_channel: Arc<dyn ApprovalChannel>,
 ) {
     registry.register(Arc::new(ShellSkill::new()));
@@ -311,7 +311,7 @@ pub fn register_builtins_with_approval(
 
 /// Register all built-in skills including memory and a custom approval channel.
 pub fn register_all(
-    registry: &mut SkillRegistry,
+    registry: &SkillRegistry,
     store: Arc<dyn VectorStore>,
     embedder: Arc<dyn EmbeddingProvider>,
     approval_channel: Arc<dyn ApprovalChannel>,
@@ -336,7 +336,7 @@ pub fn register_all(
 /// Register orchestration-specific skills (artifact_store, agent_delegate, task_status).
 /// These require a TaskQueueHandle and ArtifactBackend from the orchestrator.
 pub fn register_orchestration_builtins(
-    registry: &mut SkillRegistry,
+    registry: &SkillRegistry,
     queue: Arc<dyn TaskQueueHandle>,
     artifact_backend: Arc<dyn ArtifactBackend>,
 ) {
@@ -351,7 +351,7 @@ pub fn register_orchestration_builtins(
 /// configured with the given `BrowserConfig`. The actual WebDriver connection
 /// is established lazily when the skill is first invoked, and only when the
 /// `browser` feature is enabled.
-pub fn register_builtins_with_browser(registry: &mut SkillRegistry, config: BrowserConfig) {
+pub fn register_builtins_with_browser(registry: &SkillRegistry, config: BrowserConfig) {
     registry.register(Arc::new(ShellSkill::new()));
     registry.register(Arc::new(FileReadSkill::new()));
     registry.register(Arc::new(FileWriteSkill::new()));

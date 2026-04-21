@@ -199,8 +199,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     tracing_subscriber::fmt().with_env_filter("warn").init();
 
     // ── Setup ──────────────────────────────────────────────────
-    let mut registry = SkillRegistry::new();
-    register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    register_builtins(&registry);
 
     let mut permissions = PermissionSet::new();
     permissions.grant(Capability::NetworkAccess {
@@ -668,8 +668,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     )];
     let demo_backend = DemoBackend::new(demo_responses);
 
-    let mut demo_registry = SkillRegistry::new();
-    register_builtins(&mut demo_registry);
+    let demo_registry = SkillRegistry::new();
+    register_builtins(&demo_registry);
 
     let mut demo_permissions = PermissionSet::new();
     demo_permissions.grant(Capability::NetworkAccess {
@@ -715,8 +715,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Argentor is a modular Rust framework with 13 crates for secure AI agents.".into(),
     )];
     let clean_backend = DemoBackend::new(clean_responses);
-    let mut clean_registry = SkillRegistry::new();
-    register_builtins(&mut clean_registry);
+    let clean_registry = SkillRegistry::new();
+    register_builtins(&clean_registry);
     let mut clean_perms = PermissionSet::new();
     clean_perms.grant(Capability::NetworkAccess {
         allowed_hosts: vec!["*".into()],

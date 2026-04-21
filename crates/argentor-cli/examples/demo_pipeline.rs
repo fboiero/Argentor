@@ -467,8 +467,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let store: Arc<dyn VectorStore> = Arc::new(InMemoryVectorStore::new());
     let embedder = Arc::new(LocalEmbedding::default());
-    let mut registry = SkillRegistry::new();
-    register_builtins_with_memory(&mut registry, store, embedder);
+    let registry = SkillRegistry::new();
+    register_builtins_with_memory(&registry, store, embedder);
 
     let mut permissions = PermissionSet::new();
     permissions.grant(Capability::ShellExec {
@@ -505,7 +505,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let system_prompt = personality.to_system_prompt();
     let mut session = Session::new();
-    let tool_descriptors: Vec<_> = registry.list_descriptors().into_iter().cloned().collect();
+    let tool_descriptors = registry.list_descriptors();
 
     // ════════════════════════════════════════════════════════════
     // BANNER

@@ -268,8 +268,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let audit_dir = temp_dir.join("audit");
 
     // Build components
-    let mut registry = SkillRegistry::new();
-    register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    register_builtins(&registry);
 
     // Set up RESTRICTIVE permissions — only what's needed for legitimate work
     let mut permissions = PermissionSet::new();

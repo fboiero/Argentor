@@ -71,7 +71,7 @@ pub trait Plugin: Send + Sync {
     fn manifest(&self) -> &PluginManifest;
 
     /// Called when the plugin is loaded. Use this to register skills.
-    fn on_load(&self, _registry: &mut SkillRegistry) {}
+    fn on_load(&self, _registry: &SkillRegistry) {}
 
     /// Called when the plugin is unloaded. Use this for cleanup.
     fn on_unload(&self) {}
@@ -94,7 +94,7 @@ impl PluginRegistry {
     }
 
     /// Load a plugin: calls `on_load` to let it register skills, then stores it.
-    pub fn load(&mut self, plugin: Arc<dyn Plugin>, skill_registry: &mut SkillRegistry) {
+    pub fn load(&mut self, plugin: Arc<dyn Plugin>, skill_registry: &SkillRegistry) {
         plugin.on_load(skill_registry);
         self.plugins.push(plugin);
     }
@@ -169,7 +169,7 @@ mod tests {
             &self.manifest
         }
 
-        fn on_load(&self, _registry: &mut SkillRegistry) {
+        fn on_load(&self, _registry: &SkillRegistry) {
             self.load_called.store(true, Ordering::SeqCst);
         }
 
@@ -207,7 +207,7 @@ mod tests {
             &self.manifest
         }
 
-        fn on_load(&self, registry: &mut SkillRegistry) {
+        fn on_load(&self, registry: &SkillRegistry) {
             registry.register(Arc::new(PluginSkill {
                 descriptor: SkillDescriptor {
                     name: "plugin_skill".to_string(),
@@ -222,10 +222,10 @@ mod tests {
     #[test]
     fn test_load_plugin_manifest_accessible_via_list() {
         let mut plugin_registry = PluginRegistry::new();
-        let mut skill_registry = SkillRegistry::new();
+        let skill_registry = SkillRegistry::new();
 
         let plugin = Arc::new(MockPlugin::new("test-plugin"));
-        plugin_registry.load(plugin, &mut skill_registry);
+        plugin_registry.load(plugin, &skill_registry);
 
         let manifests = plugin_registry.list();
         assert_eq!(manifests.len(), 1);
@@ -237,12 +237,12 @@ mod tests {
     #[test]
     fn test_unload_all_clears_plugins() {
         let mut plugin_registry = PluginRegistry::new();
-        let mut skill_registry = SkillRegistry::new();
+        let skill_registry = SkillRegistry::new();
 
         let plugin = Arc::new(MockPlugin::new("to-unload"));
         let flag_clone = plugin.unload_called.clone();
 
-        plugin_registry.load(plugin, &mut skill_registry);
+        plugin_registry.load(plugin, &skill_registry);
         assert_eq!(plugin_registry.count(), 1);
 
         plugin_registry.unload_all();
@@ -258,12 +258,12 @@ mod tests {
     #[test]
     fn test_event_emission_calls_on_event() {
         let mut plugin_registry = PluginRegistry::new();
-        let mut skill_registry = SkillRegistry::new();
+        let skill_registry = SkillRegistry::new();
 
         let plugin = Arc::new(MockPlugin::new("event-listener"));
         let counter = plugin.event_count.clone();
 
-        plugin_registry.load(plugin, &mut skill_registry);
+        plugin_registry.load(plugin, &skill_registry);
 
         // Emit several events
         plugin_registry.emit(&PluginEvent::SessionCreated {
@@ -285,7 +285,7 @@ mod tests {
     #[test]
     fn test_skill_registration_via_plugin_on_load() {
         let mut plugin_registry = PluginRegistry::new();
-        let mut skill_registry = SkillRegistry::new();
+        let skill_registry = SkillRegistry::new();
 
         assert_eq!(skill_registry.skill_count(), 0);
 
@@ -298,7 +298,7 @@ mod tests {
             },
         });
 
-        plugin_registry.load(plugin, &mut skill_registry);
+        plugin_registry.load(plugin, &skill_registry);
 
         // The skill should now be in the skill registry
         assert_eq!(skill_registry.skill_count(), 1);

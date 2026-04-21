@@ -25,7 +25,7 @@ use argentor_session::Session;
 use argentor_skills::skill::Skill;
 use argentor_skills::{SkillDescriptor, SkillRegistry};
 use async_trait::async_trait;
-use std::sync::{Arc, Mutex, RwLock};
+use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
@@ -316,12 +316,12 @@ async fn test_circuit_breaker_state_consistency() {
 /// 500 concurrent record_feedback() calls — stats are coherent: the total
 /// uses counter equals the number of records sent.
 ///
-/// Note: `LearningEngine::record_feedback` takes `&mut self`, so concurrent
-/// callers must serialize through a Mutex. This is documented as a known
-/// leaky abstraction (see task report).
+/// `LearningEngine` uses `Arc<RwLock<LearningInner>>` interior mutability, so
+/// `record_feedback` takes `&self` and multiple concurrent callers are safe
+/// without any outer `Mutex`.
 #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
 async fn test_learning_engine_concurrent_feedback() {
-    let engine = Arc::new(Mutex::new(LearningEngine::with_defaults()));
+    let engine = Arc::new(LearningEngine::with_defaults());
     const N: usize = 500;
     let mut handles = Vec::with_capacity(N);
     for i in 0..N {
@@ -335,14 +335,13 @@ async fn test_learning_engine_concurrent_feedback() {
                 tokens_used: 10,
                 error_type: None,
             };
-            e.lock().unwrap().record_feedback(&fb);
+            e.record_feedback(&fb);
         }));
     }
     for h in handles {
         h.await.expect("task panicked");
     }
 
-    let engine = engine.lock().unwrap();
     let stats = engine
         .get_stats("calculator")
         .expect("calculator stats should exist after feedback");

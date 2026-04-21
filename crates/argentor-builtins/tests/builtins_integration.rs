@@ -19,16 +19,16 @@ use std::sync::Arc;
 
 #[test]
 fn register_builtins_registers_expected_count() {
-    let mut registry = SkillRegistry::new();
-    register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    register_builtins(&registry);
     // register_builtins adds: 9 core + 29 utility + 6 document loaders = 44
     assert_eq!(registry.skill_count(), 44);
 }
 
 #[test]
 fn register_builtins_contains_expected_skill_names() {
-    let mut registry = SkillRegistry::new();
-    register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    register_builtins(&registry);
 
     let core_skills = [
         "shell",
@@ -70,10 +70,10 @@ fn register_builtins_contains_expected_skill_names() {
 
 #[test]
 fn register_builtins_with_memory_registers_all_skills() {
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     let store: Arc<dyn VectorStore> = Arc::new(InMemoryVectorStore::new());
     let embedder: Arc<dyn EmbeddingProvider> = Arc::new(LocalEmbedding::default());
-    register_builtins_with_memory(&mut registry, store, embedder);
+    register_builtins_with_memory(&registry, store, embedder);
     // 9 core + 29 utility + 6 document loaders + memory_store + memory_search = 46
     assert_eq!(registry.skill_count(), 46);
     assert!(registry.get("memory_store").is_some());

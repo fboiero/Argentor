@@ -38,8 +38,8 @@ async fn start_full_server(api_keys: Vec<String>) -> (String, tempfile::TempDir)
     );
 
     // Register all builtins
-    let mut registry = SkillRegistry::new();
-    argentor_builtins::register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
 
     // Build permissions from builtins
     let mut permissions = PermissionSet::new();

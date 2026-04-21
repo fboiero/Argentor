@@ -23,15 +23,15 @@ use std::sync::Arc;
 #[tokio::main]
 async fn main() {
     // 1. Register three built-in utility skills.
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     registry.register(Arc::new(CalculatorSkill::default()));
     registry.register(Arc::new(HashSkill::default()));
     registry.register(Arc::new(UuidGeneratorSkill::default()));
 
-    let skill_names: Vec<&str> = registry
+    let skill_names: Vec<String> = registry
         .list_descriptors()
-        .iter()
-        .map(|d| d.name.as_str())
+        .into_iter()
+        .map(|d| d.name)
         .collect();
     println!("Registered skills: {skill_names:?}");
 

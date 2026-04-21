@@ -12,7 +12,10 @@
 
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock};
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc, RwLock,
+};
 use std::time::{Duration, Instant};
 
 // ---------------------------------------------------------------------------
@@ -130,7 +133,20 @@ struct LruNode {
 }
 
 // ---------------------------------------------------------------------------
-// Inner state
+// Result of a get() call — carries data out of the write lock
+// ---------------------------------------------------------------------------
+
+enum LruGetResult {
+    Hit {
+        response: String,
+        token_estimate: u64,
+    },
+    Miss,
+    Expired,
+}
+
+// ---------------------------------------------------------------------------
+// Inner state (no stats — they live on AtomicU64 fields outside the lock)
 // ---------------------------------------------------------------------------
 
 #[derive(Debug)]
@@ -149,12 +165,6 @@ struct Inner {
     capacity: usize,
     /// TTL for cache entries.
     ttl: Duration,
-    /// Stats.
-    total_lookups: u64,
-    hits: u64,
-    misses: u64,
-    evictions: u64,
-    tokens_saved: u64,
 }
 
 impl Inner {
@@ -167,11 +177,6 @@ impl Inner {
             tail: None,
             capacity,
             ttl,
-            total_lookups: 0,
-            hits: 0,
-            misses: 0,
-            evictions: 0,
-            tokens_saved: 0,
         }
     }
 
@@ -228,16 +233,17 @@ impl Inner {
         }
     }
 
-    /// Remove the least recently used entry.
-    fn evict_lru(&mut self) {
+    /// Remove the least recently used entry. Returns `true` if an entry was evicted.
+    fn evict_lru(&mut self) -> bool {
         if let Some(tail_idx) = self.tail {
             self.detach(tail_idx);
             if let Some(node) = self.nodes[tail_idx].take() {
                 self.index.remove(&node.key);
                 self.free_list.push(tail_idx);
-                self.evictions += 1;
+                return true;
             }
         }
+        false
     }
 
     /// Allocate or reuse a node index.
@@ -252,15 +258,13 @@ impl Inner {
     }
 
     /// Get a cached response, moving it to front if found and not expired.
-    fn get(&mut self, key: &CacheKey) -> Option<String> {
-        self.total_lookups += 1;
-
+    ///
+    /// Returns a `LruGetResult` so that stats counters (which live outside the
+    /// lock as `AtomicU64`s) can be updated *after* the lock is released.
+    fn get(&mut self, key: &CacheKey) -> LruGetResult {
         let idx = match self.index.get(key) {
             Some(&i) => i,
-            None => {
-                self.misses += 1;
-                return None;
-            }
+            None => return LruGetResult::Miss,
         };
 
         // Check TTL
@@ -273,30 +277,31 @@ impl Inner {
             if let Some(node) = self.nodes[idx].take() {
                 self.index.remove(&node.key);
                 self.free_list.push(idx);
-                self.evictions += 1;
             }
-            self.misses += 1;
-            return None;
+            return LruGetResult::Expired;
         }
 
         // Move to front
         self.detach(idx);
         self.push_front(idx);
 
-        // Update hit count and stats
+        // Update hit count and return data
         if let Some(node) = &mut self.nodes[idx] {
             node.entry.hit_count += 1;
-            self.hits += 1;
-            self.tokens_saved += node.entry.token_estimate;
-            return Some(node.entry.response.clone());
+            let token_estimate = node.entry.token_estimate;
+            return LruGetResult::Hit {
+                response: node.entry.response.clone(),
+                token_estimate,
+            };
         }
 
-        self.misses += 1;
-        None
+        LruGetResult::Miss
     }
 
-    /// Insert a response into the cache.
-    fn put(&mut self, key: CacheKey, response: String, model: String, token_estimate: u64) {
+    /// Insert a response into the cache. Returns `true` if an LRU eviction occurred.
+    fn put(&mut self, key: CacheKey, response: String, model: String, token_estimate: u64) -> bool {
+        let mut evicted = false;
+
         // If already present, update and move to front
         if let Some(&idx) = self.index.get(&key) {
             self.detach(idx);
@@ -307,12 +312,12 @@ impl Inner {
                 node.entry.token_estimate = token_estimate;
             }
             self.push_front(idx);
-            return;
+            return false;
         }
 
         // Evict if at capacity
         if self.len() >= self.capacity {
-            self.evict_lru();
+            evicted = self.evict_lru();
         }
 
         let idx = self.alloc_index();
@@ -337,6 +342,7 @@ impl Inner {
 
         self.index.insert(key, idx);
         self.push_front(idx);
+        evicted
     }
 }
 
@@ -346,10 +352,17 @@ impl Inner {
 
 /// Thread-safe in-memory LRU cache for LLM responses.
 ///
-/// Clone is cheap (inner state is behind `Arc<RwLock>`).
+/// Clone is cheap — inner state is behind `Arc<RwLock>` and all stats
+/// counters are `Arc<AtomicU64>`, so `stats()` is wait-free (no lock held).
 #[derive(Debug, Clone)]
 pub struct ResponseCache {
     inner: Arc<RwLock<Inner>>,
+    // Stats live outside the lock so stats() is wait-free.
+    total_lookups: Arc<AtomicU64>,
+    hits: Arc<AtomicU64>,
+    misses: Arc<AtomicU64>,
+    evictions: Arc<AtomicU64>,
+    tokens_saved: Arc<AtomicU64>,
 }
 
 impl ResponseCache {
@@ -357,15 +370,47 @@ impl ResponseCache {
     pub fn new(capacity: usize, ttl: Duration) -> Self {
         Self {
             inner: Arc::new(RwLock::new(Inner::new(capacity, ttl))),
+            total_lookups: Arc::new(AtomicU64::new(0)),
+            hits: Arc::new(AtomicU64::new(0)),
+            misses: Arc::new(AtomicU64::new(0)),
+            evictions: Arc::new(AtomicU64::new(0)),
+            tokens_saved: Arc::new(AtomicU64::new(0)),
         }
     }
 
     /// Look up a cached response for the given key.
+    ///
+    /// Acquires a write lock (LRU promotion on hit is unavoidable) but updates
+    /// all stats counters *after* the lock is released via `AtomicU64`.
     pub fn get(&self, key: &CacheKey) -> Option<String> {
-        self.inner
+        self.total_lookups.fetch_add(1, Ordering::Relaxed);
+
+        let result = self
+            .inner
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
-            .get(key)
+            .get(key);
+
+        match result {
+            LruGetResult::Hit {
+                response,
+                token_estimate,
+            } => {
+                self.hits.fetch_add(1, Ordering::Relaxed);
+                self.tokens_saved
+                    .fetch_add(token_estimate, Ordering::Relaxed);
+                Some(response)
+            }
+            LruGetResult::Miss => {
+                self.misses.fetch_add(1, Ordering::Relaxed);
+                None
+            }
+            LruGetResult::Expired => {
+                self.misses.fetch_add(1, Ordering::Relaxed);
+                self.evictions.fetch_add(1, Ordering::Relaxed);
+                None
+            }
+        }
     }
 
     /// Store a response in the cache.
@@ -376,38 +421,52 @@ impl ResponseCache {
         model: impl Into<String>,
         token_estimate: u64,
     ) {
-        self.inner
+        let evicted = self
+            .inner
             .write()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
             .put(key, response.into(), model.into(), token_estimate);
+
+        if evicted {
+            self.evictions.fetch_add(1, Ordering::Relaxed);
+        }
     }
 
     /// Get cache performance statistics.
+    ///
+    /// All counters are read from `AtomicU64` (wait-free).
+    /// Only `size` and `capacity` require a short read lock.
     pub fn stats(&self) -> CacheStats {
+        let total_lookups = self.total_lookups.load(Ordering::Relaxed);
+        let hits = self.hits.load(Ordering::Relaxed);
+        let misses = self.misses.load(Ordering::Relaxed);
+        let evictions = self.evictions.load(Ordering::Relaxed);
+        let tokens_saved = self.tokens_saved.load(Ordering::Relaxed);
+
+        let hit_rate = if total_lookups > 0 {
+            (hits as f64 / total_lookups as f64) * 100.0
+        } else {
+            0.0
+        };
+
         let inner = self
             .inner
             .read()
             .unwrap_or_else(std::sync::PoisonError::into_inner);
 
-        let hit_rate = if inner.total_lookups > 0 {
-            (inner.hits as f64 / inner.total_lookups as f64) * 100.0
-        } else {
-            0.0
-        };
-
         CacheStats {
-            total_lookups: inner.total_lookups,
-            hits: inner.hits,
-            misses: inner.misses,
-            evictions: inner.evictions,
+            total_lookups,
+            hits,
+            misses,
+            evictions,
             size: inner.len(),
             capacity: inner.capacity,
             hit_rate_percent: hit_rate,
-            tokens_saved: inner.tokens_saved,
+            tokens_saved,
         }
     }
 
-    /// Clear all cached entries.
+    /// Clear all cached entries and reset all stats counters.
     pub fn clear(&self) {
         let mut inner = self
             .inner
@@ -416,6 +475,13 @@ impl ResponseCache {
         let capacity = inner.capacity;
         let ttl = inner.ttl;
         *inner = Inner::new(capacity, ttl);
+        drop(inner);
+
+        self.total_lookups.store(0, Ordering::Relaxed);
+        self.hits.store(0, Ordering::Relaxed);
+        self.misses.store(0, Ordering::Relaxed);
+        self.evictions.store(0, Ordering::Relaxed);
+        self.tokens_saved.store(0, Ordering::Relaxed);
     }
 
     /// Get the current number of entries.
@@ -624,7 +690,7 @@ mod tests {
         assert_eq!(c.len(), 1);
     }
 
-    // 15. Clear removes all entries
+    // 15. Clear removes all entries and resets stats
     #[test]
     fn test_clear() {
         let c = cache();
@@ -636,6 +702,10 @@ mod tests {
         c.clear();
         assert_eq!(c.len(), 0);
         assert!(c.is_empty());
+        let stats = c.stats();
+        assert_eq!(stats.hits, 0);
+        assert_eq!(stats.misses, 0);
+        assert_eq!(stats.total_lookups, 0);
     }
 
     // 16. CacheKey determinism

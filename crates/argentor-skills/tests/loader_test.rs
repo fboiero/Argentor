@@ -47,7 +47,7 @@ fn test_create_skill_loader() {
 fn test_load_valid_wasm_skill_via_loader() {
     let base_dir = assert_prerequisites();
     let loader = SkillLoader::new().expect("failed to create SkillLoader");
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
 
     let config = SkillConfig {
         name: "echo".to_string(),
@@ -64,7 +64,7 @@ fn test_load_valid_wasm_skill_via_loader() {
         capabilities: CapabilityConfig::default(),
     };
 
-    let loaded = loader.load_all(&[config], &base_dir, &mut registry);
+    let loaded = loader.load_all(&[config], &base_dir, &registry);
     assert!(loaded.is_ok(), "load_all should succeed");
     assert_eq!(loaded.unwrap(), 1, "Should have loaded exactly one skill");
     assert_eq!(registry.skill_count(), 1);
@@ -82,7 +82,7 @@ fn test_load_valid_wasm_skill_via_loader() {
 fn test_load_skill_with_nonexistent_path_is_skipped() {
     let base_dir = workspace_root();
     let loader = SkillLoader::new().expect("failed to create SkillLoader");
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
 
     let config = SkillConfig {
         name: "missing-skill".to_string(),
@@ -94,7 +94,7 @@ fn test_load_skill_with_nonexistent_path_is_skipped() {
     };
 
     // load_all should not fail; it skips individual failures and logs a warning
-    let loaded = loader.load_all(&[config], &base_dir, &mut registry);
+    let loaded = loader.load_all(&[config], &base_dir, &registry);
     assert!(
         loaded.is_ok(),
         "load_all should succeed even when a skill fails to load"
@@ -111,7 +111,7 @@ fn test_load_skill_with_nonexistent_path_is_skipped() {
 fn test_load_skill_with_no_path_is_skipped() {
     let base_dir = workspace_root();
     let loader = SkillLoader::new().expect("failed to create SkillLoader");
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
 
     let config = SkillConfig {
         name: "no-path-skill".to_string(),
@@ -122,7 +122,7 @@ fn test_load_skill_with_no_path_is_skipped() {
         capabilities: CapabilityConfig::default(),
     };
 
-    let loaded = loader.load_all(&[config], &base_dir, &mut registry);
+    let loaded = loader.load_all(&[config], &base_dir, &registry);
     assert!(
         loaded.is_ok(),
         "load_all should succeed even when a config is invalid"
@@ -138,7 +138,7 @@ fn test_load_skill_with_no_path_is_skipped() {
 fn test_load_native_skill_type_is_skipped() {
     let base_dir = workspace_root();
     let loader = SkillLoader::new().expect("failed to create SkillLoader");
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
 
     let config = SkillConfig {
         name: "native-skill".to_string(),
@@ -149,7 +149,7 @@ fn test_load_native_skill_type_is_skipped() {
         capabilities: CapabilityConfig::default(),
     };
 
-    let loaded = loader.load_all(&[config], &base_dir, &mut registry);
+    let loaded = loader.load_all(&[config], &base_dir, &registry);
     assert!(
         loaded.is_ok(),
         "load_all should succeed for native skill configs"
@@ -176,7 +176,7 @@ fn test_load_native_skill_type_is_skipped() {
 fn test_load_mix_of_valid_and_invalid_skills() {
     let base_dir = assert_prerequisites();
     let loader = SkillLoader::new().expect("failed to create SkillLoader");
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
 
     let configs = vec![
         SkillConfig {
@@ -205,7 +205,7 @@ fn test_load_mix_of_valid_and_invalid_skills() {
         },
     ];
 
-    let loaded = loader.load_all(&configs, &base_dir, &mut registry);
+    let loaded = loader.load_all(&configs, &base_dir, &registry);
     assert!(loaded.is_ok(), "load_all should succeed");
     assert_eq!(
         loaded.unwrap(),
@@ -230,7 +230,7 @@ fn test_load_mix_of_valid_and_invalid_skills() {
 async fn test_loaded_skill_can_execute() {
     let base_dir = assert_prerequisites();
     let loader = SkillLoader::new().expect("failed to create SkillLoader");
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
 
     let config = SkillConfig {
         name: "echo".to_string(),
@@ -248,7 +248,7 @@ async fn test_loaded_skill_can_execute() {
     };
 
     loader
-        .load_all(&[config], &base_dir, &mut registry)
+        .load_all(&[config], &base_dir, &registry)
         .expect("failed to load skills");
 
     let call = argentor_core::ToolCall {

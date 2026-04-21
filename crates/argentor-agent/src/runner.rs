@@ -31,6 +31,25 @@ type OptionalProxy = Option<(Arc<argentor_mcp::McpProxy>, String)>;
 /// The Agent Runner: orchestrates the agentic loop.
 /// Prompt -> LLM -> ToolCall -> Execute Skill -> Backfill -> Repeat.
 ///
+/// # Sharing across threads
+///
+/// `AgentRunner` is designed to be shared via `Arc<AgentRunner>`:
+///
+/// ```rust,no_run
+/// use argentor_agent::AgentRunner;
+/// use std::sync::Arc;
+///
+/// # async fn example(runner: AgentRunner) {
+/// let runner = Arc::new(runner);
+/// let r1 = runner.clone();
+/// let r2 = runner.clone();
+/// # }
+/// ```
+///
+/// All mutation after construction goes through interior mutability
+/// (`LearningEngine`, `ResponseCache`, `SkillRegistry` all use `Arc<RwLock<…>>`),
+/// so you never need `&mut AgentRunner` once it is constructed.
+///
 /// # Examples
 ///
 /// ```no_run
@@ -41,8 +60,8 @@ type OptionalProxy = Option<(Arc<argentor_mcp::McpProxy>, String)>;
 /// use std::sync::Arc;
 /// use std::path::PathBuf;
 ///
-/// let mut registry = SkillRegistry::new();
-/// register_builtins(&mut registry);
+/// let registry = SkillRegistry::new();
+/// register_builtins(&registry);
 /// let skills = Arc::new(registry);
 /// let permissions = PermissionSet::new();
 /// let audit = Arc::new(AuditLog::new(PathBuf::from("/tmp/audit")));
@@ -130,6 +149,11 @@ impl AgentRunner {
     }
 
     /// Create from a custom LLM backend (for testing or custom providers).
+    ///
+    /// Ownership: `skills` and `audit` are passed as `Arc` so multiple runners
+    /// (or concurrent tasks) can share the same registry and audit log without
+    /// cloning the underlying data.  `permissions` is cloned per-runner; mutating
+    /// a runner's permission set does not affect any other runner.
     pub fn from_backend(
         backend: Box<dyn crate::backends::LlmBackend>,
         skills: Arc<SkillRegistry>,
@@ -369,13 +393,12 @@ impl AgentRunner {
     }
 
     /// Get a reference to the learning engine (if enabled).
+    ///
+    /// `LearningEngine` uses interior mutability (`Arc<RwLock<…>>`), so all
+    /// mutation methods (`record_feedback`, `learn_patterns`, `deserialize`) take
+    /// `&self` — no `&mut AgentRunner` is required.
     pub fn learning(&self) -> Option<&crate::learning::LearningEngine> {
         self.learning.as_ref()
-    }
-
-    /// Get a mutable reference to the learning engine (for recording feedback).
-    pub fn learning_mut(&mut self) -> Option<&mut crate::learning::LearningEngine> {
-        self.learning.as_mut()
     }
 
     /// Enable all intelligence features with default configurations.
@@ -442,21 +465,12 @@ impl AgentRunner {
                     .list_descriptors()
                     .into_iter()
                     .filter(|d| selected_names.contains(d.name.as_str()))
-                    .cloned()
                     .collect()
             } else {
-                self.skills
-                    .list_descriptors()
-                    .into_iter()
-                    .cloned()
-                    .collect()
+                self.skills.list_descriptors()
             }
         } else {
-            self.skills
-                .list_descriptors()
-                .into_iter()
-                .cloned()
-                .collect()
+            self.skills.list_descriptors()
         };
 
         // --- Intelligence: Extended Thinking ---
@@ -864,7 +878,7 @@ impl AgentRunner {
 
                                 // --- Intelligence: Learning Feedback ---
                                 // Note: feedback is logged for post-run batch application
-                                // via `learning_mut().record_feedback()` since run() takes &self.
+                                // via `learning().record_feedback()` since LearningEngine uses interior mutability.
                                 if self.learning.is_some() {
                                     self.debug_recorder.record(
                                         StepType::Custom("learning".into()),
@@ -997,12 +1011,7 @@ impl AgentRunner {
             context.push(msg.clone());
         }
 
-        let tool_descriptors: Vec<_> = self
-            .skills
-            .list_descriptors()
-            .into_iter()
-            .cloned()
-            .collect();
+        let tool_descriptors = self.skills.list_descriptors();
 
         info!(session_id = %session_id, "Starting streaming agentic loop");
 

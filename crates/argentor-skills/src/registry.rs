@@ -3,7 +3,7 @@ use argentor_core::{ArgentorError, ArgentorResult, ToolCall, ToolResult};
 use argentor_security::PermissionSet;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, RwLock};
 use tracing::{info, warn};
 
 /// A named group of skills for progressive tool disclosure.
@@ -166,6 +166,10 @@ pub fn default_tool_groups() -> Vec<ToolGroup> {
 
 /// Central registry for all available skills.
 ///
+/// `SkillRegistry` uses interior mutability (`RwLock`) so it can be shared
+/// across threads via `Arc<SkillRegistry>` without requiring exclusive (`&mut`)
+/// access for registration.
+///
 /// # Examples
 ///
 /// ```rust
@@ -179,8 +183,8 @@ pub fn default_tool_groups() -> Vec<ToolGroup> {
 /// assert!(!groups.is_empty()); // default groups are pre-loaded
 /// ```
 pub struct SkillRegistry {
-    skills: HashMap<String, Arc<dyn Skill>>,
-    groups: HashMap<String, ToolGroup>,
+    skills: RwLock<HashMap<String, Arc<dyn Skill>>>,
+    groups: RwLock<HashMap<String, ToolGroup>>,
 }
 
 impl SkillRegistry {
@@ -192,49 +196,73 @@ impl SkillRegistry {
             .collect();
 
         Self {
-            skills: HashMap::new(),
-            groups,
+            skills: RwLock::new(HashMap::new()),
+            groups: RwLock::new(groups),
         }
     }
 
     /// Register a skill in the registry.
-    pub fn register(&mut self, skill: Arc<dyn Skill>) {
+    pub fn register(&self, skill: Arc<dyn Skill>) {
         let name = skill.descriptor().name.clone();
         info!(skill = %name, "Registered skill");
-        self.skills.insert(name, skill);
+        self.skills
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(name, skill);
     }
 
     /// Register a custom tool group.
-    pub fn register_group(&mut self, group: ToolGroup) {
+    pub fn register_group(&self, group: ToolGroup) {
         info!(group = %group.name, skills = group.skills.len(), "Registered tool group");
-        self.groups.insert(group.name.clone(), group);
+        self.groups
+            .write()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .insert(group.name.clone(), group);
     }
 
     /// Register multiple custom tool groups.
-    pub fn register_groups(&mut self, groups: Vec<ToolGroup>) {
+    pub fn register_groups(&self, groups: Vec<ToolGroup>) {
         for group in groups {
             self.register_group(group);
         }
     }
 
-    /// Look up a skill by name.
-    pub fn get(&self, name: &str) -> Option<&Arc<dyn Skill>> {
-        self.skills.get(name)
+    /// Look up a skill by name. Returns an owned `Arc` clone.
+    pub fn get(&self, name: &str) -> Option<Arc<dyn Skill>> {
+        self.skills
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(name)
+            .cloned()
     }
 
-    /// List descriptors for all registered skills.
-    pub fn list_descriptors(&self) -> Vec<&SkillDescriptor> {
-        self.skills.values().map(|s| s.descriptor()).collect()
+    /// List descriptors for all registered skills (owned clones).
+    pub fn list_descriptors(&self) -> Vec<SkillDescriptor> {
+        self.skills
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .values()
+            .map(|s| s.descriptor().clone())
+            .collect()
     }
 
-    /// List all registered tool groups.
-    pub fn list_groups(&self) -> Vec<&ToolGroup> {
-        self.groups.values().collect()
+    /// List all registered tool groups (owned clones).
+    pub fn list_groups(&self) -> Vec<ToolGroup> {
+        self.groups
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .values()
+            .cloned()
+            .collect()
     }
 
-    /// Get a tool group by name.
-    pub fn get_group(&self, name: &str) -> Option<&ToolGroup> {
-        self.groups.get(name)
+    /// Get a tool group by name (owned clone).
+    pub fn get_group(&self, name: &str) -> Option<ToolGroup> {
+        self.groups
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .get(name)
+            .cloned()
     }
 
     /// Execute a tool call, checking permissions first.
@@ -250,7 +278,6 @@ impl SkillRegistry {
         permissions: &PermissionSet,
     ) -> ArgentorResult<ToolResult> {
         let skill = self
-            .skills
             .get(&call.name)
             .ok_or_else(|| ArgentorError::Skill(format!("Unknown skill: {}", call.name)))?;
 
@@ -362,15 +389,17 @@ impl SkillRegistry {
         }
     }
 
-    /// Return only skills whose names appear in the given list.
+    /// Return only descriptors for skills whose names appear in the given list.
     /// Used for progressive tool disclosure in multi-agent orchestration.
-    pub fn filter_by_names(&self, names: &[String]) -> Vec<&SkillDescriptor> {
+    pub fn filter_by_names(&self, names: &[String]) -> Vec<SkillDescriptor> {
         let allowed: std::collections::HashSet<&str> =
             names.iter().map(std::string::String::as_str).collect();
         self.skills
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .values()
             .filter(|s| allowed.contains(s.descriptor().name.as_str()))
-            .map(|s| s.descriptor())
+            .map(|s| s.descriptor().clone())
             .collect()
     }
 
@@ -379,15 +408,22 @@ impl SkillRegistry {
     pub fn filter_to_new(&self, names: &[String]) -> Self {
         let allowed: std::collections::HashSet<&str> =
             names.iter().map(std::string::String::as_str).collect();
-        let skills = self
+        let skills: HashMap<String, Arc<dyn Skill>> = self
             .skills
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
             .iter()
             .filter(|(name, _)| allowed.contains(name.as_str()))
             .map(|(name, skill)| (name.clone(), skill.clone()))
             .collect();
+        let groups = self
+            .groups
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .clone();
         Self {
-            skills,
-            groups: self.groups.clone(),
+            skills: RwLock::new(skills),
+            groups: RwLock::new(groups),
         }
     }
 
@@ -395,35 +431,52 @@ impl SkillRegistry {
     /// If the group has an empty skills list (like "full"), returns all skills.
     pub fn filter_by_group(&self, group_name: &str) -> ArgentorResult<Self> {
         let group = self
-            .groups
-            .get(group_name)
+            .get_group(group_name)
             .ok_or_else(|| ArgentorError::Config(format!("Unknown tool group: {group_name}")))?;
 
         if group.skills.is_empty() {
             // "full" group — return everything
+            let skills = self
+                .skills
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone();
+            let groups = self
+                .groups
+                .read()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .clone();
             return Ok(Self {
-                skills: self.skills.clone(),
-                groups: self.groups.clone(),
+                skills: RwLock::new(skills),
+                groups: RwLock::new(groups),
             });
         }
 
-        let skills = self.filter_to_new(&group.skills);
-        Ok(skills)
+        Ok(self.filter_to_new(&group.skills))
     }
 
     /// Get skill names that belong to a specific group.
     pub fn skills_in_group(&self, group_name: &str) -> Vec<String> {
-        match self.groups.get(group_name) {
+        let groups = self
+            .groups
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        let skills = self
+            .skills
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+
+        match groups.get(group_name) {
             Some(group) if group.skills.is_empty() => {
                 // "full" = all skills
-                self.skills.keys().cloned().collect()
+                skills.keys().cloned().collect()
             }
             Some(group) => {
                 // Return only skills that exist in both the group definition and registry
                 group
                     .skills
                     .iter()
-                    .filter(|name| self.skills.contains_key(name.as_str()))
+                    .filter(|name| skills.contains_key(name.as_str()))
                     .cloned()
                     .collect()
             }
@@ -433,7 +486,10 @@ impl SkillRegistry {
 
     /// Return the total number of registered skills.
     pub fn skill_count(&self) -> usize {
-        self.skills.len()
+        self.skills
+            .read()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .len()
     }
 }
 
@@ -518,7 +574,7 @@ mod tests {
 
     #[test]
     fn test_filter_by_names_subset() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(TestSkill::new("echo")));
         reg.register(Arc::new(TestSkill::new("time")));
         reg.register(Arc::new(TestSkill::new("memory_store")));
@@ -530,7 +586,7 @@ mod tests {
 
     #[test]
     fn test_filter_by_names_empty() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(TestSkill::new("echo")));
 
         let filtered = reg.filter_by_names(&[]);
@@ -539,7 +595,7 @@ mod tests {
 
     #[test]
     fn test_filter_by_names_no_match() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(TestSkill::new("echo")));
 
         let names = vec!["nonexistent".to_string()];
@@ -549,7 +605,7 @@ mod tests {
 
     #[test]
     fn test_registry_basic_operations() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         assert_eq!(reg.skill_count(), 0);
 
         reg.register(Arc::new(TestSkill::new("echo")));
@@ -560,7 +616,7 @@ mod tests {
 
     #[test]
     fn test_list_descriptors() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(TestSkill::new("a")));
         reg.register(Arc::new(TestSkill::new("b")));
 
@@ -586,7 +642,7 @@ mod tests {
 
     #[test]
     fn test_filter_by_group_minimal() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(TestSkill::new("echo")));
         reg.register(Arc::new(TestSkill::new("time")));
         reg.register(Arc::new(TestSkill::new("help")));
@@ -603,7 +659,7 @@ mod tests {
 
     #[test]
     fn test_filter_by_group_full() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(TestSkill::new("echo")));
         reg.register(Arc::new(TestSkill::new("file_read")));
         reg.register(Arc::new(TestSkill::new("shell")));
@@ -620,7 +676,7 @@ mod tests {
 
     #[test]
     fn test_custom_tool_group() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(TestSkill::new("my_tool")));
         reg.register(Arc::new(TestSkill::new("other_tool")));
 
@@ -637,7 +693,7 @@ mod tests {
 
     #[test]
     fn test_skills_in_group() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(TestSkill::new("echo")));
         reg.register(Arc::new(TestSkill::new("time")));
 
@@ -650,7 +706,7 @@ mod tests {
 
     #[test]
     fn test_register_groups_batch() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register_groups(vec![
             ToolGroup::new("a", "Group A", vec!["x".into()]),
             ToolGroup::new("b", "Group B", vec!["y".into()]),
@@ -661,7 +717,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_validate_arguments_denies_returns_error_tool_result() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(DenyingSkill::new("deny_skill")));
 
         let perms = PermissionSet::new();
@@ -681,7 +737,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_no_validate_arguments_override_works_normally() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(TestSkill::new("simple_skill")));
 
         let perms = PermissionSet::new();
@@ -698,7 +754,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_capability_type_check_denies_missing_type() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
 
         // Create a skill that requires FileRead capability
         let skill = Arc::new(TestSkill {
@@ -728,7 +784,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_capability_type_check_allows_any_matching_type() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
 
         // Skill requires FileRead with /specific/path
         let skill = Arc::new(TestSkill {
@@ -825,7 +881,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_parallel_execution_of_three_independent_tools() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(TestSkill::new("alpha")));
         reg.register(Arc::new(TestSkill::new("beta")));
         reg.register(Arc::new(TestSkill::new("gamma")));
@@ -862,7 +918,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_parallel_one_failure_does_not_affect_others() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(TestSkill::new("good_a")));
         reg.register(Arc::new(FailingSkill::new("bad")));
         reg.register(Arc::new(TestSkill::new("good_b")));
@@ -909,7 +965,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_execute_with_timeout_on_slow_tool() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         reg.register(Arc::new(SlowSkill::new(
             "very_slow",
             std::time::Duration::from_secs(10),
@@ -933,7 +989,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_parallel_results_maintain_input_order() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         // Give different delays to each skill so they complete out of order,
         // but results should still be returned in input order.
         reg.register(Arc::new(SlowSkill::new(
@@ -996,7 +1052,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_parallel_permission_denial_in_batch() {
-        let mut reg = SkillRegistry::new();
+        let reg = SkillRegistry::new();
         // "open" has no required capabilities
         reg.register(Arc::new(TestSkill::new("open")));
         // "restricted" requires FileRead capability

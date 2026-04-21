@@ -299,10 +299,7 @@ impl McpServer {
         };
 
         let descriptors = self.skills.list_descriptors();
-        let tools: Vec<McpToolDef> = descriptors
-            .iter()
-            .map(|d| Self::skill_to_mcp_tool(d))
-            .collect();
+        let tools: Vec<McpToolDef> = descriptors.iter().map(Self::skill_to_mcp_tool).collect();
 
         OutgoingResponse::success(id, serde_json::json!({ "tools": tools }))
     }
@@ -502,7 +499,7 @@ mod tests {
     // -----------------------------------------------------------------------
 
     fn make_test_server() -> McpServer {
-        let mut registry = SkillRegistry::new();
+        let registry = SkillRegistry::new();
         registry.register(Arc::new(EchoSkill::new()));
         registry.register(Arc::new(RestrictedSkill::new()));
         McpServer::new(

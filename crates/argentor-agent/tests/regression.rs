@@ -299,8 +299,8 @@ async fn test_agent_runner_construction() {
 async fn test_agent_runner_with_builtins() {
     let tmp = tempfile::tempdir().unwrap();
     let audit = Arc::new(AuditLog::new(tmp.path().join("audit")));
-    let mut registry = SkillRegistry::new();
-    argentor_builtins::register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
 
     // Verify all 44 builtins registered (9 core + 29 utility + 6 document loaders)
     assert_eq!(registry.skill_count(), 44);

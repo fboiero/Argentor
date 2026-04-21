@@ -69,8 +69,8 @@ fn claude_text(text: &str) -> serde_json::Value {
 fn build_agent(url: &str) -> AgentRunner {
     let tmp = tempfile::tempdir().unwrap();
     let audit = Arc::new(AuditLog::new(tmp.path().join("audit")));
-    let mut registry = SkillRegistry::new();
-    argentor_builtins::register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
     let skills = Arc::new(registry);
     let permissions = PermissionSet::new();
     AgentRunner::new(make_config(url.to_string()), skills, permissions, audit)
@@ -160,8 +160,8 @@ impl LlmBackend for ScriptedBackend {
 fn build_scripted_agent(backend: ScriptedBackend) -> AgentRunner {
     let tmp = tempfile::tempdir().unwrap();
     let audit = Arc::new(AuditLog::new(tmp.path().join("audit")));
-    let mut registry = SkillRegistry::new();
-    argentor_builtins::register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
     let skills = Arc::new(registry);
     let permissions = PermissionSet::new();
     AgentRunner::from_backend(Box::new(backend), skills, permissions, audit, 10)
@@ -588,8 +588,8 @@ async fn test_full_loop_tool_discovery_filters_tools() {
 
     let tmp = tempfile::tempdir().unwrap();
     let audit = Arc::new(AuditLog::new(tmp.path().join("audit")));
-    let mut registry = SkillRegistry::new();
-    argentor_builtins::register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
     let total_tools = registry.skill_count();
     assert!(
         total_tools >= 30,

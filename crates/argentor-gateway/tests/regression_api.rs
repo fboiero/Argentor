@@ -85,8 +85,8 @@ async fn start_full_server() -> (
             .unwrap(),
     );
 
-    let mut registry = SkillRegistry::new();
-    argentor_builtins::register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
     let skills = Arc::new(registry);
     let permissions = PermissionSet::new();
     let agent = Arc::new(AgentRunner::new(

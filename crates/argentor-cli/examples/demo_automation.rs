@@ -386,8 +386,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 3. Set up SkillRegistry with memory
     let store: Arc<dyn VectorStore> = Arc::new(InMemoryVectorStore::new());
     let embedder = Arc::new(LocalEmbedding::default());
-    let mut registry = SkillRegistry::new();
-    register_builtins_with_memory(&mut registry, store, embedder);
+    let registry = SkillRegistry::new();
+    register_builtins_with_memory(&registry, store, embedder);
 
     // 4. Set up permissions
     let mut permissions = PermissionSet::new();
@@ -447,7 +447,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     session.add_message(user_msg);
 
     // 10. Collect tool descriptors
-    let tool_descriptors: Vec<_> = registry.list_descriptors().into_iter().cloned().collect();
+    let tool_descriptors = registry.list_descriptors();
 
     // 11. Run the agentic loop
     let start = std::time::Instant::now();

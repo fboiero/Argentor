@@ -596,7 +596,7 @@ impl Skill for XcapitCustomer360Skill {
 /// A single `reqwest::Client` with a 10-second timeout is shared across all
 /// skills. `base_url` overrides the `XCAPITSFF_URL` env var; pass `""` to
 /// use the environment variable or the default (`http://localhost:8000`).
-pub fn register_xcapitsff_skills(registry: &mut SkillRegistry, base_url: &str) {
+pub fn register_xcapitsff_skills(registry: &SkillRegistry, base_url: &str) {
     let client = build_xcapitsff_client();
     registry.register(Arc::new(XcapitSearchSkill::new(base_url, client.clone())));
     registry.register(Arc::new(XcapitLeadInfoSkill::new(base_url, client.clone())));
@@ -945,8 +945,8 @@ mod tests {
 
     #[test]
     fn test_register_xcapitsff_skills_registers_all_five() {
-        let mut registry = SkillRegistry::new();
-        register_xcapitsff_skills(&mut registry, "http://test-backend:8000");
+        let registry = SkillRegistry::new();
+        register_xcapitsff_skills(&registry, "http://test-backend:8000");
         assert!(registry.get("xcapitsff_search").is_some());
         assert!(registry.get("xcapitsff_lead_info").is_some());
         assert!(registry.get("xcapitsff_ticket_info").is_some());

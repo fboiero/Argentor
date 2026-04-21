@@ -159,7 +159,7 @@ async fn test_memory_stable_after_1000_agent_runs() {
 /// keep this test focused on the drop semantics rather than RSS bytes.
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn test_memory_freed_after_dropping_registry() {
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     for _ in 0..50 {
         registry.register(Arc::new(CalculatorSkill::new()));
     }

@@ -567,8 +567,8 @@ async fn mock_tool_calling_full_loop() {
 
     let config = mock_config(LlmProvider::Claude, &server.uri());
 
-    let mut registry = SkillRegistry::new();
-    argentor_builtins::register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
     let skills = Arc::new(registry);
     let permissions = PermissionSet::new();
     let tmp = tempfile::tempdir().unwrap();
@@ -1342,8 +1342,8 @@ async fn test_agent_runner_real_e2e() {
     let config = make_config(LlmProvider::Claude, "claude-haiku-4-5-20251001", api_key);
 
     // Set up a skill registry with builtins (echo, time, etc.)
-    let mut registry = SkillRegistry::new();
-    argentor_builtins::register_builtins(&mut registry);
+    let registry = SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
     let skills = Arc::new(registry);
 
     let permissions = PermissionSet::new();

@@ -75,7 +75,7 @@ fn make_call(id: &str, tool: &str) -> ToolCall {
 }
 
 fn make_proxy_with(skills: Vec<Arc<dyn Skill>>) -> McpProxy {
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     for skill in skills {
         registry.register(skill);
     }
@@ -289,7 +289,7 @@ async fn test_proxy_denied_tracking() {
 
 #[tokio::test]
 async fn test_tool_discovery() {
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     registry.register(Arc::new(StubSkill::ok("memory_store")));
     registry.register(Arc::new(StubSkill::ok("memory_search")));
     registry.register(Arc::new(StubSkill::ok("echo")));
@@ -348,8 +348,8 @@ async fn test_server_manager() {
         health_check_interval_secs: 0,
     };
 
-    let mut registry = SkillRegistry::new();
-    let errors = manager.connect_all(&[config], &mut registry).await;
+    let registry = SkillRegistry::new();
+    let errors = manager.connect_all(&[config], &registry).await;
     assert_eq!(errors.len(), 1);
     // Still no servers managed (the failed one is not tracked).
     assert_eq!(manager.server_count().await, 0);
@@ -371,7 +371,7 @@ async fn test_server_manager() {
             health_check_interval_secs: 30,
         },
     ];
-    let errors = manager.connect_all(&configs, &mut registry).await;
+    let errors = manager.connect_all(&configs, &registry).await;
     assert_eq!(errors.len(), 2);
     assert_eq!(manager.server_count().await, 0);
 

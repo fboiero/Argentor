@@ -82,7 +82,7 @@ impl McpServerManager {
     pub async fn connect_all(
         &self,
         configs: &[McpServerConfig],
-        registry: &mut SkillRegistry,
+        registry: &SkillRegistry,
     ) -> Vec<ArgentorError> {
         let mut errors = Vec::new();
 
@@ -113,7 +113,7 @@ impl McpServerManager {
     async fn connect_server(
         &self,
         config: &McpServerConfig,
-        registry: &mut SkillRegistry,
+        registry: &SkillRegistry,
     ) -> ArgentorResult<usize> {
         let args: Vec<&str> = config
             .args
@@ -152,7 +152,7 @@ impl McpServerManager {
     fn register_tools(
         tools: &[McpToolDef],
         client: &Arc<McpClient>,
-        registry: &mut SkillRegistry,
+        registry: &SkillRegistry,
     ) -> Vec<String> {
         let mut names = Vec::new();
         for tool in tools {
@@ -382,8 +382,8 @@ mod tests {
             auto_reconnect: false,
             health_check_interval_secs: 0,
         };
-        let mut registry = SkillRegistry::new();
-        let errors = mgr.connect_all(&[config], &mut registry).await;
+        let registry = SkillRegistry::new();
+        let errors = mgr.connect_all(&[config], &registry).await;
         assert_eq!(errors.len(), 1);
         assert_eq!(mgr.server_count().await, 0);
     }

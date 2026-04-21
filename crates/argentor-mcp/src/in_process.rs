@@ -31,8 +31,8 @@
 //!     );
 //!
 //! // Register all tools as Argentor skills
-//! let mut registry = SkillRegistry::new();
-//! server.register_skills(&mut registry);
+//! let registry = SkillRegistry::new();
+//! server.register_skills(&registry);
 //! ```
 
 use crate::protocol::McpToolDef;
@@ -373,7 +373,7 @@ impl InProcessMcpServer {
     ///
     /// Tool names follow the convention `mcp__{server_name}__{tool_name}`,
     /// matching the naming used by [`McpSkill`](crate::skill::McpSkill).
-    pub fn register_skills(self, registry: &mut SkillRegistry) {
+    pub fn register_skills(self, registry: &SkillRegistry) {
         // Collect tool metadata before moving self into Arc.
         let tool_meta: Vec<(String, String, serde_json::Value)> = self
             .tools
@@ -910,18 +910,18 @@ mod tests {
     #[test]
     fn test_register_skills_adds_to_registry() {
         let server = make_test_server();
-        let mut registry = SkillRegistry::new();
+        let registry = SkillRegistry::new();
         assert_eq!(registry.skill_count(), 0);
 
-        server.register_skills(&mut registry);
+        server.register_skills(&registry);
         assert_eq!(registry.skill_count(), 2);
     }
 
     #[test]
     fn test_registered_skill_names_follow_convention() {
         let server = make_test_server();
-        let mut registry = SkillRegistry::new();
-        server.register_skills(&mut registry);
+        let registry = SkillRegistry::new();
+        server.register_skills(&registry);
 
         // Names should be mcp__{server_name}_{tool_name}
         assert!(registry.get("mcp__test_server_greet").is_some());
@@ -931,8 +931,8 @@ mod tests {
     #[test]
     fn test_registered_skill_descriptors() {
         let server = make_test_server();
-        let mut registry = SkillRegistry::new();
-        server.register_skills(&mut registry);
+        let registry = SkillRegistry::new();
+        server.register_skills(&registry);
 
         let skill = registry.get("mcp__test_server_greet").unwrap();
         let desc = skill.descriptor();
@@ -946,8 +946,8 @@ mod tests {
     #[tokio::test]
     async fn test_execute_registered_skill_via_registry() {
         let server = make_test_server();
-        let mut registry = SkillRegistry::new();
-        server.register_skills(&mut registry);
+        let registry = SkillRegistry::new();
+        server.register_skills(&registry);
 
         let perms = PermissionSet::new();
         let call = ToolCall {
@@ -964,8 +964,8 @@ mod tests {
     #[tokio::test]
     async fn test_execute_registered_async_skill_via_registry() {
         let server = make_async_server();
-        let mut registry = SkillRegistry::new();
-        server.register_skills(&mut registry);
+        let registry = SkillRegistry::new();
+        server.register_skills(&registry);
 
         let perms = PermissionSet::new();
         let call = ToolCall {
@@ -988,8 +988,8 @@ mod tests {
             |_| Err(ArgentorError::Skill("intentional failure".to_string())),
         );
 
-        let mut registry = SkillRegistry::new();
-        server.register_skills(&mut registry);
+        let registry = SkillRegistry::new();
+        server.register_skills(&registry);
 
         let perms = PermissionSet::new();
         let call = ToolCall {
@@ -1041,8 +1041,8 @@ mod tests {
             |_| Ok("ok".into()),
         );
 
-        let mut registry = SkillRegistry::new();
-        server.register_skills(&mut registry);
+        let registry = SkillRegistry::new();
+        server.register_skills(&registry);
 
         // Dashes and dots should be replaced with underscores
         assert!(registry
