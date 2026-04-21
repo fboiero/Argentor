@@ -581,47 +581,76 @@ fn check_regex(
 }
 
 // -- Prompt injection ------------------------------------------------------
+//
+// #29: first-person phrasing variants added.
+// #30: patterns use \s+ so newline-split keywords still match.
 
-fn prompt_injection_patterns() -> Vec<&'static str> {
-    vec![
-        "ignore previous instructions",
-        "ignore all previous",
-        "disregard previous",
-        "disregard all previous",
-        "forget your instructions",
-        "forget previous instructions",
-        "you are now",
-        "pretend you are",
-        "act as if you are",
-        "new system prompt",
-        "override system prompt",
-        "system prompt:",
-        "ignore the above",
-        "ignore everything above",
-        "do not follow your instructions",
-        "bypass your restrictions",
-        "jailbreak",
-        "developer mode",
-        "dan mode",
-        "reveal your system prompt",
-        "show me your instructions",
-        "what are your instructions",
-        "print your system prompt",
-    ]
+struct InjectionPatterns {
+    patterns: Vec<Regex>,
+}
+
+static INJECTION_PATTERNS: std::sync::OnceLock<InjectionPatterns> = std::sync::OnceLock::new();
+
+fn injection_patterns() -> &'static InjectionPatterns {
+    INJECTION_PATTERNS.get_or_init(|| {
+        let raw_patterns: &[&str] = &[
+            // Classic override / ignore patterns
+            r"ignore\s+(all\s+)?previous\s+instructions",
+            r"ignore\s+all\s+previous",
+            r"disregard\s+(all\s+)?previous",
+            r"forget\s+(your|my|all)\s+instructions",
+            r"forget\s+previous\s+instructions",
+            // Role-play / persona injection
+            r"you\s+are\s+now",
+            r"pretend\s+you\s+are",
+            r"act\s+as\s+if\s+you\s+are",
+            // System prompt manipulation
+            r"new\s+system\s+prompt",
+            r"override\s+system\s+prompt",
+            r"system\s+prompt\s*:",
+            r"system\s+prompt",
+            r"ignore\s+(the|everything)\s+above",
+            r"do\s+not\s+follow\s+your\s+instructions",
+            r"bypass\s+your\s+restrictions",
+            // Jailbreak keywords
+            r"jailbreak",
+            r"developer\s+mode",
+            r"dan\s+mode",
+            // System prompt extraction
+            r"reveal\s+(your|my)\s+system\s+prompt",
+            r"show\s+me\s+your\s+instructions",
+            r"what\s+are\s+your\s+instructions",
+            r"print\s+(your|my)\s+system\s+prompt",
+            // First-person injection variants (#29)
+            r"i\s+want\s+you\s+to\s+ignore",
+            r"i\s+need\s+you\s+to\s+pretend",
+            r"i\s+am\s+your\s+(developer|creator|admin|owner|trainer)",
+            r"my\s+instructions\s+override",
+        ];
+        #[allow(clippy::unwrap_used)]
+        InjectionPatterns {
+            patterns: raw_patterns
+                .iter()
+                .map(|p| Regex::new(&format!("(?i){p}")).unwrap())
+                .collect(),
+        }
+    })
 }
 
 fn check_prompt_injection(rule: &GuardrailRule, text: &str) -> Vec<Violation> {
-    let lower = text.to_lowercase();
+    // #30: collapse newlines to spaces so line-split keywords still match.
+    let normalized = text.replace(['\n', '\r'], " ");
     let mut vs = Vec::new();
-    for pattern in prompt_injection_patterns() {
-        if let Some(pos) = lower.find(pattern) {
+    for re in &injection_patterns().patterns {
+        if let Some(m) = re.find(&normalized) {
             vs.push(Violation {
                 rule_name: rule.name.clone(),
                 severity: rule.severity.clone(),
                 message: "Possible prompt-injection attempt detected".to_string(),
-                span: Some((pos, pos + pattern.len())),
+                span: Some((m.start(), m.end())),
                 suggestion: Some("Remove the prompt-injection payload".into()),
             });
+            break;
         }
     }
     vs
@@ -631,6 +660,8 @@ fn check_prompt_injection(rule: &GuardrailRule, text: &str) -> Vec<Violation> {
 
 struct ShellPatterns {
     execution: Regex,
+    // #28: bare metacharacters in tool-argument positions
+    metachar: Regex,
 }
 
 static SHELL_PATTERNS: std::sync::OnceLock<ShellPatterns> = std::sync::OnceLock::new();
@@ -641,27 +672,25 @@ fn shell_patterns() -> &'static ShellPatterns {
         ShellPatterns {
             execution: Regex::new(concat!(
                 r"(?i)(?:",
-                // Dangerous command patterns with execution context
                 r"(?:run|exec(?:ute)?|sudo|sh\s+-c|bash\s+-c|eval)\s+.*(?:",
                 r"rm\s+-[rf]+|",
                 r"chmod\s+[0-7]{3,4}|",
                 r"mkfs\b|",
                 r"dd\s+if=|",
-                r":\(\)\s*\{|", // fork bomb
+                r":\(\)\s*\{|",
                 r">\s*/dev/sd|",
                 r"/etc/(?:passwd|shadow)",
                 r")|",
-                // Pipe-to-shell patterns
                 r"(?:curl|wget|fetch)\s+\S+\s*\|\s*(?:bash|sh|zsh|sudo)|",
-                // Backtick/subshell with dangerous commands
                 r"[`$]\(.*(?:rm\s+-rf|chmod\s+777|mkfs|dd\s+if=).*[`)]|",
-                // Reverse shell patterns
                 r"(?:nc|ncat|netcat)\s+.*-[el]|",
                 r"/dev/tcp/|",
                 r"bash\s+-i\s+>&\s*/dev/tcp",
                 r")"
             ))
             .unwrap(),
+            // #28: semicolons, &&, ||, subshell, backtick, redirect to sensitive paths
+            metachar: Regex::new(r"&&|\|\||`[^`]+`|\$\(|\$\{").unwrap(),
         }
     })
 }
@@ -669,16 +698,25 @@ fn shell_patterns() -> &'static ShellPatterns {
 fn check_shell_injection(rule: &GuardrailRule, text: &str) -> Vec<Violation> {
     let patterns = shell_patterns();
     if let Some(m) = patterns.execution.find(text) {
-        vec![Violation {
+        return vec![Violation {
             rule_name: rule.name.clone(),
             severity: rule.severity.clone(),
             message: "Shell command injection detected".to_string(),
             span: Some((m.start(), m.end())),
             suggestion: Some("Remove the shell command payload".into()),
-        }]
-    } else {
-        vec![]
+        }];
     }
+    // #28: bare metacharacter injection
+    if let Some(m) = patterns.metachar.find(text) {
+        return vec![Violation {
+            rule_name: rule.name.clone(),
+            severity: rule.severity.clone(),
+            message: "Shell metacharacter injection detected".to_string(),
+            span: Some((m.start(), m.end())),
+            suggestion: Some("Remove shell metacharacters from inputs".into()),
+        }];
+    }
+    vec![]
 }
 
 // -- Unicode normalization / base64 decode ---------------------------------
@@ -721,6 +759,8 @@ fn normalize_text(text: &str) -> String {
             '\u{0412}' => 'B', // Cyrillic В
             '\u{041C}' => 'M', // Cyrillic М
             '\u{041A}' => 'K', // Cyrillic К
+            '\u{0456}' => 'i', // Cyrillic Ukrainian і (homoglyph for Latin i)
+            '\u{0406}' => 'I', // Cyrillic Ukrainian І
             other => other,
         })
         .collect()

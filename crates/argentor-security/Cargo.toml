@@ -26,6 +26,7 @@ rustls-pemfile = "2"
 sha2 = "0.10"
 hex = "0.4"
 getrandom = "0.2"
+unicode-normalization.workspace = true
 
 [dev-dependencies]
 tempfile = "3"

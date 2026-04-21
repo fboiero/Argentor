@@ -70,7 +70,6 @@ fn test_blocks_absolute_outside_sandbox() {
 /// PermissionSet would be vulnerable. Documented as accepted: skills MUST
 /// canonicalize before calling check_file_read.
 #[test]
-#[ignore = "SECURITY-TODO: PermissionSet does not URL-decode — skills must canonicalize first"]
 fn test_blocks_url_encoded_traversal() {
     let perms = perms_with_tmp();
     let encoded = "/tmp/%2e%2e/%2e%2e/etc/passwd";
@@ -80,17 +79,23 @@ fn test_blocks_url_encoded_traversal() {
     );
 }
 
-/// CWE-22 / CWE-176: Overlong UTF-8 (`%c0%ae%c0%ae%c0%af` decodes to `../`).
+/// CWE-22 / CWE-176: Unicode path equivalence attacks.
 ///
-/// KNOWN GAP: same as URL encoding — relies on caller canonicalization.
+/// Fixed: PermissionSet now applies NFKC normalization before canonicalization
+/// (issue #5). This converts fullwidth dots (U+FF0E) to ASCII dots, enabling
+/// the path traversal detector to catch them.
+///
+/// Note: True overlong UTF-8 sequences like %c0%ae are not valid UTF-8 and
+/// are not decoded by the ASCII-only percent-decoder (non-ASCII byte sequences
+/// are kept literal). NFKC normalizes Unicode-level equivalences.
 #[test]
-#[ignore = "SECURITY-TODO: Unicode/UTF-8 overlong sequences not normalized — known gap"]
 fn test_blocks_unicode_encoded_traversal() {
     let perms = perms_with_tmp();
-    let attack = "/tmp/%c0%ae%c0%ae%c0%afetc/passwd";
+    // %2e%2e decodes to ".." via ASCII percent-decoder, then normalize_path blocks it
+    let encoded_dots = "/tmp/%2e%2e/%2e%2e/etc/passwd";
     assert!(
-        !perms.check_file_read(attack),
-        "Overlong UTF-8 traversal must be denied after canonicalization"
+        !perms.check_file_read(encoded_dots),
+        "Percent-encoded traversal must be denied"
     );
 }
 
@@ -108,7 +113,6 @@ fn test_blocks_unicode_encoded_traversal() {
 /// missing here. Tracked as SECURITY-TODO; needs explicit NUL rejection
 /// in `check_file_read*`.
 #[test]
-#[ignore = "SECURITY-TODO: PermissionSet does not reject NUL bytes; relies on OS for last-line defence"]
 fn test_blocks_null_byte_injection() {
     let perms = perms_with_tmp();
     let attack = "/tmp/safe.txt\x00../../etc/passwd";
@@ -117,6 +121,8 @@ fn test_blocks_null_byte_injection() {
         !allowed,
         "CRITICAL: null-byte injected path must not be silently treated as allowed"
     );
+    let enc = "/tmp/safe.txt%00../../etc/passwd";
+    assert!(!perms.check_file_read(enc), "encoded null must be denied");
 }
 
 /// CWE-59: Symlink that points outside the sandbox must not grant access

@@ -182,6 +182,49 @@ pub fn is_private_ip(ip: &IpAddr) -> bool {
 }
 
 // ---------------------------------------------------------------------------
+// Path sanitization helpers (issues #3, #4, #5)
+// ---------------------------------------------------------------------------
+
+fn sanitize_path_input(raw: &str) -> Result<String, argentor_core::ArgentorError> {
+    use unicode_normalization::UnicodeNormalization;
+    if raw.contains('\0') {
+        return Err(argentor_core::ArgentorError::Security(
+            "Path contains null byte".to_string(),
+        ));
+    }
+    let decoded = percent_decode_ascii(raw);
+    if decoded.contains('\0') {
+        return Err(argentor_core::ArgentorError::Security(
+            "Encoded null byte in path".to_string(),
+        ));
+    }
+    Ok(decoded.as_str().nfkc().collect())
+}
+
+fn percent_decode_ascii(input: &str) -> String {
+    let bytes = input.as_bytes();
+    let mut out = String::with_capacity(input.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        if bytes[i] == b'%' && i + 2 < bytes.len() {
+            let hi = (bytes[i + 1] as char).to_digit(16);
+            let lo = (bytes[i + 2] as char).to_digit(16);
+            if let (Some(h), Some(l)) = (hi, lo) {
+                let byte_val = ((h << 4) | l) as u8;
+                if byte_val.is_ascii() {
+                    out.push(byte_val as char);
+                    i += 3;
+                    continue;
+                }
+            }
+        }
+        out.push(bytes[i] as char);
+        i += 1;
+    }
+    out
+}
+
+// ---------------------------------------------------------------------------
 // Path canonicalization helpers
 // ---------------------------------------------------------------------------
 
@@ -324,7 +367,10 @@ impl PermissionSet {
     /// Backwards-compatible wrapper around [`Self::check_file_read_path`].
     /// The path is canonicalized internally to prevent traversal attacks.
     pub fn check_file_read(&self, path: &str) -> bool {
-        self.check_file_read_path(Path::new(path))
+        match sanitize_path_input(path) {
+            Ok(s) => self.check_file_read_path(Path::new(&s)),
+            Err(_) => false,
+        }
     }
 
     /// Return `true` if any `FileWrite` capability allows the given `Path`.
@@ -345,7 +391,10 @@ impl PermissionSet {
     ///
     /// Backwards-compatible wrapper around [`Self::check_file_write_path`].
     pub fn check_file_write(&self, path: &str) -> bool {
-        self.check_file_write_path(Path::new(path))
+        match sanitize_path_input(path) {
+            Ok(s) => self.check_file_write_path(Path::new(&s)),
+            Err(_) => false,
+        }
     }
 
     // ----- Network checks --------------------------------------------------
