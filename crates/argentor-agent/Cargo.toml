@@ -14,6 +14,12 @@ categories.workspace = true
 # Enable the real AWS Bedrock implementation (SigV4-signed HTTP via reqwest).
 # Uses sha2/hmac/hex from the workspace — no extra toolchain requirement.
 bedrock = []
+# Enable the real Cohere v2 chat implementation (reqwest + SSE streaming).
+# Requires a valid COHERE API key at runtime.
+cohere = []
+# Enable the real Replicate async-prediction implementation (reqwest + polling).
+# Requires a valid REPLICATE_API_TOKEN at runtime.
+replicate = []
 
 [lints]
 workspace = true

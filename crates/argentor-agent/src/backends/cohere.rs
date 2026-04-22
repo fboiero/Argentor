@@ -1,19 +1,34 @@
+// SPDX-License-Identifier: AGPL-3.0-only
+// Copyright (C) 2024 Argentor contributors
+//
+// Cohere v2 chat backend.
+//
+// Without the `cohere` feature flag this module compiles to a stub that
+// returns a clear error.  Enable the real implementation with:
+//
+//   cargo build --features cohere
+//
+// API reference: https://docs.cohere.com/reference/chat
+// Endpoint: POST https://api.cohere.com/v2/chat
+// Auth: Authorization: bearer <API_KEY>
+
 use super::LlmBackend;
 use crate::config::ModelConfig;
 use crate::llm::LlmResponse;
 use crate::stream::StreamEvent;
 use argentor_core::{ArgentorError, ArgentorResult, Message, Role};
 use argentor_skills::SkillDescriptor;
+#[cfg(not(feature = "cohere"))]
 use async_trait::async_trait;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
-/// Cohere API backend (stub).
+/// Cohere API backend.
 ///
 /// Implements the Cohere `v2/chat` REST API at `https://api.cohere.com/v2/chat`.
 /// Auth header: `Authorization: bearer <API_KEY>`.
 ///
-/// Request format (non-OpenAI):
+/// Request format:
 /// ```json
 /// {
 ///   "model": "command-r-08-2024",
@@ -26,22 +41,27 @@ use tokio::task::JoinHandle;
 /// }
 /// ```
 ///
-/// NOTE: this backend ships as a stub — real HTTP integration lives behind a
-/// `cohere-http` feature flag that is not enabled yet. Stub responses are
-/// deterministic for tests and make routing/plumbing verifiable.
+/// Enable real HTTP with `--features cohere`. Without that flag, the backend
+/// is a lightweight stub that returns a clear, actionable error message.
 pub struct CohereBackend {
     config: ModelConfig,
+    #[cfg(feature = "cohere")]
+    http: reqwest::Client,
 }
 
 impl CohereBackend {
     /// Create a new Cohere API backend with the given configuration.
     pub fn new(config: ModelConfig) -> Self {
-        Self { config }
+        Self {
+            #[cfg(feature = "cohere")]
+            http: reqwest::Client::new(),
+            config,
+        }
     }
 
     /// Build the Cohere request body from the Argentor message shape.
     ///
-    /// Exposed for tests — real HTTP sending is out of scope for the stub.
+    /// Exposed for tests — always compiled regardless of feature flag.
     pub fn build_request_body(
         &self,
         system_prompt: Option<&str>,
@@ -118,6 +138,218 @@ impl CohereBackend {
     }
 }
 
+// ---------------------------------------------------------------------------
+// Real implementation (feature = "cohere")
+// Uses reqwest with SSE streaming support.
+// ---------------------------------------------------------------------------
+
+#[cfg(feature = "cohere")]
+mod real {
+    use super::*;
+    use futures_util::StreamExt;
+
+    /// Parse a Cohere v2 non-streaming chat response into an `LlmResponse`.
+    pub fn parse_cohere_response(body: &serde_json::Value) -> ArgentorResult<LlmResponse> {
+        // Cohere v2: { "message": { "content": [{ "type": "text", "text": "..." }] } }
+        let content_arr = body
+            .pointer("/message/content")
+            .and_then(|v| v.as_array())
+            .ok_or_else(|| {
+                ArgentorError::Agent(format!("Unexpected Cohere response shape: {}", body))
+            })?;
+
+        let text: String = content_arr
+            .iter()
+            .filter_map(|block| {
+                if block["type"].as_str() == Some("text") {
+                    block["text"].as_str().map(str::to_string)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("");
+
+        let finish_reason = body
+            .pointer("/finish_reason")
+            .and_then(|v| v.as_str())
+            .unwrap_or("COMPLETE");
+
+        if finish_reason == "COMPLETE" || finish_reason == "MAX_TOKENS" {
+            Ok(LlmResponse::Done(text))
+        } else {
+            Ok(LlmResponse::Text(text))
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl LlmBackend for super::CohereBackend {
+        fn provider_name(&self) -> &str {
+            "cohere"
+        }
+
+        async fn chat(
+            &self,
+            system_prompt: Option<&str>,
+            messages: &[Message],
+            tools: &[SkillDescriptor],
+        ) -> ArgentorResult<LlmResponse> {
+            self.ensure_api_key()?;
+
+            let url = self.chat_url();
+            let body = self.build_request_body(system_prompt, messages, tools);
+
+            let resp = self
+                .http
+                .post(&url)
+                .header("Authorization", self.auth_header())
+                .header("Content-Type", "application/json")
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| ArgentorError::Http(e.to_string()))?;
+
+            let status = resp.status();
+            let resp_body: serde_json::Value = resp
+                .json()
+                .await
+                .map_err(|e| ArgentorError::Http(e.to_string()))?;
+
+            if !status.is_success() {
+                return Err(ArgentorError::Http(format!(
+                    "Cohere API error {status}: {resp_body}"
+                )));
+            }
+
+            parse_cohere_response(&resp_body)
+        }
+
+        async fn chat_stream(
+            &self,
+            system_prompt: Option<&str>,
+            messages: &[Message],
+            tools: &[SkillDescriptor],
+        ) -> ArgentorResult<(
+            mpsc::Receiver<StreamEvent>,
+            JoinHandle<ArgentorResult<LlmResponse>>,
+        )> {
+            self.ensure_api_key()?;
+
+            let url = self.chat_url();
+            let mut body = self.build_request_body(system_prompt, messages, tools);
+            body["stream"] = serde_json::json!(true);
+
+            let resp = self
+                .http
+                .post(&url)
+                .header("Authorization", self.auth_header())
+                .header("Content-Type", "application/json")
+                .json(&body)
+                .send()
+                .await
+                .map_err(|e| ArgentorError::Http(e.to_string()))?;
+
+            let status = resp.status();
+            if !status.is_success() {
+                let error_body = resp
+                    .text()
+                    .await
+                    .unwrap_or_else(|_| "unknown error".to_string());
+                return Err(ArgentorError::Http(format!(
+                    "Cohere API error {status}: {error_body}"
+                )));
+            }
+
+            let (tx, rx) = mpsc::channel::<StreamEvent>(256);
+            let byte_stream = resp.bytes_stream();
+
+            let handle = tokio::spawn(async move {
+                let mut stream = byte_stream;
+                let mut buffer = String::new();
+                let mut full_text = String::new();
+                let mut finish_reason = String::from("COMPLETE");
+
+                while let Some(chunk_result) = stream.next().await {
+                    let chunk = match chunk_result {
+                        Ok(bytes) => bytes,
+                        Err(e) => {
+                            let _ = tx
+                                .send(StreamEvent::Error {
+                                    message: format!("Stream read error: {e}"),
+                                })
+                                .await;
+                            return Err(ArgentorError::Http(format!("Stream read error: {e}")));
+                        }
+                    };
+
+                    buffer.push_str(&String::from_utf8_lossy(&chunk));
+
+                    while let Some(line_end) = buffer.find('\n') {
+                        let line = buffer[..line_end].trim().to_string();
+                        buffer = buffer[line_end + 1..].to_string();
+
+                        if line.is_empty() || line.starts_with(':') {
+                            continue;
+                        }
+
+                        // Cohere SSE: "data: <json>"
+                        if let Some(data) = line.strip_prefix("data: ") {
+                            if data == "[DONE]" {
+                                let _ = tx.send(StreamEvent::Done).await;
+                                continue;
+                            }
+
+                            let event: serde_json::Value = match serde_json::from_str(data) {
+                                Ok(v) => v,
+                                Err(_) => continue,
+                            };
+
+                            let event_type = event["type"].as_str().unwrap_or("");
+
+                            match event_type {
+                                // Cohere v2 streaming event types
+                                "content-delta" => {
+                                    if let Some(text) = event
+                                        .pointer("/delta/message/content/text")
+                                        .and_then(|v| v.as_str())
+                                    {
+                                        full_text.push_str(text);
+                                        let _ = tx
+                                            .send(StreamEvent::TextDelta {
+                                                text: text.to_string(),
+                                            })
+                                            .await;
+                                    }
+                                }
+                                "message-end" => {
+                                    if let Some(fr) = event["delta"]["finish_reason"].as_str() {
+                                        finish_reason = fr.to_string();
+                                    }
+                                    let _ = tx.send(StreamEvent::Done).await;
+                                }
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+
+                if finish_reason == "COMPLETE" || finish_reason == "MAX_TOKENS" {
+                    Ok(LlmResponse::Done(full_text))
+                } else {
+                    Ok(LlmResponse::Text(full_text))
+                }
+            });
+
+            Ok((rx, handle))
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Stub implementation (no feature = "cohere")
+// ---------------------------------------------------------------------------
+
+#[cfg(not(feature = "cohere"))]
 #[async_trait]
 impl LlmBackend for CohereBackend {
     fn provider_name(&self) -> &str {
@@ -131,7 +363,11 @@ impl LlmBackend for CohereBackend {
         _tools: &[SkillDescriptor],
     ) -> ArgentorResult<LlmResponse> {
         self.ensure_api_key()?;
-        Ok(LlmResponse::Done("[cohere-stub] response".into()))
+        Err(ArgentorError::Config(
+            "Cohere backend requires the `cohere` feature flag. \
+             Recompile with `--features cohere`."
+                .into(),
+        ))
     }
 
     async fn chat_stream(
@@ -144,17 +380,11 @@ impl LlmBackend for CohereBackend {
         JoinHandle<ArgentorResult<LlmResponse>>,
     )> {
         self.ensure_api_key()?;
-        let (tx, rx) = mpsc::channel::<StreamEvent>(8);
-        let handle = tokio::spawn(async move {
-            let _ = tx
-                .send(StreamEvent::TextDelta {
-                    text: "[cohere-stub] response".into(),
-                })
-                .await;
-            let _ = tx.send(StreamEvent::Done).await;
-            Ok(LlmResponse::Done("[cohere-stub] response".into()))
-        });
-        Ok((rx, handle))
+        Err(ArgentorError::Config(
+            "Cohere backend requires the `cohere` feature flag. \
+             Recompile with `--features cohere`."
+                .into(),
+        ))
     }
 }
 
@@ -294,16 +524,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn stub_chat_returns_done_response() {
-        let backend = CohereBackend::new(sample_config("key-1"));
-        let resp = backend.chat(None, &[user_msg("Hi")], &[]).await.unwrap();
-        match resp {
-            LlmResponse::Done(text) => assert!(text.contains("[cohere-stub]")),
-            other => panic!("Expected Done, got {other:?}"),
-        }
-    }
-
-    #[tokio::test]
     async fn chat_fails_without_api_key() {
         let backend = CohereBackend::new(sample_config(""));
         let err = backend
@@ -313,21 +533,75 @@ mod tests {
         assert!(err.to_string().to_lowercase().contains("api_key"));
     }
 
+    #[cfg(not(feature = "cohere"))]
     #[tokio::test]
-    async fn stub_chat_stream_emits_done_and_text_events() {
+    async fn stub_chat_returns_feature_flag_error() {
         let backend = CohereBackend::new(sample_config("key-1"));
-        let (mut rx, handle) = backend
+        let err = backend
+            .chat(None, &[user_msg("Hi")], &[])
+            .await
+            .expect_err("stub should return error without cohere feature");
+        assert!(
+            err.to_string().contains("cohere"),
+            "error should mention the feature flag"
+        );
+    }
+
+    #[cfg(not(feature = "cohere"))]
+    #[tokio::test]
+    async fn stub_chat_stream_returns_feature_flag_error() {
+        let backend = CohereBackend::new(sample_config("key-1"));
+        let err = backend
             .chat_stream(None, &[user_msg("Hi")], &[])
             .await
-            .unwrap();
+            .expect_err("stub should return error without cohere feature");
+        assert!(
+            err.to_string().contains("cohere"),
+            "error should mention the feature flag"
+        );
+    }
+
+    /// Integration test — requires a real COHERE_API_KEY in the environment.
+    #[cfg(feature = "cohere")]
+    #[tokio::test]
+    #[ignore = "requires real COHERE_API_KEY"]
+    async fn integration_chat_real_api() {
+        let api_key = std::env::var("COHERE_API_KEY").expect("COHERE_API_KEY must be set");
+        let mut cfg = sample_config(&api_key);
+        cfg.model_id = "command-r-plus".into();
+        let backend = CohereBackend::new(cfg);
+        let resp = backend
+            .chat(None, &[user_msg("Say hello in one word.")], &[])
+            .await
+            .expect("real API call should succeed");
+        match resp {
+            LlmResponse::Done(text) | LlmResponse::Text(text) => {
+                assert!(!text.is_empty(), "response text must not be empty");
+            }
+            other => panic!("Unexpected response: {other:?}"),
+        }
+    }
+
+    /// Integration test — requires a real COHERE_API_KEY in the environment.
+    #[cfg(feature = "cohere")]
+    #[tokio::test]
+    #[ignore = "requires real COHERE_API_KEY"]
+    async fn integration_chat_stream_real_api() {
+        use futures_util::StreamExt as _;
+        let api_key = std::env::var("COHERE_API_KEY").expect("COHERE_API_KEY must be set");
+        let mut cfg = sample_config(&api_key);
+        cfg.model_id = "command-r-plus".into();
+        let backend = CohereBackend::new(cfg);
+        let (mut rx, handle) = backend
+            .chat_stream(None, &[user_msg("Say hello in one word.")], &[])
+            .await
+            .expect("stream should start");
 
         let mut saw_text = false;
         let mut saw_done = false;
         while let Some(event) = rx.recv().await {
             match event {
-                StreamEvent::TextDelta { text } => {
-                    saw_text = saw_text || text.contains("[cohere-stub]");
-                }
+                StreamEvent::TextDelta { text } if !text.is_empty() => saw_text = true,
                 StreamEvent::Done => {
                     saw_done = true;
                     break;
@@ -335,10 +609,57 @@ mod tests {
                 _ => {}
             }
         }
-        assert!(saw_text, "expected a text delta from the stub");
-        assert!(saw_done, "expected a Done event from the stub");
+        assert!(saw_text, "expected at least one text delta");
+        assert!(saw_done, "expected Done event");
+        let final_resp = handle.await.unwrap().expect("join handle should succeed");
+        assert!(matches!(
+            final_resp,
+            LlmResponse::Done(_) | LlmResponse::Text(_)
+        ));
+    }
 
-        let final_resp = handle.await.unwrap().unwrap();
-        assert!(matches!(final_resp, LlmResponse::Done(_)));
+    /// Unit test for response parsing logic (feature-gated, no HTTP).
+    #[cfg(feature = "cohere")]
+    #[test]
+    fn parse_cohere_response_extracts_text() {
+        let body = serde_json::json!({
+            "message": {
+                "content": [
+                    { "type": "text", "text": "Hello, world!" }
+                ]
+            },
+            "finish_reason": "COMPLETE"
+        });
+        let resp = real::parse_cohere_response(&body).unwrap();
+        match resp {
+            LlmResponse::Done(text) => assert_eq!(text, "Hello, world!"),
+            other => panic!("Expected Done, got {other:?}"),
+        }
+    }
+
+    #[cfg(feature = "cohere")]
+    #[test]
+    fn parse_cohere_response_joins_multiple_text_blocks() {
+        let body = serde_json::json!({
+            "message": {
+                "content": [
+                    { "type": "text", "text": "Hello" },
+                    { "type": "text", "text": " world" }
+                ]
+            },
+            "finish_reason": "COMPLETE"
+        });
+        let resp = real::parse_cohere_response(&body).unwrap();
+        match resp {
+            LlmResponse::Done(text) => assert_eq!(text, "Hello world"),
+            other => panic!("Expected Done, got {other:?}"),
+        }
+    }
+
+    #[cfg(feature = "cohere")]
+    #[test]
+    fn parse_cohere_response_returns_error_on_bad_shape() {
+        let body = serde_json::json!({ "unexpected": "shape" });
+        assert!(real::parse_cohere_response(&body).is_err());
     }
 }

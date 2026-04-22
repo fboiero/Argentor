@@ -963,9 +963,22 @@ async fn llm_client_dispatches_cohere_to_cohere_backend() {
     let config = make_config(LlmProvider::Cohere, "https://api.cohere.com");
     let client = argentor_agent::LlmClient::new(config);
     assert_eq!(client.provider_name(), "cohere");
-    // Stub returns Done without hitting HTTP.
-    let result = client.chat(None, &[user_message("Hi")], &[]).await.unwrap();
-    assert!(matches!(result, LlmResponse::Done(_)));
+    // Without the `cohere` feature flag the backend returns a clear error.
+    // With the flag enabled, a real HTTP call would be made (tested separately).
+    #[cfg(not(feature = "cohere"))]
+    {
+        let err = client
+            .chat(None, &[user_message("Hi")], &[])
+            .await
+            .expect_err("cohere stub must require feature flag");
+        assert!(err.to_string().contains("cohere"));
+    }
+    #[cfg(feature = "cohere")]
+    {
+        // With the real feature enabled, just verify the provider name is correct.
+        // Real HTTP integration tests live in the backend's own test module.
+        let _ = client; // backend wired correctly; HTTP call omitted here
+    }
 }
 
 #[tokio::test]
@@ -990,8 +1003,22 @@ async fn llm_client_dispatches_replicate_to_replicate_backend() {
     config.model_id = "meta/meta-llama-3-70b-instruct".into();
     let client = argentor_agent::LlmClient::new(config);
     assert_eq!(client.provider_name(), "replicate");
-    let result = client.chat(None, &[user_message("Hi")], &[]).await.unwrap();
-    assert!(matches!(result, LlmResponse::Done(_)));
+    // Without the `replicate` feature flag the backend returns a clear error.
+    // With the flag enabled, a real HTTP call would be made (tested separately).
+    #[cfg(not(feature = "replicate"))]
+    {
+        let err = client
+            .chat(None, &[user_message("Hi")], &[])
+            .await
+            .expect_err("replicate stub must require feature flag");
+        assert!(err.to_string().contains("replicate"));
+    }
+    #[cfg(feature = "replicate")]
+    {
+        // With the real feature enabled, just verify the provider name is correct.
+        // Real HTTP integration tests live in the backend's own test module.
+        let _ = client; // backend wired correctly; HTTP call omitted here
+    }
 }
 
 // ============================================================
