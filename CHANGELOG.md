@@ -10,6 +10,32 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.2.0] - 2026-04-20
+
+### Security
+- Shell injection, base64-decode, unicode normalization (NFKC) attack blocking in guardrails pipeline
+- Sandbox hardening: null-byte, URL-decode, NFKC path attack prevention
+- Audit log rotation with background writer thread (non-blocking I/O)
+
+### Intelligence
+- Token budget per session with configurable limits and cost estimation
+- Adaptive context compaction with 4 strategies (summarize, truncate, prune, hybrid)
+- 6-phase competitive benchmark suite vs LangChain, CrewAI, PydanticAI, Claude SDK
+- Concurrent `LearningEngine` and `ResponseCache` (lock-free, TTL-aware)
+
+### Integrations
+- AWS Bedrock backend — real SigV4 request signing, feature-gated (`bedrock` feature flag)
+- Python SDK (`pip install -e python/`) — httpx + pydantic, sync + async, 24 typed models
+- Concurrent `SkillRegistry` — readers do not block each other
+- Skill marketplace with download, install, checksum verification, and local cache
+
+### Developer Experience
+- 5 runnable examples (hello_world, demo_pipeline, and more under `examples/`)
+- Observability dashboard — pure HTML/JS SPA at `/dashboard`, no build step required
+- CI: overhead gate (framework latency regression check) + nightly LLM integration tests
+
+---
+
 ## [1.1.0] - 2026-04-12
 
 ### Highlights

@@ -141,7 +141,7 @@ checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 
 [[package]]
 name = "argentor-a2a"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -160,7 +160,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-agent"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-builtins",
  "argentor-core",
@@ -216,7 +216,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-builtins"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-core",
  "argentor-memory",
@@ -244,7 +244,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-channels"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -261,7 +261,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-cli"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "anyhow",
  "argentor-a2a",
@@ -296,7 +296,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-cloud"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-agent",
  "argentor-core",
@@ -333,7 +333,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-compliance"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -348,7 +348,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-core"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -368,7 +368,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-gateway"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-a2a",
  "argentor-agent",
@@ -406,7 +406,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-mcp"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-core",
  "argentor-security",
@@ -424,7 +424,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-memory"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -441,7 +441,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-orchestrator"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-agent",
  "argentor-builtins",
@@ -465,7 +465,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-security"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-core",
  "chrono",
@@ -486,7 +486,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-session"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -502,7 +502,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-skills"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-core",
  "argentor-security",
@@ -529,7 +529,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-tee"
-version = "1.1.1"
+version = "1.2.0"
 dependencies = [
  "argentor-core",
  "async-trait",
