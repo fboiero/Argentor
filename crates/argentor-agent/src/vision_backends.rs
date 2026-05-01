@@ -5,12 +5,11 @@
 //! construction — no HTTP is performed — so the payload builders can be unit
 //! tested and reused by higher-level clients.
 //!
-//! The [`VisionBackend::ask_with_image`] implementations intentionally return a
-//! stub placeholder right now. Real HTTP wiring (if desired) can be added
-//! behind a feature flag without changing the public surface.
+//! The [`VisionBackend::ask_with_image`] implementations make real HTTP calls
+//! to the respective provider APIs using `reqwest`.
 
 use crate::multimodal::{ImageInput, MultimodalMessage, VisionBackend, VisionCapability};
-use argentor_core::ArgentorResult;
+use argentor_core::{ArgentorError, ArgentorResult};
 use async_trait::async_trait;
 use serde_json::{json, Value};
 
@@ -29,6 +28,7 @@ pub struct ClaudeVisionBackend {
     api_key: String,
     model_id: String,
     api_base_url: String,
+    http: reqwest::Client,
 }
 
 impl ClaudeVisionBackend {
@@ -38,6 +38,7 @@ impl ClaudeVisionBackend {
             api_key: api_key.into(),
             model_id: model_id.into(),
             api_base_url: "https://api.anthropic.com".to_string(),
+            http: reqwest::Client::new(),
         }
     }
 
@@ -99,6 +100,27 @@ impl ClaudeVisionBackend {
 
         json!({ "role": "user", "content": content })
     }
+
+    /// Extract the text reply from a Claude API JSON response body.
+    fn extract_text(body: &Value) -> ArgentorResult<String> {
+        let content = body["content"]
+            .as_array()
+            .ok_or_else(|| ArgentorError::Agent("Missing content in Claude response".into()))?;
+
+        let text = content
+            .iter()
+            .filter_map(|block| {
+                if block["type"].as_str() == Some("text") {
+                    block["text"].as_str().map(str::to_owned)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("");
+
+        Ok(text)
+    }
 }
 
 #[async_trait]
@@ -112,11 +134,39 @@ impl VisionBackend for ClaudeVisionBackend {
     }
 
     async fn ask_with_image(&self, message: &MultimodalMessage) -> ArgentorResult<String> {
-        Ok(format!(
-            "[claude-vision-stub] would process {} image(s) with text: {}",
-            message.image_count(),
-            message.text
-        ))
+        let url = format!("{}/v1/messages", self.api_base_url);
+        let message_block = Self::build_messages_payload(message);
+
+        let body = json!({
+            "model": self.model_id,
+            "max_tokens": 1024,
+            "messages": [message_block],
+        });
+
+        let resp = self
+            .http
+            .post(&url)
+            .header("x-api-key", &self.api_key)
+            .header("anthropic-version", "2023-06-01")
+            .header("content-type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| ArgentorError::Http(e.to_string()))?;
+
+        let status = resp.status();
+        let resp_body: Value = resp
+            .json()
+            .await
+            .map_err(|e| ArgentorError::Http(e.to_string()))?;
+
+        if !status.is_success() {
+            return Err(ArgentorError::Http(format!(
+                "Claude vision API error {status}: {resp_body}"
+            )));
+        }
+
+        Self::extract_text(&resp_body)
     }
 }
 
@@ -135,6 +185,7 @@ pub struct OpenAiVisionBackend {
     api_key: String,
     model_id: String,
     api_base_url: String,
+    http: reqwest::Client,
 }
 
 impl OpenAiVisionBackend {
@@ -144,6 +195,7 @@ impl OpenAiVisionBackend {
             api_key: api_key.into(),
             model_id: model_id.into(),
             api_base_url: "https://api.openai.com".to_string(),
+            http: reqwest::Client::new(),
         }
     }
 
@@ -199,6 +251,17 @@ impl OpenAiVisionBackend {
 
         json!({ "role": "user", "content": content })
     }
+
+    /// Extract the text reply from an OpenAI chat completions JSON response body.
+    fn extract_text(body: &Value) -> ArgentorResult<String> {
+        let text = body["choices"][0]["message"]["content"]
+            .as_str()
+            .ok_or_else(|| {
+                ArgentorError::Agent("Missing choices[0].message.content in OpenAI response".into())
+            })?
+            .to_owned();
+        Ok(text)
+    }
 }
 
 #[async_trait]
@@ -212,11 +275,37 @@ impl VisionBackend for OpenAiVisionBackend {
     }
 
     async fn ask_with_image(&self, message: &MultimodalMessage) -> ArgentorResult<String> {
-        Ok(format!(
-            "[openai-vision-stub] would process {} image(s) with text: {}",
-            message.image_count(),
-            message.text
-        ))
+        let url = format!("{}/v1/chat/completions", self.api_base_url);
+        let message_block = Self::build_messages_payload(message);
+
+        let body = json!({
+            "model": self.model_id,
+            "messages": [message_block],
+        });
+
+        let resp = self
+            .http
+            .post(&url)
+            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("content-type", "application/json")
+            .json(&body)
+            .send()
+            .await
+            .map_err(|e| ArgentorError::Http(e.to_string()))?;
+
+        let status = resp.status();
+        let resp_body: Value = resp
+            .json()
+            .await
+            .map_err(|e| ArgentorError::Http(e.to_string()))?;
+
+        if !status.is_success() {
+            return Err(ArgentorError::Http(format!(
+                "OpenAI vision API error {status}: {resp_body}"
+            )));
+        }
+
+        Self::extract_text(&resp_body)
     }
 }
 
@@ -235,6 +324,7 @@ pub struct GeminiVisionBackend {
     api_key: String,
     model_id: String,
     api_base_url: String,
+    http: reqwest::Client,
 }
 
 impl GeminiVisionBackend {
@@ -244,6 +334,7 @@ impl GeminiVisionBackend {
             api_key: api_key.into(),
             model_id: model_id.into(),
             api_base_url: "https://generativelanguage.googleapis.com".to_string(),
+            http: reqwest::Client::new(),
         }
     }
 
@@ -308,6 +399,19 @@ impl GeminiVisionBackend {
 
         json!({ "contents": [{ "parts": parts }] })
     }
+
+    /// Extract the text reply from a Gemini generateContent JSON response body.
+    fn extract_text(body: &Value) -> ArgentorResult<String> {
+        let text = body["candidates"][0]["content"]["parts"][0]["text"]
+            .as_str()
+            .ok_or_else(|| {
+                ArgentorError::Agent(
+                    "Missing candidates[0].content.parts[0].text in Gemini response".into(),
+                )
+            })?
+            .to_owned();
+        Ok(text)
+    }
 }
 
 #[async_trait]
@@ -321,11 +425,34 @@ impl VisionBackend for GeminiVisionBackend {
     }
 
     async fn ask_with_image(&self, message: &MultimodalMessage) -> ArgentorResult<String> {
-        Ok(format!(
-            "[gemini-vision-stub] would process {} image(s) with text: {}",
-            message.image_count(),
-            message.text
-        ))
+        let url = format!(
+            "{}/v1/models/{}:generateContent?key={}",
+            self.api_base_url, self.model_id, self.api_key
+        );
+        let payload = Self::build_messages_payload(message);
+
+        let resp = self
+            .http
+            .post(&url)
+            .header("content-type", "application/json")
+            .json(&payload)
+            .send()
+            .await
+            .map_err(|e| ArgentorError::Http(e.to_string()))?;
+
+        let status = resp.status();
+        let resp_body: Value = resp
+            .json()
+            .await
+            .map_err(|e| ArgentorError::Http(e.to_string()))?;
+
+        if !status.is_success() {
+            return Err(ArgentorError::Http(format!(
+                "Gemini vision API error {status}: {resp_body}"
+            )));
+        }
+
+        Self::extract_text(&resp_body)
     }
 }
 
@@ -574,37 +701,237 @@ mod tests {
         assert_eq!(p["contents"].as_array().unwrap().len(), 1);
     }
 
-    // ---- ask_with_image stub behaviour ----
+    // ---- Response parsing (unit tests — no network) ----
+
+    #[test]
+    fn claude_extract_text_single_block() {
+        let body = json!({
+            "content": [
+                { "type": "text", "text": "A cat." }
+            ]
+        });
+        assert_eq!(ClaudeVisionBackend::extract_text(&body).unwrap(), "A cat.");
+    }
+
+    #[test]
+    fn claude_extract_text_multiple_blocks() {
+        let body = json!({
+            "content": [
+                { "type": "text", "text": "Hello " },
+                { "type": "text", "text": "world." }
+            ]
+        });
+        assert_eq!(
+            ClaudeVisionBackend::extract_text(&body).unwrap(),
+            "Hello world."
+        );
+    }
+
+    #[test]
+    fn claude_extract_text_missing_content_errors() {
+        let body = json!({ "stop_reason": "end_turn" });
+        assert!(ClaudeVisionBackend::extract_text(&body).is_err());
+    }
+
+    #[test]
+    fn openai_extract_text_ok() {
+        let body = json!({
+            "choices": [
+                {
+                    "message": {
+                        "role": "assistant",
+                        "content": "A red square."
+                    }
+                }
+            ]
+        });
+        assert_eq!(
+            OpenAiVisionBackend::extract_text(&body).unwrap(),
+            "A red square."
+        );
+    }
+
+    #[test]
+    fn openai_extract_text_missing_choices_errors() {
+        let body = json!({ "id": "chatcmpl-xyz" });
+        assert!(OpenAiVisionBackend::extract_text(&body).is_err());
+    }
+
+    #[test]
+    fn gemini_extract_text_ok() {
+        let body = json!({
+            "candidates": [
+                {
+                    "content": {
+                        "parts": [{ "text": "A blue circle." }]
+                    }
+                }
+            ]
+        });
+        assert_eq!(
+            GeminiVisionBackend::extract_text(&body).unwrap(),
+            "A blue circle."
+        );
+    }
+
+    #[test]
+    fn gemini_extract_text_missing_candidates_errors() {
+        let body = json!({ "usageMetadata": {} });
+        assert!(GeminiVisionBackend::extract_text(&body).is_err());
+    }
+
+    // ---- ask_with_image via wiremock ----
 
     #[tokio::test]
-    async fn claude_ask_with_image_stub() {
-        let b = ClaudeVisionBackend::new("k", "claude-sonnet-4");
-        let m = MultimodalMessage::new("what?").with_image_url("https://x");
-        let out = b.ask_with_image(&m).await.unwrap();
-        assert!(out.contains("claude-vision-stub"));
-        assert!(out.contains("1 image"));
-        assert!(out.contains("what?"));
+    async fn claude_ask_with_image_http() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/messages"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "msg_01",
+                "type": "message",
+                "role": "assistant",
+                "content": [{ "type": "text", "text": "A cute cat." }],
+                "model": "claude-sonnet-4",
+                "stop_reason": "end_turn",
+                "usage": { "input_tokens": 10, "output_tokens": 5 }
+            })))
+            .mount(&server)
+            .await;
+
+        let backend =
+            ClaudeVisionBackend::new("test-key", "claude-sonnet-4").with_base_url(server.uri());
+        let msg = MultimodalMessage::new("What is this?").with_image_url("https://x/cat.png");
+        let result = backend.ask_with_image(&msg).await.unwrap();
+        assert_eq!(result, "A cute cat.");
     }
 
     #[tokio::test]
-    async fn openai_ask_with_image_stub() {
-        let b = OpenAiVisionBackend::new("k", "gpt-4o");
-        let m = MultimodalMessage::new("describe")
-            .with_image_base64("image/png", "AA")
-            .with_image_url("https://x");
-        let out = b.ask_with_image(&m).await.unwrap();
-        assert!(out.contains("openai-vision-stub"));
-        assert!(out.contains("2 image"));
+    async fn claude_ask_with_image_http_error() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/messages"))
+            .respond_with(ResponseTemplate::new(401).set_body_json(json!({
+                "error": { "type": "authentication_error", "message": "invalid api key" }
+            })))
+            .mount(&server)
+            .await;
+
+        let backend =
+            ClaudeVisionBackend::new("bad-key", "claude-sonnet-4").with_base_url(server.uri());
+        let msg = MultimodalMessage::new("test");
+        let result = backend.ask_with_image(&msg).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("401"));
     }
 
     #[tokio::test]
-    async fn gemini_ask_with_image_stub() {
-        let b = GeminiVisionBackend::new("k", "gemini-2.0-flash");
-        let m = MultimodalMessage::new("analyze");
-        let out = b.ask_with_image(&m).await.unwrap();
-        assert!(out.contains("gemini-vision-stub"));
-        assert!(out.contains("0 image"));
-        assert!(out.contains("analyze"));
+    async fn openai_ask_with_image_http() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "id": "chatcmpl-01",
+                "object": "chat.completion",
+                "choices": [
+                    {
+                        "index": 0,
+                        "message": { "role": "assistant", "content": "A red square." },
+                        "finish_reason": "stop"
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let backend = OpenAiVisionBackend::new("sk-test", "gpt-4o").with_base_url(server.uri());
+        let msg = MultimodalMessage::new("Describe").with_image_base64("image/png", "AAAA");
+        let result = backend.ask_with_image(&msg).await.unwrap();
+        assert_eq!(result, "A red square.");
+    }
+
+    #[tokio::test]
+    async fn openai_ask_with_image_http_error() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path("/v1/chat/completions"))
+            .respond_with(ResponseTemplate::new(429).set_body_json(json!({
+                "error": { "message": "rate limit exceeded", "type": "rate_limit_error" }
+            })))
+            .mount(&server)
+            .await;
+
+        let backend = OpenAiVisionBackend::new("sk-test", "gpt-4o").with_base_url(server.uri());
+        let msg = MultimodalMessage::new("test");
+        let result = backend.ask_with_image(&msg).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("429"));
+    }
+
+    #[tokio::test]
+    async fn gemini_ask_with_image_http() {
+        use wiremock::matchers::{method, path_regex};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path_regex(r"/v1/models/gemini-2\.0-flash:generateContent"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(json!({
+                "candidates": [
+                    {
+                        "content": {
+                            "parts": [{ "text": "A blue triangle." }],
+                            "role": "model"
+                        },
+                        "finishReason": "STOP"
+                    }
+                ]
+            })))
+            .mount(&server)
+            .await;
+
+        let backend =
+            GeminiVisionBackend::new("AIza-test", "gemini-2.0-flash").with_base_url(server.uri());
+        let msg = MultimodalMessage::new("Describe").with_image_base64("image/png", "AAAA");
+        let result = backend.ask_with_image(&msg).await.unwrap();
+        assert_eq!(result, "A blue triangle.");
+    }
+
+    #[tokio::test]
+    async fn gemini_ask_with_image_http_error() {
+        use wiremock::matchers::{method, path_regex};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let server = MockServer::start().await;
+        Mock::given(method("POST"))
+            .and(path_regex(r"/v1/models/gemini-2\.0-flash:generateContent"))
+            .respond_with(ResponseTemplate::new(400).set_body_json(json!({
+                "error": { "code": 400, "message": "Invalid API key", "status": "INVALID_ARGUMENT" }
+            })))
+            .mount(&server)
+            .await;
+
+        let backend =
+            GeminiVisionBackend::new("bad-key", "gemini-2.0-flash").with_base_url(server.uri());
+        let msg = MultimodalMessage::new("test");
+        let result = backend.ask_with_image(&msg).await;
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("400"));
     }
 
     // ---- Trait-object usage (ensures Send + Sync) ----
@@ -618,17 +945,38 @@ mod tests {
         ];
     }
 
+    // ---- Integration tests (require real API keys — skipped in CI) ----
+
     #[tokio::test]
-    async fn vision_backend_dispatch_dynamic() {
-        let backends: Vec<Box<dyn VisionBackend>> = vec![
-            Box::new(ClaudeVisionBackend::new("k", "m")),
-            Box::new(OpenAiVisionBackend::new("k", "m")),
-            Box::new(GeminiVisionBackend::new("k", "m")),
-        ];
-        let m = MultimodalMessage::new("hi").with_image_url("https://x");
-        for b in &backends {
-            let out = b.ask_with_image(&m).await.unwrap();
-            assert!(out.contains(b.provider_name()));
-        }
+    #[ignore]
+    async fn integration_claude_vision_real_api() {
+        let api_key = std::env::var("ANTHROPIC_API_KEY").expect("ANTHROPIC_API_KEY not set");
+        let backend = ClaudeVisionBackend::new(api_key, "claude-sonnet-4-20250514");
+        let msg = MultimodalMessage::new("Reply with exactly: OK")
+            .with_image_url("https://www.gstatic.com/webp/gallery/1.webp");
+        let result = backend.ask_with_image(&msg).await.unwrap();
+        assert!(!result.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn integration_openai_vision_real_api() {
+        let api_key = std::env::var("OPENAI_API_KEY").expect("OPENAI_API_KEY not set");
+        let backend = OpenAiVisionBackend::new(api_key, "gpt-4o");
+        let msg = MultimodalMessage::new("Reply with exactly: OK")
+            .with_image_url("https://www.gstatic.com/webp/gallery/1.webp");
+        let result = backend.ask_with_image(&msg).await.unwrap();
+        assert!(!result.is_empty());
+    }
+
+    #[tokio::test]
+    #[ignore]
+    async fn integration_gemini_vision_real_api() {
+        let api_key = std::env::var("GEMINI_API_KEY").expect("GEMINI_API_KEY not set");
+        let backend = GeminiVisionBackend::new(api_key, "gemini-2.0-flash");
+        let msg = MultimodalMessage::new("Reply with exactly: OK")
+            .with_image_base64("image/png", "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==");
+        let result = backend.ask_with_image(&msg).await.unwrap();
+        assert!(!result.is_empty());
     }
 }
