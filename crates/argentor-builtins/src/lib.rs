@@ -27,6 +27,12 @@ pub mod calculator;
 pub mod code_analysis;
 /// Color conversion skill (Hex/RGB/HSL, contrast ratio, lighten/darken).
 pub mod color_converter;
+/// Computer-use skill: screenshot, mouse, keyboard, scroll via platform tools.
+#[cfg(feature = "computer-use")]
+pub mod computer_use;
+/// High-level computer-use agentic loop (screenshot → vision → action).
+#[cfg(feature = "computer-use")]
+pub mod computer_use_loop;
 /// Cron expression parsing, validation, and scheduling skill.
 pub mod cron_parser;
 /// CSV parsing, filtering, sorting, statistics, and format conversion.
@@ -184,6 +190,14 @@ pub use uuid_generator::UuidGeneratorSkill;
 #[cfg(feature = "web-browse")]
 pub use web_browse::WebExtractSkill;
 pub use web_browse::{WebBrowseSearchSkill, WebFetchSkill};
+
+#[cfg(feature = "computer-use")]
+pub use computer_use::{
+    ComputerUseConfig, ComputerUseSkill, LinuxController, MacOsController, ScreenController,
+    ScreenRegion,
+};
+#[cfg(feature = "computer-use")]
+pub use computer_use_loop::{ActionLogEntry, ComputerAction, ComputerUseAgent, ComputerUseResult};
 pub use web_scraper::WebScraperSkill;
 pub use web_search::{SearchProvider, WebSearchSkill};
 pub use xcapitsff_skills::{
