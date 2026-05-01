@@ -21,8 +21,9 @@ use std::sync::Arc;
 fn register_builtins_registers_expected_count() {
     let registry = SkillRegistry::new();
     register_builtins(&registry);
-    // register_builtins adds: 9 core + 29 utility + 6 document loaders = 44
-    assert_eq!(registry.skill_count(), 44);
+    // register_builtins adds: 9 core + 31 utility + 6 document loaders = 46
+    // (utility includes web_fetch + web_browse_search added in web_browse module)
+    assert_eq!(registry.skill_count(), 46);
 }
 
 #[test]
@@ -74,8 +75,8 @@ fn register_builtins_with_memory_registers_all_skills() {
     let store: Arc<dyn VectorStore> = Arc::new(InMemoryVectorStore::new());
     let embedder: Arc<dyn EmbeddingProvider> = Arc::new(LocalEmbedding::default());
     register_builtins_with_memory(&registry, store, embedder);
-    // 9 core + 29 utility + 6 document loaders + memory_store + memory_search = 46
-    assert_eq!(registry.skill_count(), 46);
+    // 9 core + 31 utility + 6 document loaders + memory_store + memory_search = 48
+    assert_eq!(registry.skill_count(), 48);
     assert!(registry.get("memory_store").is_some());
     assert!(registry.get("memory_search").is_some());
 }

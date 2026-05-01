@@ -302,8 +302,9 @@ async fn test_agent_runner_with_builtins() {
     let registry = SkillRegistry::new();
     argentor_builtins::register_builtins(&registry);
 
-    // Verify all 44 builtins registered (9 core + 29 utility + 6 document loaders)
-    assert_eq!(registry.skill_count(), 44);
+    // Verify all 46 builtins registered (9 core + 31 utility + 6 document loaders)
+    // (utility includes web_fetch + web_browse_search from web_browse module)
+    assert_eq!(registry.skill_count(), 46);
 
     let skills = Arc::new(registry);
     let permissions = PermissionSet::new();

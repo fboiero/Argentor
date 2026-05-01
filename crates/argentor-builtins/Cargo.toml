@@ -33,12 +33,14 @@ base64.workspace = true
 hex.workspace = true
 fantoccini = { version = "0.21", optional = true }
 bollard = { version = "0.17", optional = true }
+scraper = { version = "0.20", optional = true }
 git2.workspace = true
 
 [features]
 default = []
 browser = ["fantoccini"]
 docker = ["bollard"]
+web-browse = ["scraper"]
 
 [dev-dependencies]
 tempfile = "3"

@@ -115,6 +115,8 @@ pub mod test_runner;
 pub mod text_transform;
 /// UUID generation and parsing skill.
 pub mod uuid_generator;
+/// Web browsing skills: fetch (text/html/markdown), DuckDuckGo search, CSS-selector extraction.
+pub mod web_browse;
 /// Web scraping skill for extracting text, links, metadata from web pages.
 pub mod web_scraper;
 /// Web search skill using DuckDuckGo HTML endpoint.
@@ -179,6 +181,9 @@ pub use template_engine::TemplateEngineSkill;
 pub use test_runner::TestRunnerSkill;
 pub use text_transform::TextTransformSkill;
 pub use uuid_generator::UuidGeneratorSkill;
+#[cfg(feature = "web-browse")]
+pub use web_browse::WebExtractSkill;
+pub use web_browse::{WebBrowseSearchSkill, WebFetchSkill};
 pub use web_scraper::WebScraperSkill;
 pub use web_search::{SearchProvider, WebSearchSkill};
 pub use xcapitsff_skills::{
@@ -232,6 +237,8 @@ pub fn register_utility_skills(registry: &SkillRegistry) {
     registry.register(Arc::new(EnvManagerSkill::default()));
     registry.register(Arc::new(CronParserSkill::default()));
     // Web & Network
+    registry.register(Arc::new(WebFetchSkill::default()));
+    registry.register(Arc::new(WebBrowseSearchSkill::default()));
     registry.register(Arc::new(WebSearchSkill::default()));
     registry.register(Arc::new(WebScraperSkill::default()));
     registry.register(Arc::new(RssReaderSkill::default()));
