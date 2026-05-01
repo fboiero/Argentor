@@ -332,3 +332,26 @@ Ten hands-on tutorials take you from "empty directory" to "production-grade mult
 - [Tutorial 10: Observability](./tutorials/10-observability.md) — OpenTelemetry, traces, metrics, alerts
 
 See the [tutorials index](./tutorials/README.md) for recommended learning paths.
+
+---
+
+## How-To Guides
+
+Focused, task-oriented guides you can follow independently:
+
+- [Build a RAG Agent](./tutorials/build-rag-agent.md) — Load documents, embed, query with semantic search, feed results to an agent
+- [Deploy to the Cloud](./tutorials/deploy-to-cloud.md) — Docker build, local Compose dev stack, AWS ECS/Fargate, GCP Cloud Run, Azure Container Apps
+- [Build Custom Skills](./tutorials/custom-skills.md) — `ToolBuilder`, `Skill` trait, WASM sandboxed plugins, Markdown prompt-skills
+- [Multi-Agent Patterns](./tutorials/multi-agent-patterns.md) — Orchestrator-Workers, Pipeline, Fan-out/Fan-in, Human-in-the-loop
+
+---
+
+## Troubleshooting
+
+Stuck? Check [TROUBLESHOOTING.md](./TROUBLESHOOTING.md) for solutions to the most common problems:
+
+- "Connection refused" — gateway not running
+- "API key not found" — env var setup
+- Rate limiting — configure retry policy and rate limits
+- WASM skill failures — memory limits and pointer protocol
+- Guardrail blocking legitimate content — custom rules and allowlists
