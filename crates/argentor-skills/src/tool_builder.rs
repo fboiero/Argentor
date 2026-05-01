@@ -154,6 +154,7 @@ impl ToolBuilder {
                     description: self.description,
                     parameters_schema: json!({}),
                     required_capabilities: self.capabilities,
+                    requires_approval: false,
                 },
                 message: format!(
                     "Tool '{}' was built without a handler — call .handler() or .async_handler() before .build()",
@@ -188,6 +189,7 @@ impl ToolBuilder {
                 description: self.description,
                 parameters_schema,
                 required_capabilities: self.capabilities,
+                requires_approval: false,
             },
             handler,
         })

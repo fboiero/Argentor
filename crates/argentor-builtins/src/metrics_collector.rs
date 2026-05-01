@@ -47,6 +47,7 @@ impl MetricsCollectorSkill {
                     "required": ["operation"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
             counters: Mutex::new(HashMap::new()),
             gauges: Mutex::new(HashMap::new()),

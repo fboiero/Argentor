@@ -45,6 +45,7 @@ impl FileWriteSkill {
                 required_capabilities: vec![Capability::FileWrite {
                     allowed_paths: vec![], // Configured at runtime
                 }],
+                requires_approval: false,
             },
         }
     }

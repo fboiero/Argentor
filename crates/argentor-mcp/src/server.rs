@@ -440,6 +440,7 @@ mod tests {
                         "required": ["message"]
                     }),
                     required_capabilities: vec![],
+                    requires_approval: false,
                 },
             }
         }
@@ -478,6 +479,7 @@ mod tests {
                     required_capabilities: vec![Capability::FileRead {
                         allowed_paths: vec!["/tmp".to_string()],
                     }],
+                    requires_approval: false,
                 },
             }
         }
@@ -675,6 +677,7 @@ mod tests {
             required_capabilities: vec![Capability::ShellExec {
                 allowed_commands: vec!["ls".to_string()],
             }],
+            requires_approval: false,
         };
 
         let tool = McpServer::skill_to_mcp_tool(&descriptor);

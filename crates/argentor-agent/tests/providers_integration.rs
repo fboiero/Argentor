@@ -46,6 +46,7 @@ fn sample_tool() -> SkillDescriptor {
             "required": ["city"]
         }),
         required_capabilities: vec![],
+        requires_approval: false,
     }
 }
 

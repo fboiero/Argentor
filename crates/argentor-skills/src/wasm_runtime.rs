@@ -35,6 +35,7 @@ impl WasmSkillRuntime {
         description: String,
         parameters_schema: serde_json::Value,
         required_capabilities: Vec<Capability>,
+        requires_approval: bool,
     ) -> ArgentorResult<WasmSkill> {
         info!(path = %path.display(), name = %name, "Loading WASM skill");
 
@@ -47,6 +48,7 @@ impl WasmSkillRuntime {
                 description,
                 parameters_schema,
                 required_capabilities,
+                requires_approval,
             },
             engine: self.engine.clone(),
             module,

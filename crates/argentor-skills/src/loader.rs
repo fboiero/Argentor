@@ -181,6 +181,7 @@ impl SkillLoader {
                     config.description.clone(),
                     config.parameters_schema.clone(),
                     capabilities,
+                    false,
                 )?;
 
                 registry.register(Arc::new(skill));

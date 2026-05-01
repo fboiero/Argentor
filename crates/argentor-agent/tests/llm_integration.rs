@@ -103,6 +103,7 @@ fn simple_calculator_tool() -> SkillDescriptor {
             "required": ["expression"]
         }),
         required_capabilities: vec![],
+        requires_approval: false,
     }
 }
 
@@ -118,6 +119,7 @@ fn sample_tool() -> SkillDescriptor {
             "required": ["city"]
         }),
         required_capabilities: vec![],
+        requires_approval: false,
     }
 }
 

@@ -45,6 +45,7 @@ impl CronParserSkill {
                     "required": ["operation", "expression"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

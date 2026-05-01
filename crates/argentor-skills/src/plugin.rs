@@ -214,6 +214,7 @@ mod tests {
                     description: "A skill registered by a plugin".to_string(),
                     parameters_schema: serde_json::json!({}),
                     required_capabilities: vec![],
+                    requires_approval: false,
                 },
             }));
         }

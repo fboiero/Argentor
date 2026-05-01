@@ -36,6 +36,7 @@ impl MarkdownRendererSkill {
                     "required": ["operation", "markdown"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

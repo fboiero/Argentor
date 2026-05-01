@@ -55,6 +55,7 @@ impl ExcelLoaderSkill {
                     "required": ["operation", "data"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

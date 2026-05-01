@@ -430,6 +430,7 @@ mod tests {
                 }
             }),
             required_capabilities: vec![],
+            requires_approval: false,
         }
     }
 

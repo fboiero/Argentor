@@ -33,6 +33,7 @@ impl StubSkill {
                 description: format!("Stub skill: {name}"),
                 parameters_schema: serde_json::json!({}),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
             fail: false,
         }
@@ -45,6 +46,7 @@ impl StubSkill {
                 description: format!("Failing stub: {name}"),
                 parameters_schema: serde_json::json!({}),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
             fail: true,
         }

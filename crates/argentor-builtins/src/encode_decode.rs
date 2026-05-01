@@ -44,6 +44,7 @@ impl EncodeDecodeSkill {
                     "required": ["operation", "input"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

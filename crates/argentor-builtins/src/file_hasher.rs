@@ -63,6 +63,7 @@ impl FileHasherSkill {
                     "required": ["operation"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

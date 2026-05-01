@@ -219,6 +219,7 @@ dependencies = [
 name = "argentor-builtins"
 version = "1.2.0"
 dependencies = [
+ "argentor-agent",
  "argentor-core",
  "argentor-memory",
  "argentor-security",

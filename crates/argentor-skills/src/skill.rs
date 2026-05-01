@@ -14,6 +14,10 @@ pub struct SkillDescriptor {
     pub parameters_schema: serde_json::Value,
     /// Capabilities the skill needs to operate.
     pub required_capabilities: Vec<Capability>,
+    /// Whether the agent runner must obtain human approval before executing this skill.
+    /// Defaults to `false`. Skills that delete data, send emails, or spend money should set this.
+    #[serde(default)]
+    pub requires_approval: bool,
 }
 
 /// Trait that all skills must implement — whether native Rust or WASM.

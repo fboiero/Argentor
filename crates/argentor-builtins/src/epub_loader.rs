@@ -46,6 +46,7 @@ impl EpubLoaderSkill {
                     "required": ["operation", "data"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

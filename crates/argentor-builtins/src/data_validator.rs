@@ -63,6 +63,7 @@ impl DataValidatorSkill {
                     "required": ["format", "value"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

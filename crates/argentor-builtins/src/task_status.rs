@@ -36,6 +36,7 @@ impl TaskStatusSkill {
                     "required": ["action"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
             queue,
         }

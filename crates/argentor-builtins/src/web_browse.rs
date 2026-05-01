@@ -266,6 +266,7 @@ impl WebFetchSkill {
                 required_capabilities: vec![Capability::NetworkAccess {
                     allowed_hosts: vec![],
                 }],
+                requires_approval: false,
             },
             client: build_client(),
         }
@@ -415,6 +416,7 @@ impl WebBrowseSearchSkill {
                 required_capabilities: vec![Capability::NetworkAccess {
                     allowed_hosts: vec!["html.duckduckgo.com".to_string()],
                 }],
+                requires_approval: false,
             },
             client: build_client(),
         }
@@ -577,6 +579,7 @@ impl WebExtractSkill {
                     "required": ["url", "selectors"]
                 }),
                 required_capabilities: vec![Capability::NetworkAccess { allowed_hosts: vec![] }],
+                requires_approval: false,
             },
             client: build_client(),
         }

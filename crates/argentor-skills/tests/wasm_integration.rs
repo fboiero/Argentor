@@ -57,6 +57,7 @@ fn test_load_echo_skill() {
             "required": ["message"]
         }),
         vec![],
+        false,
     );
 
     assert!(
@@ -76,6 +77,7 @@ fn test_load_skill_with_nonexistent_path() {
         "This should fail".to_string(),
         serde_json::json!({}),
         vec![],
+        false,
     );
 
     assert!(
@@ -102,6 +104,7 @@ async fn test_execute_echo_skill() {
                 "required": ["message"]
             }),
             vec![],
+            false,
         )
         .expect("failed to load echo skill");
 
@@ -141,6 +144,7 @@ async fn test_register_and_list_echo_skill() {
                 "required": ["message"]
             }),
             vec![],
+            false,
         )
         .expect("failed to load echo skill");
 
@@ -177,6 +181,7 @@ async fn test_registry_execute_echo_skill() {
             "Echoes back the input message".to_string(),
             serde_json::json!({}),
             vec![], // No capabilities required
+            false,
         )
         .expect("failed to load echo skill");
 
@@ -234,6 +239,7 @@ async fn test_register_multiple_skills_and_list() {
             "First echo variant".to_string(),
             serde_json::json!({}),
             vec![],
+            false,
         )
         .expect("failed to load skill a");
 
@@ -244,6 +250,7 @@ async fn test_register_multiple_skills_and_list() {
             "Second echo variant".to_string(),
             serde_json::json!({}),
             vec![],
+            false,
         )
         .expect("failed to load skill b");
 

@@ -975,6 +975,89 @@ impl AgentRunner {
             }
         }
 
+        // --- HITL approval gate ---
+        // If the target skill is tagged `requires_approval: true`, invoke the
+        // `human_approval` skill before executing.  If approval is denied (or
+        // the approval skill itself is absent), the call is blocked.
+        if !self.proxy.is_some() {
+            if let Some(skill) = self.skills.get(&call.name) {
+                if skill.descriptor().requires_approval {
+                    warn!(
+                        tool = %call.name,
+                        "Skill requires human approval — invoking human_approval"
+                    );
+                    let approval_call = argentor_core::ToolCall {
+                        id: format!("hitl_{}", call.id),
+                        name: "human_approval".to_string(),
+                        arguments: serde_json::json!({
+                            "task_id": call.id,
+                            "description": format!(
+                                "Agent wants to call '{}' with args: {}",
+                                call.name,
+                                serde_json::to_string(&call.arguments).unwrap_or_default()
+                            ),
+                            "risk_level": "high",
+                        }),
+                    };
+                    match self.skills.get("human_approval") {
+                        Some(approval_skill) => match approval_skill.execute(approval_call).await {
+                            Ok(decision_result) if !decision_result.is_error => {
+                                let parsed: serde_json::Value =
+                                    serde_json::from_str(&decision_result.content)
+                                        .unwrap_or_default();
+                                if parsed["approved"] != true {
+                                    let reason = parsed["reason"]
+                                        .as_str()
+                                        .unwrap_or("denied by reviewer")
+                                        .to_string();
+                                    warn!(tool = %call.name, reason = %reason, "HITL denied");
+                                    return Ok(argentor_core::ToolResult::error(
+                                        &call.id,
+                                        format!(
+                                            "Tool '{}' blocked by human reviewer: {reason}",
+                                            call.name
+                                        ),
+                                    ));
+                                }
+                                info!(tool = %call.name, "HITL approved");
+                            }
+                            Ok(decision_result) => {
+                                warn!(
+                                    tool = %call.name,
+                                    error = %decision_result.content,
+                                    "Approval skill returned error — blocking call"
+                                );
+                                return Ok(argentor_core::ToolResult::error(
+                                    &call.id,
+                                    format!(
+                                        "Approval check failed for '{}': {}",
+                                        call.name, decision_result.content
+                                    ),
+                                ));
+                            }
+                            Err(e) => {
+                                warn!(tool = %call.name, error = %e, "Approval skill error — blocking call");
+                                return Ok(argentor_core::ToolResult::error(
+                                    &call.id,
+                                    format!("Approval error for '{}': {e}", call.name),
+                                ));
+                            }
+                        },
+                        None => {
+                            warn!(tool = %call.name, "human_approval skill not registered — blocking requires_approval tool");
+                            return Ok(argentor_core::ToolResult::error(
+                                &call.id,
+                                format!(
+                                    "Tool '{}' requires human approval but no approval channel is configured",
+                                    call.name
+                                ),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
         if let Some((proxy, agent_id)) = &self.proxy {
             proxy.execute(call, agent_id).await
         } else {

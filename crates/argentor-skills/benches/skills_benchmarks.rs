@@ -21,6 +21,7 @@ impl BenchSkill {
                 description: format!("Bench skill {name}"),
                 parameters_schema: serde_json::json!({}),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }
@@ -112,6 +113,7 @@ fn bench_descriptor_generation(c: &mut Criterion) {
                 description: black_box("Echoes input back").to_string(),
                 parameters_schema: serde_json::json!({}),
                 required_capabilities: vec![],
+                requires_approval: false,
             })
         });
     });
@@ -131,6 +133,7 @@ fn bench_descriptor_generation(c: &mut Criterion) {
                     "required": ["path"]
                 }),
                 required_capabilities: vec![argentor_security::Capability::FileRead {
+                    requires_approval: false,
                     allowed_paths: vec!["/tmp".into(), "/workspace".into()],
                 }],
             })
@@ -150,6 +153,7 @@ fn bench_descriptor_generation(c: &mut Criterion) {
                 "required": ["command"]
             }),
             required_capabilities: vec![argentor_security::Capability::ShellExec {
+                requires_approval: false,
                 allowed_commands: vec!["ls".into(), "echo".into(), "cat".into()],
             }],
         };

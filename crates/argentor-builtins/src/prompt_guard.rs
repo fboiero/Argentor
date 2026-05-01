@@ -51,6 +51,7 @@ impl PromptGuardSkill {
                     "required": ["operation", "text"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

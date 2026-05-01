@@ -36,6 +36,7 @@ impl JwtToolSkill {
                     "required": ["operation", "token"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

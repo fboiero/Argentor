@@ -53,6 +53,7 @@ impl BrowserSkill {
                 required_capabilities: vec![Capability::NetworkAccess {
                     allowed_hosts: vec![],
                 }],
+                requires_approval: false,
             },
             client,
         }

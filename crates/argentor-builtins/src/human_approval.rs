@@ -112,6 +112,7 @@ impl HumanApprovalSkill {
                     "required": ["task_id", "description", "risk_level"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
             channel,
         }

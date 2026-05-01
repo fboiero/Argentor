@@ -39,6 +39,7 @@ impl HtmlLoaderSkill {
                     "required": ["operation", "html"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

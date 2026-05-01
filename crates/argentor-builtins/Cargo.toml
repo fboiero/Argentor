@@ -18,6 +18,7 @@ argentor-core.workspace = true
 argentor-skills.workspace = true
 argentor-security.workspace = true
 argentor-memory.workspace = true
+argentor-agent = { workspace = true, optional = true }
 serde.workspace = true
 serde_json.workspace = true
 async-trait.workspace = true
@@ -41,6 +42,7 @@ default = []
 browser = ["fantoccini"]
 docker = ["bollard"]
 web-browse = ["scraper"]
+computer-use = ["argentor-agent"]
 
 [dev-dependencies]
 tempfile = "3"

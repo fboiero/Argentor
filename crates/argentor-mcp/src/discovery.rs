@@ -81,6 +81,7 @@ mod tests {
                     description: description.to_string(),
                     parameters_schema: serde_json::json!({}),
                     required_capabilities: vec![],
+                    requires_approval: false,
                 },
             }
         }

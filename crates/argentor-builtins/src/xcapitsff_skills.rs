@@ -100,6 +100,7 @@ impl XcapitSearchSkill {
                 required_capabilities: vec![Capability::NetworkAccess {
                     allowed_hosts: vec![host],
                 }],
+                requires_approval: false,
             },
             client,
             base_url: base,
@@ -202,6 +203,7 @@ impl XcapitLeadInfoSkill {
                 required_capabilities: vec![Capability::NetworkAccess {
                     allowed_hosts: vec![host],
                 }],
+                requires_approval: false,
             },
             client,
             base_url: base,
@@ -299,6 +301,7 @@ impl XcapitTicketInfoSkill {
                 required_capabilities: vec![Capability::NetworkAccess {
                     allowed_hosts: vec![host],
                 }],
+                requires_approval: false,
             },
             client,
             base_url: base,
@@ -402,6 +405,7 @@ impl XcapitKbSearchSkill {
                 required_capabilities: vec![Capability::NetworkAccess {
                     allowed_hosts: vec![host],
                 }],
+                requires_approval: false,
             },
             client,
             base_url: base,
@@ -528,6 +532,7 @@ impl XcapitCustomer360Skill {
                 required_capabilities: vec![Capability::NetworkAccess {
                     allowed_hosts: vec![host],
                 }],
+                requires_approval: false,
             },
             client,
             base_url: base,

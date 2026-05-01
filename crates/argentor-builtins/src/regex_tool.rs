@@ -59,6 +59,7 @@ impl RegexSkill {
                     "required": ["operation", "pattern"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

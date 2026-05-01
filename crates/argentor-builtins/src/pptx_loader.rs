@@ -45,6 +45,7 @@ impl PptxLoaderSkill {
                     "required": ["operation", "data"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

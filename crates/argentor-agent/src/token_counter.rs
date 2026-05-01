@@ -389,6 +389,7 @@ mod tests {
             description: "A test tool for testing".to_string(),
             parameters_schema: serde_json::json!({"type": "object"}),
             required_capabilities: vec![],
+            requires_approval: false,
         }];
         let tokens = tc.estimate_tool_tokens(&tools, &LlmProvider::OpenAi);
         // Should include tokens for name + description + schema + overhead

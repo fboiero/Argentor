@@ -399,6 +399,7 @@ impl InProcessMcpServer {
                     description: format!("[MCP:{}] {}", server.name, description),
                     parameters_schema: input_schema,
                     required_capabilities: vec![],
+                    requires_approval: false,
                 },
                 server: Arc::clone(&server),
                 tool_name: tool_name.clone(),

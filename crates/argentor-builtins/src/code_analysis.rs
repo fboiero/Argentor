@@ -121,6 +121,7 @@ impl CodeAnalysisSkill {
                 required_capabilities: vec![Capability::FileRead {
                     allowed_paths: vec![], // Configured at runtime
                 }],
+                requires_approval: false,
             },
         }
     }

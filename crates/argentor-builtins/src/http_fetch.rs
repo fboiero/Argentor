@@ -324,6 +324,7 @@ impl HttpFetchSkill {
                 required_capabilities: vec![Capability::NetworkAccess {
                     allowed_hosts: vec![], // Configured at runtime
                 }],
+                requires_approval: false,
             },
             client,
         }

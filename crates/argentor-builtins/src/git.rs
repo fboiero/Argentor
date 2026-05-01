@@ -116,6 +116,7 @@ impl GitSkill {
                 required_capabilities: vec![Capability::ShellExec {
                     allowed_commands: vec!["git".to_string()],
                 }],
+                requires_approval: false,
             },
             protected_branches,
         }

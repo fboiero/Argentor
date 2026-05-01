@@ -114,6 +114,7 @@ impl ArtifactStoreSkill {
                     "required": ["action"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
             backend,
         }

@@ -130,6 +130,7 @@ impl TestRunnerSkill {
                         "npx".to_string(),
                     ],
                 }],
+                requires_approval: false,
             },
         }
     }

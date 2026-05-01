@@ -58,6 +58,7 @@ impl EnvManagerSkill {
                     "required": ["operation"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }

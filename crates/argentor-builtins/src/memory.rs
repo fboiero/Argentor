@@ -44,6 +44,7 @@ impl MemoryStoreSkill {
                     "required": ["content"]
                 }),
                 required_capabilities: vec![Capability::DatabaseQuery],
+                requires_approval: false,
             },
             store,
             embedder,
@@ -154,6 +155,7 @@ impl MemorySearchSkill {
                     "required": ["query"]
                 }),
                 required_capabilities: vec![Capability::DatabaseQuery],
+                requires_approval: false,
             },
             store,
             embedder,

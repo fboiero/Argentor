@@ -91,6 +91,7 @@ impl AgentDelegateSkill {
                     "required": ["description", "role"]
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
             queue,
         }

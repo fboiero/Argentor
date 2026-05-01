@@ -98,6 +98,7 @@ impl MarkdownSkill {
             description: frontmatter.description.clone(),
             parameters_schema,
             required_capabilities: capabilities,
+            requires_approval: false,
         };
 
         Ok(Self {

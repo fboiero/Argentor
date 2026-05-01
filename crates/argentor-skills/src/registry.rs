@@ -520,6 +520,7 @@ mod tests {
                     description: format!("Test skill {name}"),
                     parameters_schema: serde_json::json!({}),
                     required_capabilities: vec![],
+                    requires_approval: false,
                 },
             }
         }
@@ -548,6 +549,7 @@ mod tests {
                     description: format!("Denying skill {name}"),
                     parameters_schema: serde_json::json!({}),
                     required_capabilities: vec![],
+                    requires_approval: false,
                 },
             }
         }
@@ -765,6 +767,7 @@ mod tests {
                 required_capabilities: vec![Capability::FileRead {
                     allowed_paths: vec!["/tmp".to_string()],
                 }],
+                requires_approval: false,
             },
         });
         reg.register(skill);
@@ -795,6 +798,7 @@ mod tests {
                 required_capabilities: vec![Capability::FileRead {
                     allowed_paths: vec!["/specific/path".to_string()],
                 }],
+                requires_approval: false,
             },
         });
         reg.register(skill);
@@ -834,6 +838,7 @@ mod tests {
                     description: format!("Slow skill {name}"),
                     parameters_schema: serde_json::json!({}),
                     required_capabilities: vec![],
+                    requires_approval: false,
                 },
                 delay,
             }
@@ -864,6 +869,7 @@ mod tests {
                     description: format!("Failing skill {name}"),
                     parameters_schema: serde_json::json!({}),
                     required_capabilities: vec![],
+                    requires_approval: false,
                 },
             }
         }
@@ -1064,6 +1070,7 @@ mod tests {
                 required_capabilities: vec![Capability::FileRead {
                     allowed_paths: vec!["/tmp".to_string()],
                 }],
+                requires_approval: false,
             },
         }));
         let reg = Arc::new(reg);

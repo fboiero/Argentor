@@ -28,6 +28,7 @@ impl McpSkill {
                 description: format!("[MCP:{}] {}", client.server_name(), tool.description),
                 parameters_schema: tool.input_schema.clone(),
                 required_capabilities: vec![], // MCP server handles its own capabilities
+                requires_approval: false,
             },
             tool_name: tool.name.clone(),
             client,

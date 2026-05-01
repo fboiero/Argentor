@@ -454,6 +454,7 @@ impl BrowserAutomationSkill {
                 required_capabilities: vec![Capability::NetworkAccess {
                     allowed_hosts: vec!["*".into()],
                 }],
+                requires_approval: false,
             },
             #[cfg(feature = "browser")]
             client: Arc::new(tokio::sync::Mutex::new(None)),

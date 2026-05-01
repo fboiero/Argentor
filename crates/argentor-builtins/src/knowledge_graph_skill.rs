@@ -80,6 +80,7 @@ impl KnowledgeGraphSkill {
                     "required": ["operation"]
                 }),
                 required_capabilities: vec![Capability::DatabaseQuery],
+                requires_approval: false,
             },
             graph,
         }

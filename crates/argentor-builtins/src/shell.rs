@@ -89,6 +89,7 @@ impl ShellSkill {
                 required_capabilities: vec![Capability::ShellExec {
                     allowed_commands: vec![], // Configured at runtime via policy
                 }],
+                requires_approval: false,
             },
             policy,
             max_stdout_bytes: DEFAULT_MAX_STDOUT_BYTES,

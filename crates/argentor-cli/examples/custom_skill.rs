@@ -46,6 +46,7 @@ impl ReverseSkill {
                     }
                 }),
                 required_capabilities: vec![],
+                requires_approval: false,
             },
         }
     }
