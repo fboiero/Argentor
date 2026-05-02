@@ -3,42 +3,33 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Argentor - Intelligent Multi-Agent AI Framework in Rust</title>
-  <meta name="description" content="Production-grade autonomous AI agent framework with ReAct reasoning, A2A protocol, cost-aware routing, WASM sandboxing, and enterprise compliance. 4498 tests, 187K+ LOC, built in Rust.">
-
-  <!-- Asciinema Player -->
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/asciinema-player@3.9.0/dist/bundle/asciinema-player.css">
-
+  <title>Argentor — The Secure AI Agent Framework</title>
+  <meta name="description" content="Production-grade autonomous AI agent framework. 17 crates, 8 LLM providers, 6-layer guardrails, WASM sandboxed skills, Python SDK. Built in Rust.">
   <style>
     :root {
-      --bg: #0d1117;
-      --bg2: #161b22;
-      --bg3: #1c2128;
+      --bg:     #0d1117;
+      --bg2:    #161b22;
+      --bg3:    #1c2128;
       --border: #30363d;
-      --text: #e6edf3;
-      --text2: #8b949e;
-      --cyan: #58a6ff;
-      --green: #3fb950;
+      --text:   #e6edf3;
+      --text2:  #8b949e;
+      --cyan:   #58a6ff;
+      --green:  #3fb950;
       --purple: #bc8cff;
       --orange: #d29922;
-      --red: #f85149;
-      --magenta: #db61a2;
+      --red:    #f85149;
     }
 
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
     html { scroll-behavior: smooth; }
-
     body {
       font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
       background: var(--bg);
       color: var(--text);
       line-height: 1.6;
     }
-
     a { color: var(--cyan); text-decoration: none; }
     a:hover { text-decoration: underline; }
-
     .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
 
     /* ── Nav ── */
@@ -47,22 +38,13 @@
       padding: 14px 0;
       position: sticky;
       top: 0;
-      background: rgba(13, 17, 23, 0.95);
+      background: rgba(13,17,23,0.95);
       backdrop-filter: blur(12px);
       -webkit-backdrop-filter: blur(12px);
       z-index: 100;
     }
-    nav .container {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-    }
-    nav .logo {
-      font-size: 1.3rem;
-      font-weight: 700;
-      color: var(--cyan);
-      letter-spacing: 2px;
-    }
+    nav .container { display: flex; align-items: center; justify-content: space-between; }
+    .logo { font-size: 1.3rem; font-weight: 700; color: var(--cyan); letter-spacing: 2px; }
     nav .links { display: flex; gap: 20px; flex-wrap: wrap; }
     nav .links a { color: var(--text2); font-size: 0.88rem; white-space: nowrap; }
     nav .links a:hover { color: var(--text); text-decoration: none; }
@@ -70,694 +52,174 @@
     /* ── Hero ── */
     .hero {
       text-align: center;
-      padding: 80px 0 48px;
+      padding: 88px 0 56px;
       position: relative;
       overflow: hidden;
     }
     .hero::before {
       content: '';
       position: absolute;
-      top: -200px;
-      left: 50%;
+      top: -200px; left: 50%;
       transform: translateX(-50%);
-      width: 800px;
-      height: 600px;
-      background: radial-gradient(ellipse, rgba(88,166,255,0.08) 0%, transparent 70%);
+      width: 800px; height: 600px;
+      background: radial-gradient(ellipse, rgba(88,166,255,0.09) 0%, transparent 70%);
       pointer-events: none;
     }
     .hero h1 {
-      font-size: 3.4rem;
+      font-size: 3.2rem;
       font-weight: 800;
-      letter-spacing: 4px;
-      margin-bottom: 16px;
+      letter-spacing: 3px;
+      margin-bottom: 18px;
       background: linear-gradient(135deg, var(--cyan), var(--purple));
       -webkit-background-clip: text;
       -webkit-text-fill-color: transparent;
       background-clip: text;
     }
     .hero .tagline {
-      font-size: 1.3rem;
+      font-size: 1.2rem;
       color: var(--text2);
-      max-width: 780px;
-      margin: 0 auto 12px;
+      max-width: 620px;
+      margin: 0 auto 36px;
     }
-    .hero .tagline-sub {
-      font-size: 1rem;
-      color: var(--text2);
-      max-width: 650px;
-      margin: 0 auto 28px;
-      opacity: 0.8;
-    }
-    .hero .badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-bottom: 32px; }
-    .hero .badges img { height: 22px; }
-
-    .btn {
+    .hero .version {
       display: inline-block;
-      padding: 12px 28px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 1rem;
-      transition: opacity 0.2s, transform 0.15s;
-    }
-    .btn:hover { opacity: 0.85; text-decoration: none; transform: translateY(-1px); }
-    .btn-primary { background: var(--cyan); color: var(--bg); }
-    .btn-secondary { border: 1px solid var(--border); color: var(--text); }
-    .hero .buttons { display: flex; gap: 16px; justify-content: center; flex-wrap: wrap; }
-
-    /* ── Section Common ── */
-    section { padding: 72px 0; }
-    section h2 {
-      text-align: center;
-      font-size: 2rem;
-      margin-bottom: 12px;
-    }
-    section .section-sub {
-      text-align: center;
-      color: var(--text2);
-      margin-bottom: 40px;
-      max-width: 650px;
-      margin-left: auto;
-      margin-right: auto;
-    }
-
-    /* ── Demo ── */
-    .demo-player {
-      max-width: 900px;
-      margin: 0 auto;
-      border-radius: 12px;
-      overflow: hidden;
-      border: 1px solid var(--border);
-      box-shadow: 0 8px 40px rgba(0,0,0,0.4);
-    }
-    .demo-bar {
-      background: var(--bg3);
-      padding: 10px 16px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .demo-dot {
-      width: 12px; height: 12px;
-      border-radius: 50%;
-      display: inline-block;
-    }
-    .demo-dot.r { background: #ff5f57; }
-    .demo-dot.y { background: #febc2e; }
-    .demo-dot.g { background: #28c840; }
-    .demo-bar span {
-      margin-left: 12px;
-      color: var(--text2);
-      font-size: 0.85rem;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-    }
-    #player-container {
-      background: #1a1d23;
-    }
-    .demo-info {
-      text-align: center;
-      margin-top: 16px;
-      color: var(--text2);
-      font-size: 0.85rem;
-    }
-
-    /* ── Why Argentor ── */
-    .why-grid {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 24px;
-      margin-bottom: 48px;
-    }
-    .why-card {
       background: var(--bg2);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 28px;
+      border-radius: 20px;
+      padding: 4px 14px;
+      font-size: 0.8rem;
+      color: var(--green);
+      letter-spacing: 1px;
+      margin-bottom: 36px;
+    }
+    .hero-ctas { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; margin-bottom: 56px; }
+    .btn {
+      padding: 10px 22px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; text-decoration: none; }
+    .btn-primary { background: var(--cyan); color: #0d1117; }
+    .btn-secondary { background: var(--bg2); color: var(--text); border: 1px solid var(--border); }
+
+    /* ── Metrics ── */
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 16px;
+      margin-bottom: 72px;
+    }
+    @media (max-width: 700px) { .metrics { grid-template-columns: repeat(2, 1fr); } }
+    .metric {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 24px 16px;
       text-align: center;
     }
-    .why-card .why-icon {
-      font-size: 2.2rem;
-      margin-bottom: 12px;
+    .metric .num {
+      font-size: 2rem;
+      font-weight: 800;
+      color: var(--cyan);
+      display: block;
     }
-    .why-card h3 {
-      font-size: 1.1rem;
+    .metric .label { font-size: 0.82rem; color: var(--text2); margin-top: 4px; }
+
+    /* ── Section headers ── */
+    .section-title {
+      font-size: 1.6rem;
+      font-weight: 700;
       margin-bottom: 8px;
     }
-    .why-card p {
-      color: var(--text2);
-      font-size: 0.9rem;
-    }
-    .comparison-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 0.9rem;
-    }
-    .comparison-table th,
-    .comparison-table td {
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-      text-align: center;
-    }
-    .comparison-table th:first-child,
-    .comparison-table td:first-child {
-      text-align: left;
-    }
-    .comparison-table th {
-      color: var(--text2);
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .comparison-table thead th:nth-child(2) {
-      color: var(--cyan);
-      font-size: 0.85rem;
-    }
-    .comparison-table td {
-      color: var(--text2);
-    }
-    .check { color: var(--green); font-weight: bold; }
-    .cross { color: var(--red); opacity: 0.6; }
-    .partial { color: var(--orange); }
+    .section-sub { color: var(--text2); font-size: 0.95rem; margin-bottom: 40px; }
 
-    /* ── Features ── */
-    .feature-grid {
+    /* ── Feature grid ── */
+    .features {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+      margin-bottom: 80px;
     }
-    .feature-card {
+    @media (max-width: 800px) { .features { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 500px) { .features { grid-template-columns: 1fr; } }
+    .card {
       background: var(--bg2);
       border: 1px solid var(--border);
-      border-radius: 12px;
+      border-radius: 10px;
       padding: 24px;
       transition: border-color 0.2s;
     }
-    .feature-card:hover {
-      border-color: var(--cyan);
-    }
-    .feature-card .icon {
-      font-size: 1.5rem;
-      margin-bottom: 8px;
-    }
-    .feature-card h3 {
-      font-size: 1.1rem;
-      margin-bottom: 8px;
-      color: var(--text);
-    }
-    .feature-card p {
-      color: var(--text2);
-      font-size: 0.9rem;
-    }
-    .feature-card .tag {
-      display: inline-block;
-      margin-top: 10px;
-      padding: 2px 10px;
-      border-radius: 12px;
-      font-size: 0.75rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .tag-new {
-      background: rgba(63,185,80,0.15);
-      color: var(--green);
-      border: 1px solid rgba(63,185,80,0.3);
-    }
-    .tag-core {
-      background: rgba(88,166,255,0.1);
-      color: var(--cyan);
-      border: 1px solid rgba(88,166,255,0.25);
-    }
-    .tag-intel {
-      background: rgba(188,140,255,0.15);
-      color: var(--purple);
-      border: 1px solid rgba(188,140,255,0.3);
-    }
+    .card:hover { border-color: var(--cyan); }
+    .card .icon { font-size: 1.6rem; margin-bottom: 12px; }
+    .card h3 { font-size: 1rem; font-weight: 700; margin-bottom: 8px; }
+    .card p { font-size: 0.86rem; color: var(--text2); line-height: 1.55; }
 
-    /* ── Intelligence ── */
-    .intel-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-    }
-    .intel-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      border-left: 3px solid var(--purple);
-    }
-    .intel-card h3 {
-      font-size: 1rem;
-      margin-bottom: 8px;
-      color: var(--purple);
-    }
-    .intel-card p {
-      color: var(--text2);
-      font-size: 0.88rem;
-    }
-    .intel-flow {
-      margin-top: 32px;
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 28px 32px;
-      max-width: 800px;
-      margin-left: auto;
-      margin-right: auto;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.85rem;
-      line-height: 1.5;
-      white-space: pre;
-      overflow-x: auto;
-      color: var(--text2);
-      text-align: center;
-    }
-
-    /* ── Security ── */
-    .security-layers {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 20px;
-      margin-bottom: 32px;
-    }
-    .security-layer {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      border-left: 3px solid var(--red);
-    }
-    .security-layer h3 {
-      font-size: 1rem;
-      margin-bottom: 8px;
-      color: var(--red);
-    }
-    .security-layer ul {
-      list-style: none;
-      padding: 0;
-    }
-    .security-layer li {
-      color: var(--text2);
-      font-size: 0.88rem;
-      padding: 3px 0;
-    }
-    .security-layer li::before {
-      content: "\2713 ";
-      color: var(--green);
-      font-weight: bold;
-      margin-right: 4px;
-    }
-
-    /* ── Architecture ── */
-    .arch-diagram {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 32px;
-      max-width: 880px;
-      margin: 0 auto;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.8rem;
-      line-height: 1.35;
-      white-space: pre;
-      overflow-x: auto;
-      color: var(--text2);
-    }
-
-    /* ── Multi-Agent Patterns ── */
-    .patterns-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 20px;
-    }
-    .pattern-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      text-align: center;
-    }
-    .pattern-card .pattern-visual {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.8rem;
-      color: var(--purple);
-      white-space: pre;
-      line-height: 1.3;
-      margin-bottom: 12px;
-      min-height: 50px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .pattern-card h3 {
-      font-size: 1rem;
-      margin-bottom: 6px;
-    }
-    .pattern-card p {
-      color: var(--text2);
-      font-size: 0.85rem;
-    }
-
-    /* ── Code Generation ── */
-    .codegen-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 24px;
-    }
-    .codegen-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-    }
-    .codegen-card-header {
-      background: var(--bg3);
-      padding: 12px 20px;
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      border-bottom: 1px solid var(--border);
-    }
-    .codegen-card-header h3 {
-      font-size: 0.95rem;
-      font-weight: 600;
-    }
-    .codegen-card-body {
-      padding: 20px;
-    }
-    .codegen-card-body ul {
-      list-style: none;
-      padding: 0;
-    }
-    .codegen-card-body li {
-      color: var(--text2);
-      font-size: 0.88rem;
-      padding: 4px 0;
-    }
-    .codegen-card-body li::before {
-      content: "\25B8 ";
-      color: var(--green);
-      margin-right: 4px;
-    }
-
-    /* ── Observability ── */
-    .obs-grid {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 24px;
-    }
-    .obs-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 28px;
-      text-align: center;
-    }
-    .obs-card .obs-icon {
-      font-size: 2rem;
-      margin-bottom: 12px;
-    }
-    .obs-card h3 {
-      font-size: 1rem;
-      margin-bottom: 6px;
-    }
-    .obs-card p {
-      color: var(--text2);
-      font-size: 0.88rem;
-    }
-    .obs-code {
-      margin-top: 28px;
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 20px 24px;
-      max-width: 700px;
-      margin-left: auto;
-      margin-right: auto;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.85rem;
-      overflow-x: auto;
-      color: var(--text2);
-    }
-    .obs-code .key { color: var(--cyan); }
-    .obs-code .val { color: var(--green); }
-    .obs-code .cmt { color: var(--text2); opacity: 0.5; }
-
-    /* ── Crates ── */
-    .crate-table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-    .crate-table th, .crate-table td {
-      text-align: left;
-      padding: 12px 16px;
-      border-bottom: 1px solid var(--border);
-    }
-    .crate-table th {
-      color: var(--text2);
-      font-size: 0.8rem;
-      text-transform: uppercase;
-      letter-spacing: 1px;
-    }
-    .crate-table td:first-child {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      color: var(--cyan);
-      font-size: 0.9rem;
-      white-space: nowrap;
-    }
-    .crate-table td:last-child {
-      color: var(--text2);
-      font-size: 0.9rem;
-    }
-
-    /* ── Quick Start ── */
+    /* ── Quick start ── */
+    .quickstart { margin-bottom: 80px; }
     .code-block {
-      background: var(--bg2);
+      background: var(--bg3);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      max-width: 700px;
-      margin: 0 auto 16px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
+      border-radius: 8px;
+      padding: 20px 24px;
+      font-family: 'SF Mono', 'Fira Code', Consolas, monospace;
       font-size: 0.9rem;
       overflow-x: auto;
+      line-height: 1.7;
     }
     .code-block .comment { color: var(--text2); }
-    .code-block .cmd { color: var(--green); }
+    .code-block .cmd     { color: var(--green); }
+    .code-block .kw      { color: var(--purple); }
+    .code-block .str     { color: var(--orange); }
+
+    /* ── Benchmarks ── */
+    .benchmarks { margin-bottom: 80px; }
+    .bench-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 700px) { .bench-grid { grid-template-columns: 1fr; } }
+    .bench-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 28px 24px;
+      text-align: center;
+    }
+    .bench-card .big {
+      font-size: 2.4rem;
+      font-weight: 800;
+      display: block;
+      margin-bottom: 6px;
+    }
+    .bench-card .bench-label { font-size: 0.85rem; color: var(--text2); }
+    .bench-card.green .big  { color: var(--green); }
+    .bench-card.cyan .big   { color: var(--cyan); }
+    .bench-card.orange .big { color: var(--orange); }
+    .bench-note { margin-top: 14px; font-size: 0.78rem; color: var(--text2); text-align: center; }
 
     /* ── Footer ── */
     footer {
       border-top: 1px solid var(--border);
-      padding: 36px 0;
-      text-align: center;
-      color: var(--text2);
-      font-size: 0.85rem;
-    }
-    footer a { color: var(--text2); }
-    footer a:hover { color: var(--cyan); }
-    .footer-badges {
-      margin-top: 12px;
-      display: flex;
-      gap: 8px;
-      justify-content: center;
-      flex-wrap: wrap;
-    }
-    .footer-badges img { height: 20px; }
-
-    /* ── Responsive ── */
-    @media (max-width: 768px) {
-      .hero h1 { font-size: 2.2rem; }
-      .hero .tagline { font-size: 1.05rem; }
-      .why-grid { grid-template-columns: 1fr; }
-      .feature-grid { grid-template-columns: 1fr; }
-      .security-layers { grid-template-columns: 1fr; }
-      .patterns-grid { grid-template-columns: 1fr; }
-      .codegen-grid { grid-template-columns: 1fr; }
-      .obs-grid { grid-template-columns: 1fr 1fr; }
-      .intel-grid { grid-template-columns: 1fr; }
-      nav .links { gap: 12px; }
-      nav .links a { font-size: 0.82rem; }
-      .comparison-table { font-size: 0.8rem; }
-      .comparison-table th, .comparison-table td { padding: 8px 6px; }
-    }
-
-    @media (max-width: 480px) {
-      .hero h1 { font-size: 1.8rem; letter-spacing: 2px; }
-      .hero .tagline { font-size: 0.95rem; }
-      nav .container { flex-direction: column; gap: 10px; }
-      section { padding: 48px 0; }
-      .obs-grid { grid-template-columns: 1fr; }
-    }
-
-    /* ── Agent Intelligence Grid ── */
-    .ai-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-      gap: 20px;
-    }
-    .ai-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 24px;
-      position: relative;
-      overflow: hidden;
-      transition: border-color 0.2s, transform 0.2s;
-    }
-    .ai-card:hover {
-      border-color: var(--purple);
-      transform: translateY(-2px);
-    }
-    .ai-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 3px;
-      background: linear-gradient(90deg, var(--purple), var(--cyan));
-    }
-    .ai-card .ai-icon {
-      font-size: 1.8rem;
-      margin-bottom: 10px;
-    }
-    .ai-card h3 {
-      font-size: 1rem;
-      margin-bottom: 6px;
-      color: var(--text);
-    }
-    .ai-card p {
-      color: var(--text2);
-      font-size: 0.85rem;
-      line-height: 1.5;
-    }
-    .ai-card .ai-tag {
-      display: inline-block;
-      margin-top: 10px;
-      padding: 2px 10px;
-      border-radius: 12px;
-      font-size: 0.7rem;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      background: rgba(188,140,255,0.15);
-      color: var(--purple);
-      border: 1px solid rgba(188,140,255,0.3);
-    }
-
-    /* ── SDK Section ── */
-    .sdk-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-      gap: 24px;
-    }
-    .sdk-card {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      overflow: hidden;
-      transition: border-color 0.2s;
-    }
-    .sdk-card:hover {
-      border-color: var(--cyan);
-    }
-    .sdk-card-header {
-      padding: 20px 24px;
-      display: flex;
-      align-items: center;
-      gap: 14px;
-      border-bottom: 1px solid var(--border);
-    }
-    .sdk-card-header .sdk-lang-icon {
-      font-size: 2rem;
-    }
-    .sdk-card-header h3 {
-      font-size: 1.15rem;
-    }
-    .sdk-card-header .sdk-pkg {
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.8rem;
-      color: var(--text2);
-    }
-    .sdk-card-body {
-      padding: 20px 24px;
-    }
-    .sdk-card-body ul {
-      list-style: none;
-      padding: 0;
-    }
-    .sdk-card-body li {
-      color: var(--text2);
-      font-size: 0.88rem;
-      padding: 4px 0;
-    }
-    .sdk-card-body li::before {
-      content: "\25B8 ";
-      color: var(--green);
-      margin-right: 4px;
-    }
-    .sdk-install {
-      margin-top: 12px;
-      background: var(--bg3);
-      border-radius: 8px;
-      padding: 10px 16px;
-      font-family: 'SF Mono', 'Fira Code', monospace;
-      font-size: 0.82rem;
-      color: var(--green);
-    }
-
-    /* ── Dashboard Section ── */
-    .dashboard-preview {
-      background: var(--bg2);
-      border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 32px;
-      max-width: 900px;
-      margin: 0 auto;
-    }
-    .dashboard-features {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-      gap: 20px;
+      padding: 32px 0;
       margin-top: 24px;
     }
-    .dashboard-feat {
-      text-align: center;
-      padding: 16px;
+    footer .container {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
     }
-    .dashboard-feat .dash-icon {
-      font-size: 1.6rem;
-      margin-bottom: 8px;
-    }
-    .dashboard-feat h3 {
-      font-size: 0.95rem;
-      margin-bottom: 4px;
-    }
-    .dashboard-feat p {
-      color: var(--text2);
-      font-size: 0.82rem;
-    }
+    footer .license { font-size: 0.82rem; color: var(--text2); }
+    footer .links { display: flex; gap: 18px; flex-wrap: wrap; }
+    footer .links a { font-size: 0.82rem; color: var(--text2); }
+    footer .links a:hover { color: var(--text); text-decoration: none; }
 
-    @media (max-width: 768px) {
-      .ai-grid { grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
-      .sdk-grid { grid-template-columns: 1fr; }
-      .dashboard-features { grid-template-columns: 1fr 1fr; }
-    }
-    @media (max-width: 480px) {
-      .ai-grid { grid-template-columns: 1fr; }
-      .dashboard-features { grid-template-columns: 1fr; }
-    }
-
-    /* ── Scroll fade-in ── */
-    .fade-in {
-      opacity: 0;
-      transform: translateY(20px);
-      transition: opacity 0.5s ease-out, transform 0.5s ease-out;
-    }
-    .fade-in.visible {
-      opacity: 1;
-      transform: translateY(0);
-    }
+    section { padding: 0 0 4px; }
   </style>
 </head>
 <body>
@@ -765,913 +227,138 @@
 <!-- Nav -->
 <nav>
   <div class="container">
-    <div class="logo">ARGENTOR</div>
+    <span class="logo">ARGENTOR</span>
     <div class="links">
-      <a href="#demo">Demo</a>
-      <a href="#intelligence">Intelligence</a>
       <a href="#features">Features</a>
-      <a href="#agent-intelligence">Agent AI</a>
-      <a href="#sdk">SDK</a>
-      <a href="#security">Security</a>
-      <a href="#architecture">Architecture</a>
-      <a href="#a2a">A2A Protocol</a>
       <a href="#quickstart">Quick Start</a>
-      <a href="https://github.com/fboiero/Agentor" target="_blank" rel="noopener">GitHub</a>
+      <a href="#benchmarks">Benchmarks</a>
+      <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+      <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a>
+      <a href="https://docs.rs/argentor-core" target="_blank">Docs</a>
     </div>
   </div>
 </nav>
 
 <!-- Hero -->
-<section class="hero">
+<div class="hero">
   <div class="container">
+    <div class="version">v1.3.0 — stable</div>
     <h1>ARGENTOR</h1>
     <p class="tagline">
-      Intelligent agents that reason, evaluate, and adapt.<br>
-      Multi-agent orchestration with defense-in-depth security.
+      The Secure AI Agent Framework — build production autonomous agents in Rust with
+      sandboxed skills, 6-layer guardrails, and 8 LLM backends out of the box.
     </p>
-    <p class="tagline-sub">
-      ReAct reasoning, cost-aware model routing, self-evaluation, A2A interop,
-      WASM-sandboxed plugins, and enterprise compliance &mdash; all in Rust.
-    </p>
-    <div class="badges">
-      <img src="https://img.shields.io/badge/v1.0.0-release-blue.svg" alt="Version">
-      <img src="https://img.shields.io/badge/License-AGPL--3.0-blue.svg" alt="License">
-      <img src="https://img.shields.io/badge/Rust-1.75%2B-orange.svg" alt="Rust">
-      <img src="https://img.shields.io/badge/Tests-4498_passing-brightgreen.svg" alt="Tests">
-      <img src="https://img.shields.io/badge/Crates-14-green.svg" alt="Crates">
-      <img src="https://img.shields.io/badge/LOC-187K%2B-purple.svg" alt="Lines of Code">
-      <img src="https://img.shields.io/badge/Skills-50%2B_built--in-green.svg" alt="Skills">
-      <img src="https://img.shields.io/badge/LLM_Providers-14-orange.svg" alt="Providers">
+    <div class="hero-ctas">
+      <a class="btn btn-primary" href="#quickstart">Get Started</a>
+      <a class="btn btn-secondary" href="https://github.com/fboiero/Agentor" target="_blank">View on GitHub</a>
+      <a class="btn btn-secondary" href="https://crates.io/search?q=argentor" target="_blank">crates.io</a>
     </div>
-    <div class="buttons">
-      <a href="https://github.com/fboiero/Agentor" class="btn btn-primary" target="_blank" rel="noopener">View on GitHub</a>
-      <a href="docs/GETTING_STARTED.md" class="btn btn-secondary">Getting Started</a>
-      <a href="#demo" class="btn btn-secondary">Watch Demo</a>
+
+    <!-- Metrics -->
+    <div class="metrics">
+      <div class="metric"><span class="num">17</span><div class="label">crates published</div></div>
+      <div class="metric"><span class="num">220K</span><div class="label">lines of Rust</div></div>
+      <div class="metric"><span class="num">5,359</span><div class="label">tests passing</div></div>
+      <div class="metric"><span class="num">8</span><div class="label">LLM backends</div></div>
     </div>
   </div>
-</section>
+</div>
 
-<!-- Demo -->
-<section id="demo" class="fade-in">
+<!-- Features -->
+<section id="features">
   <div class="container">
-    <h2>Live Demos</h2>
-
-    <h3 style="color:var(--green);margin-bottom:8px;">Skills Toolkit &amp; Guardrails</h3>
-    <p class="section-sub">
-      18 utility skills (calculator, JSON query, web search, prompt guard, secret scanner, diff&hellip;)
-      plus a guardrails pipeline that blocks PII and prompt injection in real time.
-    </p>
-    <div class="demo-player">
-      <div class="demo-bar">
-        <span class="demo-dot r"></span>
-        <span class="demo-dot y"></span>
-        <span class="demo-dot g"></span>
-        <span>cargo run --example demo_skills_toolkit</span>
+    <h2 class="section-title">Everything you need. Nothing you don't.</h2>
+    <p class="section-sub">Each capability ships as a focused crate — include only what your agent needs.</p>
+    <div class="features">
+      <div class="card">
+        <div class="icon">🛡️</div>
+        <h3>Security-First Guardrails</h3>
+        <p>6-layer pipeline: PII detection, prompt injection, toxicity, shell injection, base64 exfiltration, and unicode smuggling — all before any LLM call.</p>
       </div>
-      <div id="player-skills"></div>
-    </div>
-    <p class="demo-info">
-      16 real tool executions + 4 guardrail tests &mdash; zero API keys, zero mocks.
-    </p>
-
-    <h3 style="color:var(--cyan);margin-top:40px;margin-bottom:8px;">DevOps Pipeline</h3>
-    <p class="section-sub">
-      An Argentor agent running an automated 8-step DevOps pipeline &mdash;
-      real tool execution, no API keys, no mocks.
-    </p>
-    <div class="demo-player">
-      <div class="demo-bar">
-        <span class="demo-dot r"></span>
-        <span class="demo-dot y"></span>
-        <span class="demo-dot g"></span>
-        <span>cargo run --example demo_pipeline</span>
+      <div class="card">
+        <div class="icon">🧠</div>
+        <h3>Multimodal & Vision</h3>
+        <p>Real HTTP multimodal calls to Claude, OpenAI, and Gemini. Pass images, audio, and documents. Streaming responses out of the box.</p>
       </div>
-      <div id="player-container"></div>
-    </div>
-    <p class="demo-info">
-      Interactive player &mdash; click to pause, scroll to rewind.
-    </p>
-  </div>
-</section>
-
-<!-- Why Argentor? -->
-<section id="why" class="fade-in">
-  <div class="container">
-    <h2>Why Argentor?</h2>
-    <p class="section-sub">
-      Most agent frameworks trade security for flexibility, or intelligence for simplicity. Argentor gives you all three.
-    </p>
-    <div class="why-grid">
-      <div class="why-card">
-        <div class="why-icon" style="color:var(--purple)">&#x1f9e0;</div>
-        <h3>Genuinely Intelligent</h3>
-        <p>ReAct reasoning loops, self-evaluation with quality scoring, cost-aware model routing, and adaptive memory that learns across sessions.</p>
+      <div class="card">
+        <div class="icon">🌐</div>
+        <h3>Web & Computer Use</h3>
+        <p>Built-in web fetch, search, and extraction. Computer use skill for screenshot, mouse, and keyboard control. No external dependencies.</p>
       </div>
-      <div class="why-card">
-        <div class="why-icon" style="color:var(--red)">&#x1f6e1;&#xfe0f;</div>
-        <h3>Security-First</h3>
-        <p>WASM sandboxing, capability-based permissions, encrypted credentials, SSRF prevention, RBAC, and human-in-the-loop approval gates.</p>
-      </div>
-      <div class="why-card">
-        <div class="why-icon" style="color:var(--green)">&#x26a1;</div>
-        <h3>Production-Grade</h3>
-        <p>4498 tests, 0 failures. Persistent state, control plane, web dashboard, OpenTelemetry, and A2A protocol for agent interop.</p>
-      </div>
-    </div>
-
-    <!-- Comparison Table -->
-    <table class="comparison-table">
-      <thead>
-        <tr>
-          <th>Capability</th>
-          <th>Argentor</th>
-          <th>CrewAI</th>
-          <th>AutoGPT</th>
-          <th>LangGraph</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>ReAct Reasoning Engine</td>
-          <td class="check">&#10003;</td>
-          <td class="cross">&#10007;</td>
-          <td class="partial">Basic</td>
-          <td class="partial">Manual</td>
-        </tr>
-        <tr>
-          <td>Self-Evaluation Loop</td>
-          <td class="check">&#10003;</td>
-          <td class="cross">&#10007;</td>
-          <td class="cross">&#10007;</td>
-          <td class="cross">&#10007;</td>
-        </tr>
-        <tr>
-          <td>Cost-Aware Model Routing</td>
-          <td class="check">&#10003;</td>
-          <td class="cross">&#10007;</td>
-          <td class="cross">&#10007;</td>
-          <td class="cross">&#10007;</td>
-        </tr>
-        <tr>
-          <td>A2A Protocol (Agent Interop)</td>
-          <td class="check">&#10003;</td>
-          <td class="cross">&#10007;</td>
-          <td class="cross">&#10007;</td>
-          <td class="cross">&#10007;</td>
-        </tr>
-        <tr>
-          <td>WASM Sandboxed Plugins</td>
-          <td class="check">&#10003;</td>
-          <td class="cross">&#10007;</td>
-          <td class="cross">&#10007;</td>
-          <td class="cross">&#10007;</td>
-        </tr>
-        <tr>
-          <td>Multi-Agent Patterns (6+)</td>
-          <td class="check">&#10003;</td>
-          <td class="partial">2</td>
-          <td class="cross">&#10007;</td>
-          <td class="check">&#10003;</td>
-        </tr>
-        <tr>
-          <td>Compliance (GDPR, ISO)</td>
-          <td class="check">&#10003;</td>
-          <td class="cross">&#10007;</td>
-          <td class="cross">&#10007;</td>
-          <td class="cross">&#10007;</td>
-        </tr>
-        <tr>
-          <td>Control Plane + Dashboard</td>
-          <td class="check">&#10003;</td>
-          <td class="cross">&#10007;</td>
-          <td class="cross">&#10007;</td>
-          <td class="partial">Plugin</td>
-        </tr>
-        <tr>
-          <td>Memory-Safe (Rust)</td>
-          <td class="check">&#10003;</td>
-          <td class="cross">Python</td>
-          <td class="cross">Python</td>
-          <td class="cross">Python</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</section>
-
-<!-- Intelligent Agent Core -->
-<section id="intelligence" class="fade-in" style="background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-  <div class="container">
-    <h2>Intelligent Agent Core</h2>
-    <p class="section-sub">
-      Not just tool calling &mdash; structured reasoning, self-correction, and cost optimization built into every agent.
-    </p>
-    <div class="intel-grid">
-      <div class="intel-card">
-        <h3>ReAct Reasoning Engine</h3>
-        <p>Structured Think &rarr; Act &rarr; Observe &rarr; Reflect cycle. Agents decompose complex tasks into reasoning steps, track confidence per step, and know when to stop or ask for clarification.</p>
-      </div>
-      <div class="intel-card">
-        <h3>Smart Tool Selection</h3>
-        <p>TF-IDF relevance scoring filters tools before sending to the LLM, reducing token waste by up to 80%. Tracks per-tool success rates and adapts selection strategy automatically.</p>
-      </div>
-      <div class="intel-card">
-        <h3>Self-Evaluation</h3>
-        <p>Every response is scored on 4 dimensions: relevance, consistency, completeness, and clarity. Below-threshold responses trigger automatic refinement loops before delivery.</p>
-      </div>
-      <div class="intel-card">
-        <h3>Cost-Aware Model Router</h3>
-        <p>Routes simple tasks to fast/cheap models and complex tasks to powerful ones. 7-factor complexity estimation with 4 strategies: CostOptimized, QualityOptimized, Balanced, and Tiered.</p>
-      </div>
-      <div class="intel-card">
-        <h3>Adaptive Memory</h3>
-        <p>Cross-session memory that auto-extracts facts, tool patterns, and error resolutions. Importance decay over time keeps memory relevant. Keyword-based recall with configurable relevance thresholds.</p>
-      </div>
-      <div class="intel-card">
-        <h3>14 LLM Providers</h3>
-        <p>Claude, GPT-4, Gemini, Ollama, Mistral, xAI, Azure OpenAI, Cerebras, Together, DeepSeek, vLLM, OpenRouter, Groq, and more. Automatic failover across backends.</p>
-      </div>
-    </div>
-    <div class="intel-flow"><span style="color:var(--cyan)">User Task</span>
-       |
-  <span style="color:var(--purple)">Model Router</span>  &rarr;  selects optimal model by complexity
-       |
-  <span style="color:var(--purple)">Tool Selector</span> &rarr;  filters relevant tools (TF-IDF)
-       |
-  <span style="color:var(--purple)">ReAct Engine</span>  &rarr;  Think &rarr; Act &rarr; Observe &rarr; Reflect
-       |
-  <span style="color:var(--purple)">Evaluator</span>    &rarr;  score &ge; threshold? accept : refine
-       |
-  <span style="color:var(--purple)">Memory</span>       &rarr;  store facts + patterns for next time
-       |
-  <span style="color:var(--green)">Response</span></div>
-  </div>
-</section>
-
-<!-- Features (12 cards) -->
-<section id="features" class="fade-in">
-  <div class="container">
-    <h2>Capabilities</h2>
-    <p class="section-sub">
-      14 crates, 187K+ lines of code, 50+ built-in skills, every component tested and documented.
-    </p>
-    <div class="feature-grid">
-      <div class="feature-card">
-        <div class="icon" style="color:var(--purple)">&#x1f9e0;</div>
-        <h3>ReAct + Self-Evaluation</h3>
-        <p>Structured reasoning with Think/Act/Observe/Reflect cycle. Quality scoring on 4 dimensions with automatic refinement loops. Agents know when their answer isn't good enough.</p>
-        <span class="tag tag-intel">Intelligence</span>
-      </div>
-      <div class="feature-card">
-        <div class="icon" style="color:var(--orange)">&#x1f4b0;</div>
-        <h3>Cost-Aware Routing</h3>
-        <p>Route simple tasks to Haiku/GPT-4o-mini and complex ones to Opus/o1. Budget tracking, 7-factor complexity estimation, and 4 configurable routing strategies.</p>
-        <span class="tag tag-intel">Intelligence</span>
-      </div>
-      <div class="feature-card">
-        <div class="icon" style="color:var(--red)">&#x1f512;</div>
-        <h3>WASM Sandboxed Plugins</h3>
-        <p>Skills run in WebAssembly (wasmtime + WASI) with capability-based permissions. No skill can escape its sandbox. SSRF prevention, path traversal blocking, and shell injection blocking.</p>
-        <span class="tag tag-core">Security</span>
-      </div>
-      <div class="feature-card">
-        <div class="icon" style="color:var(--purple)">&#x1f916;</div>
+      <div class="card">
+        <div class="icon">🤖</div>
         <h3>Multi-Agent Orchestration</h3>
-        <p>10 specialized agent roles with DAG task queue, dependency resolution, inter-agent messaging via A2A MessageBus, and dynamic replanning with 6 recovery strategies.</p>
-        <span class="tag tag-core">Core</span>
+        <p>Orchestrator-Workers pattern per Anthropic guidance. TaskQueue, AgentMonitor, agent profiles, and human-in-the-loop approval flows.</p>
       </div>
-      <div class="feature-card">
-        <div class="icon" style="color:var(--cyan)">&#x1f310;</div>
-        <h3>A2A Protocol</h3>
-        <p>Google Agent-to-Agent interop via JSON-RPC 2.0. AgentCard discovery, task send/get/cancel/list, streaming SSE for real-time updates. Your agents talk to the world.</p>
-        <span class="tag tag-new">New</span>
+      <div class="card">
+        <div class="icon">🐍</div>
+        <h3>Python SDK</h3>
+        <p>First-class Python bindings via PyO3. Run Argentor agents from Python scripts, notebooks, or FastAPI services — full feature parity.</p>
       </div>
-      <div class="feature-card">
-        <div class="icon" style="color:var(--green)">&#x1f50c;</div>
-        <h3>MCP Proxy + Credential Vault</h3>
-        <p>Centralized MCP proxy with intelligent routing (round-robin, least-loaded, pattern-based), circuit breaker, credential vault with rotation, and token pool management.</p>
-        <span class="tag tag-core">Core</span>
+      <div class="card">
+        <div class="icon">🔌</div>
+        <h3>MCP Native + WASM Skills</h3>
+        <p>MCP client (JSON-RPC 2.0 stdio) ships as a core skill. WASM sandboxed plugins via Wasmtime — untrusted code runs isolated, always.</p>
       </div>
-      <div class="feature-card">
-        <div class="icon" style="color:var(--orange)">&#x1f9e0;</div>
-        <h3>Semantic + Adaptive Memory</h3>
-        <p>Hybrid BM25 + embedding vector search for long-term memory. Adaptive memory auto-extracts facts, tool patterns, and error resolutions across sessions.</p>
-        <span class="tag tag-intel">Intelligence</span>
-      </div>
-      <div class="feature-card">
-        <div class="icon" style="color:var(--magenta)">&#x2696;&#xfe0f;</div>
-        <h3>Compliance Built-in</h3>
-        <p>GDPR, ISO 27001, ISO 42001, and DPGA compliance modules. Audit logging, consent tracking, bias monitoring, and automated reporting.</p>
-      </div>
-      <div class="feature-card">
-        <div class="icon" style="color:var(--green)">&#x1f528;</div>
-        <h3>Code Generation &amp; DevOps</h3>
-        <p>API scaffold generator (Rust/Axum, Python/FastAPI, Node/Express). IaC generator (Docker, Helm, Terraform, GitHub Actions). Git operations, code analysis, test runner.</p>
-      </div>
-      <div class="feature-card">
-        <div class="icon" style="color:var(--cyan)">&#x1f4e1;</div>
-        <h3>Control Plane &amp; Dashboard</h3>
-        <p>17 REST API endpoints for deployment management. Web dashboard with real-time status, agent registry with 9 default definitions, health monitoring with auto-recovery.</p>
-        <span class="tag tag-new">New</span>
-      </div>
-      <div class="feature-card">
-        <div class="icon" style="color:var(--orange)">&#x1f4ca;</div>
-        <h3>Observability</h3>
-        <p>Prometheus /metrics, OpenTelemetry traces, token budget tracking per agent, structured audit logging, and real-time agent monitoring with health state machine.</p>
-      </div>
-      <div class="feature-card">
-        <div class="icon" style="color:var(--green)">&#x1f5a5;&#xfe0f;</div>
-        <h3>Full CLI</h3>
-        <p>Deploy, scale, and monitor agents from the terminal. A2A discovery and task management. Compliance reports, config hot-reload, and skill management.</p>
-        <span class="tag tag-new">New</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Agent Intelligence (10 new modules) -->
-<section id="agent-intelligence" class="fade-in" style="background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-  <div class="container">
-    <h2>Agent Intelligence</h2>
-    <p class="section-sub">
-      10 new cognitive modules that make agents think deeper, recover faster, and learn continuously.
-    </p>
-    <div class="ai-grid">
-      <div class="ai-card">
-        <div class="ai-icon" style="color:var(--purple)">&#x1f4ad;</div>
-        <h3>Extended Thinking</h3>
-        <p>Chain-of-thought reasoning with configurable thinking budgets. Agents break complex problems into deliberate reasoning steps before acting.</p>
-        <span class="ai-tag">Reasoning</span>
-      </div>
-      <div class="ai-card">
-        <div class="ai-icon" style="color:var(--red)">&#x1f50d;</div>
-        <h3>Self-Critique</h3>
-        <p>Agents review their own outputs against quality criteria, identify weaknesses, and revise before delivery. Multi-pass refinement built in.</p>
-        <span class="ai-tag">Quality</span>
-      </div>
-      <div class="ai-card">
-        <div class="ai-icon" style="color:var(--cyan)">&#x1f4e6;</div>
-        <h3>Context Compaction</h3>
-        <p>Intelligent summarization that compresses long conversations while preserving critical decisions and facts. Keeps agents coherent across long sessions.</p>
-        <span class="ai-tag">Memory</span>
-      </div>
-      <div class="ai-card">
-        <div class="ai-icon" style="color:var(--green)">&#x1f50e;</div>
-        <h3>Tool Discovery</h3>
-        <p>Dynamic tool registry with semantic search. Agents discover and compose tools at runtime based on task requirements, not static configuration.</p>
-        <span class="ai-tag">Tools</span>
-      </div>
-      <div class="ai-card">
-        <div class="ai-icon" style="color:var(--orange)">&#x1f91d;</div>
-        <h3>Agent Handoffs</h3>
-        <p>Structured delegation between agents with context transfer. Agents know when to escalate, what context to pass, and how to resume.</p>
-        <span class="ai-tag">Orchestration</span>
-      </div>
-      <div class="ai-card">
-        <div class="ai-icon" style="color:var(--magenta)">&#x1f4be;</div>
-        <h3>State Checkpointing</h3>
-        <p>Save and restore agent execution state at any point. Enables rollback, branching, and resumption of interrupted workflows.</p>
-        <span class="ai-tag">Reliability</span>
-      </div>
-      <div class="ai-card">
-        <div class="ai-icon" style="color:var(--cyan)">&#x1f4c8;</div>
-        <h3>Trace Visualization</h3>
-        <p>Full execution traces with reasoning steps, tool calls, and decision points. Export to OpenTelemetry or view in the built-in dashboard.</p>
-        <span class="ai-tag">Observability</span>
-      </div>
-      <div class="ai-card">
-        <div class="ai-icon" style="color:var(--green)">&#x2699;&#xfe0f;</div>
-        <h3>Dynamic Tool Gen</h3>
-        <p>Agents generate new tools on-the-fly from natural language descriptions. Created tools are sandboxed, tested, and optionally persisted for reuse.</p>
-        <span class="ai-tag">Tools</span>
-      </div>
-      <div class="ai-card">
-        <div class="ai-icon" style="color:var(--orange)">&#x1f3af;</div>
-        <h3>Process Reward Scoring</h3>
-        <p>Step-level reward signals that evaluate each reasoning step, not just the final answer. Guides agents toward better intermediate decisions.</p>
-        <span class="ai-tag">Reasoning</span>
-      </div>
-      <div class="ai-card">
-        <div class="ai-icon" style="color:var(--purple)">&#x1f4da;</div>
-        <h3>Learning Feedback</h3>
-        <p>Continuous improvement from execution outcomes. Agents store success and failure patterns, adapting their strategies across sessions.</p>
-        <span class="ai-tag">Learning</span>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- SDK -->
-<section id="sdk" class="fade-in">
-  <div class="container">
-    <h2>SDK &mdash; Build with Argentor</h2>
-    <p class="section-sub">
-      First-class SDKs for Python and TypeScript. Build agents in your language of choice with full type safety.
-    </p>
-    <div class="sdk-grid">
-      <div class="sdk-card">
-        <div class="sdk-card-header">
-          <span class="sdk-lang-icon" style="color:var(--orange)">&#x1f40d;</span>
-          <div>
-            <h3>Python SDK</h3>
-            <div class="sdk-pkg">argentor-sdk</div>
-          </div>
-        </div>
-        <div class="sdk-card-body">
-          <ul>
-            <li>Async-first with asyncio support</li>
-            <li>Pydantic models for full type safety</li>
-            <li>Agent builder with fluent API</li>
-            <li>Built-in tool decorators</li>
-            <li>Streaming support for real-time output</li>
-            <li>Comprehensive error handling</li>
-          </ul>
-          <div class="sdk-install">pip install argentor-sdk</div>
-        </div>
-      </div>
-      <div class="sdk-card">
-        <div class="sdk-card-header">
-          <span class="sdk-lang-icon" style="color:var(--cyan)">&#x1f4cc;</span>
-          <div>
-            <h3>TypeScript SDK</h3>
-            <div class="sdk-pkg">@argentor/sdk</div>
-          </div>
-        </div>
-        <div class="sdk-card-body">
-          <ul>
-            <li>Full TypeScript types and generics</li>
-            <li>Works in Node.js and browser</li>
-            <li>Zod schema integration for tool I/O</li>
-            <li>Reactive streams with RxJS</li>
-            <li>Tree-shakeable ESM package</li>
-            <li>Auto-generated from Rust types</li>
-          </ul>
-          <div class="sdk-install">npm install @argentor/sdk</div>
-        </div>
-      </div>
-      <div class="sdk-card">
-        <div class="sdk-card-header">
-          <span class="sdk-lang-icon" style="color:var(--green)">&#x1f4bb;</span>
-          <div>
-            <h3>React Dashboard</h3>
-            <div class="sdk-pkg">@argentor/dashboard</div>
-          </div>
-        </div>
-        <div class="sdk-card-body">
-          <ul>
-            <li>Real-time agent status and health</li>
-            <li>Execution trace visualization</li>
-            <li>Token usage and cost analytics</li>
-            <li>Deployment management UI</li>
-            <li>Skill registry browser</li>
-            <li>Built with React + Tailwind CSS</li>
-          </ul>
-          <div class="sdk-install">npm install @argentor/dashboard</div>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Security (Defense-in-Depth) -->
-<section id="security" class="fade-in" style="background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-  <div class="container">
-    <h2>Defense-in-Depth Security</h2>
-    <p class="section-sub">
-      Security is not a feature &mdash; it is the architecture. Every layer enforces isolation, authentication, and auditability.
-    </p>
-    <div class="security-layers">
-      <div class="security-layer">
-        <h3>Plugin Isolation</h3>
-        <ul>
-          <li>WASM sandboxing via wasmtime + WASI</li>
-          <li>Capability-based permission model</li>
-          <li>Memory isolation per plugin</li>
-          <li>Progressive tool disclosure</li>
-        </ul>
-      </div>
-      <div class="security-layer">
-        <h3>Input Sanitization</h3>
-        <ul>
-          <li>SSRF prevention (private IP blocking)</li>
-          <li>Path traversal detection and blocking</li>
-          <li>Shell injection prevention</li>
-          <li>Prompt injection defense</li>
-        </ul>
-      </div>
-      <div class="security-layer">
-        <h3>Authentication</h3>
-        <ul>
-          <li>JWT auth (HMAC-SHA256)</li>
-          <li>OAuth2 support</li>
-          <li>TLS/mTLS connections</li>
-          <li>Encrypted credential store (AES-256-GCM)</li>
-        </ul>
-      </div>
-      <div class="security-layer">
-        <h3>Rate Limiting &amp; Audit</h3>
-        <ul>
-          <li>Per-agent rate limiting</li>
-          <li>Token budget tracking with alerts</li>
-          <li>Structured audit log (JSONL)</li>
-          <li>Audit query API with filtering</li>
-        </ul>
-      </div>
-      <div class="security-layer">
-        <h3>Compliance Modules</h3>
-        <ul>
-          <li>GDPR data handling controls</li>
-          <li>ISO 27001 information security</li>
-          <li>ISO 42001 AI management</li>
-          <li>DPGA digital public goods</li>
-        </ul>
-      </div>
-      <div class="security-layer">
-        <h3>Access Control</h3>
-        <ul>
-          <li>Role-based access control (RBAC)</li>
-          <li>Human-in-the-loop approval gates</li>
-          <li>WebSocket approval workflows</li>
-          <li>Per-tool permission scoping</li>
-        </ul>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Architecture -->
-<section id="architecture" class="fade-in">
-  <div class="container">
-    <h2>Architecture</h2>
-    <p class="section-sub">
-      Orchestrator-Workers pattern with intelligent core, centralized MCP proxy, A2A interop, and full control plane.
-    </p>
-    <div class="arch-diagram">               <span style="color:var(--cyan)">HTTP/WS Gateway</span>  &larr;&rarr;  <span style="color:var(--cyan)">Web Dashboard</span>
-              (JWT Auth + TLS)         (Real-time SPA)
-                      |
-         <span style="color:var(--orange)">Prometheus /metrics</span> + <span style="color:var(--orange)">OpenTelemetry</span>
-                      |
-    <span style="color:var(--cyan)">Control Plane</span> (17 REST endpoints)
-     Deploy / Scale / Health / Registry
-                      |
-               <span style="color:var(--cyan)">Orchestrator</span>
-          <span style="color:var(--purple)">[Intelligent Core]</span>
-  Model Router &rarr; Tool Selector &rarr; ReAct &rarr; Evaluator
-                      |
-   +------+------+------+------+------+
-   |      |      |      |      |      |
-<span style="color:var(--green)">Spec</span>  <span style="color:var(--green)">Coder</span> <span style="color:var(--green)">Tester</span> <span style="color:var(--green)">Review</span> <span style="color:var(--green)">Archi</span>  <span style="color:var(--green)">...</span>
-Worker Worker Worker Worker Worker  +4
-   |      |      |      |      |
-   +------+------+------+------+
-                  |
-   <span style="color:var(--purple)">MCP Proxy</span> (Credential Vault + Token Pool)
-      Circuit Breaker + Intelligent Routing
-                  |
-   +--------+---------+---------+--------+
-   |        |         |         |        |
-<span style="color:var(--orange)">Skills</span>  <span style="color:var(--orange)">External</span>   <span style="color:var(--orange)">Audit</span>   <span style="color:var(--magenta)">CodeGen</span>  <span style="color:var(--cyan)">A2A</span>
-(WASM)  MCP Srvrs    Log    API/IaC  Interop
-   |                  |                  |
-<span style="color:var(--red)">Sandbox</span>          <span style="color:var(--red)">Encrypted</span>      <span style="color:var(--cyan)">JSON-RPC</span>
-Isolation         Credential       + SSE
-                    Store        Streaming</div>
-  </div>
-</section>
-
-<!-- A2A Protocol -->
-<section id="a2a" class="fade-in" style="background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-  <div class="container">
-    <h2>A2A Protocol &mdash; Agent Interoperability</h2>
-    <p class="section-sub">
-      Google's Agent-to-Agent protocol for cross-platform agent communication. Your Argentor agents can discover, delegate, and collaborate with any A2A-compatible agent.
-    </p>
-    <div class="codegen-grid">
-      <div class="codegen-card">
-        <div class="codegen-card-header">
-          <span style="color:var(--cyan); font-size:1.2rem;">&#x1f310;</span>
-          <h3>Agent Discovery</h3>
-        </div>
-        <div class="codegen-card-body">
-          <ul>
-            <li><strong>AgentCard</strong> at /.well-known/agent.json</li>
-            <li>Capabilities, skills, and authentication advertised</li>
-            <li>AgentCardBuilder for fluent card construction</li>
-            <li>CLI: <code>argentor a2a discover --url http://agent</code></li>
-          </ul>
-        </div>
-      </div>
-      <div class="codegen-card">
-        <div class="codegen-card-header">
-          <span style="color:var(--green); font-size:1.2rem;">&#x1f4e8;</span>
-          <h3>Task Management</h3>
-        </div>
-        <div class="codegen-card-body">
-          <ul>
-            <li><strong>JSON-RPC 2.0</strong> &mdash; tasks/send, tasks/get, tasks/cancel, tasks/list</li>
-            <li>Task status tracking with artifacts and messages</li>
-            <li>Session-based task grouping</li>
-            <li>Typed client with full error handling</li>
-          </ul>
-        </div>
-      </div>
-      <div class="codegen-card">
-        <div class="codegen-card-header">
-          <span style="color:var(--purple); font-size:1.2rem;">&#x1f4e1;</span>
-          <h3>Streaming (SSE)</h3>
-        </div>
-        <div class="codegen-card-body">
-          <ul>
-            <li><strong>tasks/sendSubscribe</strong> via Server-Sent Events</li>
-            <li>Real-time status updates, artifacts, and messages</li>
-            <li>StreamingTaskHandler trait for custom handlers</li>
-            <li>Automatic fallback for non-streaming handlers</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Multi-Agent Patterns -->
-<section id="patterns" class="fade-in">
-  <div class="container">
-    <h2>6 Collaboration Patterns</h2>
-    <p class="section-sub">
-      Choose the right multi-agent pattern for your task. Mix and match within a single orchestration.
-    </p>
-    <div class="patterns-grid">
-      <div class="pattern-card">
-        <div class="pattern-visual">A &#x2192; B &#x2192; C &#x2192; D</div>
-        <h3>Pipeline</h3>
-        <p>Sequential stages. Each agent transforms and passes output to the next. Ideal for linear workflows.</p>
-      </div>
-      <div class="pattern-card">
-        <div class="pattern-visual">    &#x250C; B &#x2510;
-A &#x2500;&#x2524;   &#x251C;&#x2500; D
-    &#x2514; C &#x2518;</div>
-        <h3>MapReduce</h3>
-        <p>Fan out to parallel workers, then aggregate results. Great for divide-and-conquer problems.</p>
-      </div>
-      <div class="pattern-card">
-        <div class="pattern-visual">A &#x21C4; B &#x21C4; C &#x2192; Judge</div>
-        <h3>Debate</h3>
-        <p>Agents argue opposing positions. A judge agent synthesizes the best answer from the discourse.</p>
-      </div>
-      <div class="pattern-card">
-        <div class="pattern-visual">&#x250C; A &#x2510;
-&#x251C; B &#x251C; &#x2192; Vote
-&#x2514; C &#x2518;</div>
-        <h3>Ensemble</h3>
-        <p>Multiple agents solve independently. Results are combined via voting, ranking, or weighted merge.</p>
-      </div>
-      <div class="pattern-card">
-        <div class="pattern-visual">  Supervisor
-  &#x250C;&#x2500;&#x2500;&#x253C;&#x2500;&#x2500;&#x2510;
-  A  B  C</div>
-        <h3>Supervisor</h3>
-        <p>A supervisor agent monitors workers, re-assigns tasks on failure, and enforces quality gates.</p>
-      </div>
-      <div class="pattern-card">
-        <div class="pattern-visual">A &#x2500; B
-|   |
-D &#x2500; C</div>
-        <h3>Swarm</h3>
-        <p>Fully decentralized. Agents self-organize via a shared message bus with emergent coordination.</p>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Code Generation -->
-<section id="codegen" class="fade-in" style="background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-  <div class="container">
-    <h2>Code Generation &amp; DevOps</h2>
-    <p class="section-sub">
-      Generate production-ready scaffolds, infrastructure, and CI/CD pipelines from agent conversations.
-    </p>
-    <div class="codegen-grid">
-      <div class="codegen-card">
-        <div class="codegen-card-header">
-          <span style="color:var(--green); font-size:1.2rem;">&#x1f528;</span>
-          <h3>API Scaffold Generator</h3>
-        </div>
-        <div class="codegen-card-body">
-          <ul>
-            <li><strong>Rust / Axum</strong> &mdash; typed handlers, extractors, error handling</li>
-            <li><strong>Python / FastAPI</strong> &mdash; Pydantic models, async routes</li>
-            <li><strong>Node / Express</strong> &mdash; middleware, validation, TypeScript</li>
-            <li>OpenAPI spec generation included</li>
-            <li>Database migrations and models</li>
-          </ul>
-        </div>
-      </div>
-      <div class="codegen-card">
-        <div class="codegen-card-header">
-          <span style="color:var(--purple); font-size:1.2rem;">&#x2601;&#xfe0f;</span>
-          <h3>Infrastructure as Code</h3>
-        </div>
-        <div class="codegen-card-body">
-          <ul>
-            <li><strong>Docker</strong> &mdash; multi-stage builds, compose files</li>
-            <li><strong>Helm</strong> &mdash; Kubernetes charts with HPA, ingress</li>
-            <li><strong>Terraform</strong> &mdash; AWS and GCP provider modules</li>
-            <li><strong>GitHub Actions</strong> &mdash; CI/CD pipelines</li>
-            <li>Secrets management and env configuration</li>
-          </ul>
-        </div>
-      </div>
-      <div class="codegen-card">
-        <div class="codegen-card-header">
-          <span style="color:var(--cyan); font-size:1.2rem;">&#x1f527;</span>
-          <h3>Developer Tools</h3>
-        </div>
-        <div class="codegen-card-body">
-          <ul>
-            <li><strong>Git operations</strong> &mdash; branch, commit, PR automation</li>
-            <li><strong>Code analysis</strong> &mdash; AST parsing, dependency graphs</li>
-            <li><strong>Test runner</strong> &mdash; execute and parse test results</li>
-            <li><strong>Linter integration</strong> &mdash; clippy, eslint, ruff</li>
-            <li>Automated code review via SecurityAuditor agent</li>
-          </ul>
-        </div>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Observability -->
-<section id="observability" class="fade-in">
-  <div class="container">
-    <h2>Observability &amp; Monitoring</h2>
-    <p class="section-sub">
-      Know exactly what your agents are doing, how much they cost, and when they need attention.
-    </p>
-    <div class="obs-grid">
-      <div class="obs-card">
-        <div class="obs-icon" style="color:var(--orange)">&#x1f4ca;</div>
-        <h3>Prometheus Metrics</h3>
-        <p>Built-in /metrics endpoint. Track latency, tokens, errors, and agent health in Grafana.</p>
-      </div>
-      <div class="obs-card">
-        <div class="obs-icon" style="color:var(--purple)">&#x1f50d;</div>
-        <h3>OpenTelemetry</h3>
-        <p>Distributed tracing with OTLP export. Instrument the full request path from gateway to tool execution.</p>
-      </div>
-      <div class="obs-card">
-        <div class="obs-icon" style="color:var(--green)">&#x1f4b0;</div>
-        <h3>Cost Tracking</h3>
-        <p>Per-agent token budgets with real-time estimation. Track spend across 14 providers with cost-aware routing.</p>
-      </div>
-      <div class="obs-card">
-        <div class="obs-icon" style="color:var(--cyan)">&#x1f4dd;</div>
-        <h3>Audit Logging</h3>
-        <p>Every tool call, LLM request, and decision logged as structured JSONL. Query API with time-range filters.</p>
-      </div>
-    </div>
-    <div class="obs-code">
-<span class="cmt"># Example: /metrics endpoint output</span>
-<span class="key">argentor_requests_total</span>{<span class="val">agent="coder"</span>} <span class="val">1247</span>
-<span class="key">argentor_tokens_used</span>{<span class="val">agent="coder",type="output"</span>} <span class="val">89432</span>
-<span class="key">argentor_model_cost_usd</span>{<span class="val">model="sonnet",strategy="balanced"</span>} <span class="val">2.47</span>
-<span class="key">argentor_tool_calls_total</span>{<span class="val">tool="shell"</span>} <span class="val">342</span>
-<span class="key">argentor_react_steps_total</span>{<span class="val">agent="architect"</span>} <span class="val">156</span>
-<span class="key">argentor_evaluation_score</span>{<span class="val">quantile="0.50"</span>} <span class="val">0.82</span>
-    </div>
-  </div>
-</section>
-
-<!-- Crates -->
-<section id="crates" class="fade-in" style="background: var(--bg2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border);">
-  <div class="container">
-    <h2>14 Workspace Crates</h2>
-    <p class="section-sub">
-      Modular architecture. Use only what you need, or the full stack.
-    </p>
-    <div style="overflow-x: auto;">
-      <table class="crate-table">
-        <thead><tr><th>Crate</th><th>Description</th></tr></thead>
-        <tbody>
-          <tr><td>argentor-core</td><td>Core types, errors, Message, ToolCall, ToolResult, OpenTelemetry integration</td></tr>
-          <tr><td>argentor-agent</td><td>Agent runner, ReAct engine, self-evaluator, model router, tool selector, adaptive memory, 14 LLM backends, failover, streaming</td></tr>
-          <tr><td>argentor-security</td><td>Capabilities, RBAC, rate limiting, SSRF/path traversal prevention, audit, TLS/mTLS, encrypted store</td></tr>
-          <tr><td>argentor-orchestrator</td><td>Multi-agent engine, 6 collaboration patterns, DAG task queue, deployment manager, health checker, agent registry</td></tr>
-          <tr><td>argentor-mcp</td><td>MCP client, server, proxy with credential vault, token pool, circuit breaker, intelligent routing</td></tr>
-          <tr><td>argentor-a2a</td><td>Google A2A protocol: JSON-RPC 2.0 server/client, AgentCard, task management, SSE streaming</td></tr>
-          <tr><td>argentor-skills</td><td>Skill trait, WASM sandbox runtime (wasmtime + WASI), plugin registry, vetting pipeline</td></tr>
-          <tr><td>argentor-memory</td><td>Semantic vector memory, hybrid BM25 + embedding search, query expansion, JSONL persistence</td></tr>
-          <tr><td>argentor-builtins</td><td>Built-in skills: shell, file I/O, HTTP fetch, memory, browser automation, Docker sandbox, code gen</td></tr>
-          <tr><td>argentor-gateway</td><td>HTTP/WS gateway, REST API, control plane (17 endpoints), web dashboard, proxy management, Prometheus metrics</td></tr>
-          <tr><td>argentor-channels</td><td>Channel bridges for Slack, Discord, Telegram, and webchat integration</td></tr>
-          <tr><td>argentor-session</td><td>Session management, file and database persistence, conversation transcripts</td></tr>
-          <tr><td>argentor-compliance</td><td>GDPR, ISO 27001, ISO 42001, DPGA modules with automated reporting and hooks</td></tr>
-          <tr><td>argentor-cli</td><td>CLI binary: serve, deploy, agents, health, a2a, skill, compliance &mdash; full control from the terminal</td></tr>
-        </tbody>
-      </table>
     </div>
   </div>
 </section>
 
 <!-- Quick Start -->
-<section id="quickstart" class="fade-in">
-  <div class="container">
-    <h2>Quick Start</h2>
-    <p class="section-sub">
-      Up and running in under a minute. The demo requires no API keys.
-    </p>
+<section id="quickstart">
+  <div class="container quickstart">
+    <h2 class="section-title">Quick Start</h2>
+    <p class="section-sub">Run the hello-world example in under a minute — no API keys required for the demo backend.</p>
     <div class="code-block">
-<span class="comment"># Clone and build</span>
-<span class="cmd">git clone https://github.com/fboiero/Agentor.git</span>
-<span class="cmd">cd Agentor</span>
-<span class="cmd">cargo build --workspace</span>
+<span class="comment"># Clone and run the demo (uses DemoBackend, no API keys needed)</span>
+<span class="cmd">git clone https://github.com/fboiero/Agentor &amp;&amp; cd Agentor</span>
+<span class="cmd">cargo run --example hello_world</span>
 
-<span class="comment"># Run the demo (no API keys needed)</span>
-<span class="cmd">cargo run --example demo_pipeline</span>
+<span class="comment"># Or add to Cargo.toml and point at a real LLM</span>
+<span class="kw">argentor-agent</span> = <span class="str">"1.3"</span>
+<span class="kw">argentor-security</span> = <span class="str">"1.3"</span>
 
-<span class="comment"># Run all 4498 tests</span>
-<span class="cmd">cargo test --workspace</span>
-
-<span class="comment"># Start the gateway with dashboard</span>
-<span class="cmd">cargo run --bin argentor -- serve</span>
-
-<span class="comment"># Deploy and manage agents</span>
-<span class="cmd">cargo run --bin argentor -- deploy create --name my-agent</span>
-<span class="cmd">cargo run --bin argentor -- deploy summary</span>
-<span class="cmd">cargo run --bin argentor -- health summary</span>
-
-<span class="comment"># Discover a remote A2A agent</span>
-<span class="cmd">cargo run --bin argentor -- a2a --url http://remote:3000 discover</span>
-
-<span class="comment"># Generate a compliance report</span>
-<span class="cmd">cargo run --bin argentor -- compliance report</span>
+<span class="comment"># Run against Claude</span>
+<span class="cmd">ANTHROPIC_API_KEY=sk-... cargo run --example hello_world -- --backend claude</span>
     </div>
-    <p style="text-align:center; margin-top:24px;">
-      <a href="docs/GETTING_STARTED.md" class="btn btn-primary" style="font-size:0.95rem;">Full Getting Started Guide</a>
-      <a href="https://github.com/fboiero/Agentor" class="btn btn-secondary" style="font-size:0.95rem; margin-left:12px;" target="_blank" rel="noopener">View on GitHub</a>
-    </p>
+  </div>
+</section>
+
+<!-- Benchmarks -->
+<section id="benchmarks">
+  <div class="container benchmarks">
+    <h2 class="section-title">Benchmark Highlights</h2>
+    <p class="section-sub">Measured against a Python/LangChain baseline on equivalent pipelines. <a href="https://github.com/fboiero/Agentor/tree/master/benchmarks" target="_blank">Full methodology →</a></p>
+    <div class="bench-grid">
+      <div class="bench-card green">
+        <span class="big">11×</span>
+        <div class="bench-label">faster end-to-end latency</div>
+      </div>
+      <div class="bench-card cyan">
+        <span class="big">7.9×</span>
+        <div class="bench-label">lower cost per 1K tool calls</div>
+      </div>
+      <div class="bench-card orange">
+        <span class="big">58.3%</span>
+        <div class="bench-label">guardrail block rate on red-team suite</div>
+      </div>
+    </div>
+    <p class="bench-note">Results from <code>benchmarks/</code> — run <code>cargo bench</code> to reproduce on your hardware.</p>
   </div>
 </section>
 
 <!-- Footer -->
 <footer>
   <div class="container">
-    <p>
-      <strong>Argentor</strong> v1.0.0 &mdash; AGPL-3.0-only &mdash;
-      <a href="https://github.com/fboiero/Agentor">GitHub</a> &mdash;
-      187K+ lines of Rust &mdash;
-      4498 tests, 0 failures &mdash;
-      50+ built-in skills &mdash;
-      Built by <a href="https://www.xcapit.com">Xcapit</a>
-    </p>
-    <div class="footer-badges">
-      <img src="https://img.shields.io/badge/v1.0.0-release-blue.svg?style=flat-square" alt="v1.0.0">
-      <img src="https://img.shields.io/badge/Built%20with-Rust-orange.svg?style=flat-square" alt="Built with Rust">
-      <img src="https://img.shields.io/badge/License-AGPL--3.0--only-blue.svg?style=flat-square" alt="AGPL-3.0-only">
-      <img src="https://img.shields.io/badge/Tests-4498%20passing-brightgreen.svg?style=flat-square" alt="4498 Tests">
-      <img src="https://img.shields.io/badge/Skills-50%2B-green.svg?style=flat-square" alt="50+ Skills">
-      <img src="https://img.shields.io/badge/ISO-27001%20|%2042001-red.svg?style=flat-square" alt="ISO Compliance">
+    <span class="license">© 2025 Argentor contributors — <a href="https://github.com/fboiero/Agentor/blob/master/LICENSE" target="_blank">AGPL-3.0-only</a></span>
+    <div class="links">
+      <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+      <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a>
+      <a href="https://docs.rs/argentor-core" target="_blank">Docs</a>
+      <a href="https://github.com/fboiero/Agentor/tree/master/examples" target="_blank">Tutorials</a>
     </div>
   </div>
 </footer>
-
-<!-- Asciinema Player -->
-<script src="https://cdn.jsdelivr.net/npm/asciinema-player@3.9.0/dist/bundle/asciinema-player.min.js"></script>
-<script>
-  // Skills Toolkit demo (new, featured)
-  AsciinemaPlayer.create('demo_skills_toolkit.cast', document.getElementById('player-skills'), {
-    theme: 'monokai',
-    speed: 1.5,
-    idleTimeLimit: 1,
-    fit: 'width',
-    autoPlay: true,
-    loop: true,
-    poster: 'npt:3',
-    terminalFontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace"
-  });
-
-  // DevOps Pipeline demo
-  AsciinemaPlayer.create('demo_pipeline.cast', document.getElementById('player-container'), {
-    theme: 'monokai',
-    speed: 2,
-    idleTimeLimit: 1,
-    fit: 'width',
-    autoPlay: false,
-    loop: true,
-    poster: 'npt:2',
-    terminalFontFamily: "'SF Mono', 'Fira Code', 'Cascadia Code', monospace"
-  });
-
-  // Scroll fade-in observer
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach(entry => {
-      if (entry.isIntersecting) {
-        entry.target.classList.add('visible');
-      }
-    });
-  }, { threshold: 0.08 });
-
-  document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
-</script>
 
 </body>
 </html>
