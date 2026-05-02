@@ -10,6 +10,24 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.3.0] - 2026-05-02
+
+### Multimodal
+- Real vision backends for Claude, OpenAI, and Gemini — send images to any supported model via HTTP APIs
+
+### Skills
+- Web browsing: `web_fetch` (HTTP GET with text/html/markdown output), `web_search` (DuckDuckGo, no API key required), `web_extract` (CSS selectors for structured data extraction)
+- Computer use: screenshot capture, mouse movement/clicking, keyboard typing, scrolling — macOS and Linux support with rate limiting (10 actions/sec) and configurable allowed screen regions
+- Human-in-the-loop approval: `human_approval` skill with risk-level-based auto-approval; skills tagged `requires_approval: true` are gated through the approval workflow before execution
+
+### Documentation
+- 5 practical tutorials: Build a RAG Agent, Deploy to Cloud, Custom Skills, Multi-Agent Patterns, Troubleshooting guide
+
+### Infrastructure
+- PyPI publish workflow (`.github/workflows/publish-pypi.yml`) — Python SDK ready for `twine upload`
+
+---
+
 ## [1.2.0] - 2026-04-20
 
 ### Security
