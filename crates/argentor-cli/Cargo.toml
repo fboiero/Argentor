@@ -18,6 +18,10 @@ workspace = true
 name = "argentor"
 path = "src/main.rs"
 
+[[bin]]
+name = "e2e_guardrail_check"
+path = "../../tests/e2e_guardrail_check.rs"
+
 [dependencies]
 argentor-core.workspace = true
 argentor-security.workspace = true
