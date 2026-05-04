@@ -161,8 +161,8 @@ pub use evaluator::{
 };
 pub use failover::{FailoverBackend, RetryPolicy};
 pub use guardrails::{
-    redact_pii, ContentPolicy, GuardrailEngine, GuardrailResult, GuardrailRule, PiiMatch,
-    RuleSeverity, RuleType, Violation,
+    redact_pii, ContentPolicy, GuardrailEngine, GuardrailProfile, GuardrailResult, GuardrailRule,
+    PiiMatch, RuleSeverity, RuleType, Violation,
 };
 pub use hooks::{hook_fn, Hook, HookChain, HookDecision, HookEvent};
 pub use identity::{AgentPersonality, ContextCompactor, SessionCommand, ThinkingLevel};
