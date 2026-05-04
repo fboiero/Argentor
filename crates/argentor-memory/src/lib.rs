@@ -38,6 +38,8 @@ pub mod query_expansion;
 pub mod rag;
 /// Vector store trait and file-backed implementation.
 pub mod store;
+/// Multi-tier memory: short-term, long-term (episodic), and entity memory.
+pub mod tiered;
 /// Weaviate vector store adapter.
 pub mod weaviate;
 
@@ -65,4 +67,5 @@ pub use rag::{
     ChunkingStrategy, Document, DocumentChunk, RagConfig, RagPipeline, RagResult, ScoredChunk,
 };
 pub use store::{FileVectorStore, InMemoryVectorStore, MemoryEntry, SearchResult, VectorStore};
+pub use tiered::{MemoryContext, ScoredMemory, TieredMemory, TieredMemoryConfig, TieredTurn};
 pub use weaviate::WeaviateStore;
