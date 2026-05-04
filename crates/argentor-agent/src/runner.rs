@@ -25,6 +25,77 @@ const DEFAULT_SYSTEM_PROMPT: &str =
      that you can use to help the user. Each tool runs in a sandboxed environment \
      with specific permissions. Always explain what you're doing before using a tool.";
 
+/// Minimal system prompt for tool-free, single-turn calls (C-02 scaffold trimming).
+///
+/// Strips multi-turn context boilerplate and tool descriptions to reduce prompt
+/// overhead from ~50 tokens (Full) to ~15 tokens (Minimal) per turn.
+const MINIMAL_SYSTEM_PROMPT: &str = "You are Argentor, a secure AI assistant.";
+
+/// Controls how much scaffolding is included in the system prompt each turn.
+///
+/// # Variants
+///
+/// - `Full` — default; includes role instruction, tool descriptions, and
+///   multi-turn context boilerplate (~50 tokens of overhead per turn).
+/// - `Minimal` — strips everything except the role instruction + task envelope.
+///   Only safe when no tools are registered (`tool_count == 0`). Reduces
+///   scaffold overhead to ~15 tokens per turn (~70 % saving on the scaffold
+///   alone). Used for short, tool-free, single-turn tasks (C-02).
+///
+/// # Example
+///
+/// ```rust
+/// use argentor_agent::{AgentRunner, ScaffoldMode};
+/// # use argentor_agent::ModelConfig;
+/// # use argentor_security::{AuditLog, PermissionSet};
+/// # use argentor_skills::SkillRegistry;
+/// # use std::sync::Arc;
+/// # use std::path::PathBuf;
+/// # let skills = Arc::new(SkillRegistry::new());
+/// # let permissions = PermissionSet::new();
+/// # let audit = Arc::new(AuditLog::new(PathBuf::from("/tmp/audit")));
+/// # let config = ModelConfig {
+/// #     provider: argentor_agent::LlmProvider::Claude,
+/// #     model_id: "claude-sonnet-4-20250514".into(),
+/// #     api_key: "key".into(),
+/// #     api_base_url: None,
+/// #     temperature: 0.7,
+/// #     max_tokens: 4096,
+/// #     max_turns: 10,
+/// #     max_context_tokens: 200_000,
+/// #     fallback_models: vec![],
+/// #     retry_policy: None,
+/// # };
+/// let agent = AgentRunner::new(config, skills, permissions, audit)
+///     .with_scaffold_mode(ScaffoldMode::Minimal);
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ScaffoldMode {
+    /// Full scaffold: role + tool descriptions + multi-turn boilerplate (~50 tokens/turn).
+    #[default]
+    Full,
+    /// Minimal scaffold: role instruction only (~15 tokens/turn).
+    /// Automatically falls back to `Full` when tools are registered.
+    Minimal,
+}
+
+impl ScaffoldMode {
+    /// Returns the approximate token overhead for this mode.
+    pub fn estimated_tokens(&self) -> u32 {
+        match self {
+            ScaffoldMode::Full => 50,
+            ScaffoldMode::Minimal => 15,
+        }
+    }
+
+    /// Token savings per turn vs `Full` mode.
+    pub fn token_savings_vs_full(&self) -> u32 {
+        ScaffoldMode::Full
+            .estimated_tokens()
+            .saturating_sub(self.estimated_tokens())
+    }
+}
+
 /// Optional MCP proxy for centralized tool call logging and metrics.
 type OptionalProxy = Option<(Arc<argentor_mcp::McpProxy>, String)>;
 
@@ -114,6 +185,8 @@ pub struct AgentRunner {
     checkpoint_manager: Option<crate::checkpoint::CheckpointManager>,
     /// Optional learning engine for improving tool selection over time.
     learning: Option<crate::learning::LearningEngine>,
+    /// System prompt scaffold mode (Full vs Minimal). See [`ScaffoldMode`].
+    scaffold_mode: ScaffoldMode,
 }
 
 impl AgentRunner {
@@ -145,6 +218,7 @@ impl AgentRunner {
             tool_discovery: None,
             checkpoint_manager: None,
             learning: None,
+            scaffold_mode: ScaffoldMode::Full,
         }
     }
 
@@ -181,6 +255,7 @@ impl AgentRunner {
             tool_discovery: None,
             checkpoint_manager: None,
             learning: None,
+            scaffold_mode: ScaffoldMode::Full,
         }
     }
 
@@ -188,6 +263,50 @@ impl AgentRunner {
     pub fn with_system_prompt(mut self, prompt: impl Into<String>) -> Self {
         self.system_prompt = prompt.into();
         self
+    }
+
+    /// Set the scaffold mode for system prompt construction (C-02).
+    ///
+    /// Use [`ScaffoldMode::Minimal`] for short, tool-free single-turn tasks to
+    /// reduce scaffold overhead from ~50 tokens to ~15 tokens per turn.
+    /// The runner automatically falls back to `Full` if tools are registered.
+    pub fn with_scaffold_mode(mut self, mode: ScaffoldMode) -> Self {
+        self.scaffold_mode = mode;
+        self
+    }
+
+    /// Return the current scaffold mode.
+    pub fn scaffold_mode(&self) -> ScaffoldMode {
+        self.scaffold_mode
+    }
+
+    /// Suggest a scaffold mode based on the current skill registry.
+    ///
+    /// Returns `ScaffoldMode::Minimal` when the registry is empty (no tools
+    /// registered), otherwise returns `ScaffoldMode::Full`.  Callers can use
+    /// this to auto-configure the runner before calling `.with_scaffold_mode()`.
+    pub fn suggest_scaffold_mode(&self) -> ScaffoldMode {
+        if self.skills.list_descriptors().is_empty() {
+            ScaffoldMode::Minimal
+        } else {
+            ScaffoldMode::Full
+        }
+    }
+
+    /// Compute the effective system prompt respecting scaffold mode (C-02).
+    ///
+    /// Falls back to `Full` automatically when tools are registered, so the
+    /// LLM always receives skill descriptions even if `Minimal` was requested.
+    fn effective_system_prompt(&self) -> String {
+        let has_tools = !self.skills.list_descriptors().is_empty();
+        match self.scaffold_mode {
+            ScaffoldMode::Full => self.system_prompt.clone(),
+            ScaffoldMode::Minimal if has_tools => {
+                // Safety fallback: tools need context — use full prompt.
+                self.system_prompt.clone()
+            }
+            ScaffoldMode::Minimal => MINIMAL_SYSTEM_PROMPT.to_string(),
+        }
     }
 
     /// Configure the agent with a personality (generates system prompt from it).
@@ -430,7 +549,13 @@ impl AgentRunner {
         session.add_message(user_msg);
 
         let mut context = ContextWindow::new(100);
-        context.set_system_prompt(&self.system_prompt);
+
+        // --- C-02: Scaffold mode — pick system prompt before building context ---
+        // Minimal mode strips tool descriptions and multi-turn boilerplate.
+        // Falls back to Full automatically when tools are registered so the LLM
+        // always knows about available skills.
+        let effective_system_prompt = self.effective_system_prompt();
+        context.set_system_prompt(&effective_system_prompt);
 
         for msg in &session.messages {
             context.push(msg.clone());
@@ -528,7 +653,7 @@ impl AgentRunner {
                             None,
                         );
                         context = ContextWindow::new(100);
-                        context.set_system_prompt(&self.system_prompt);
+                        context.set_system_prompt(&effective_system_prompt);
                         for cm in &result.preserved_messages {
                             let role = match cm.role.as_str() {
                                 "System" => Role::System,
@@ -1088,7 +1213,8 @@ impl AgentRunner {
         session.add_message(user_msg);
 
         let mut context = ContextWindow::new(100);
-        context.set_system_prompt(&self.system_prompt);
+        let effective_system_prompt = self.effective_system_prompt();
+        context.set_system_prompt(&effective_system_prompt);
 
         for msg in &session.messages {
             context.push(msg.clone());
@@ -1362,5 +1488,166 @@ impl AgentRunner {
             }),
             outcome,
         );
+    }
+}
+
+// ---------------------------------------------------------------------------
+// C-02: ScaffoldMode unit tests
+// ---------------------------------------------------------------------------
+
+#[cfg(test)]
+mod scaffold_tests {
+    use super::*;
+    use crate::backends::LlmBackend;
+    use argentor_core::{ArgentorError, ArgentorResult, Message};
+    use argentor_security::{AuditLog, PermissionSet};
+    use argentor_skills::SkillRegistry;
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    /// Minimal no-op backend for constructing an `AgentRunner` without network.
+    struct NopBackend;
+
+    #[async_trait::async_trait]
+    impl LlmBackend for NopBackend {
+        fn provider_name(&self) -> &str {
+            "nop"
+        }
+
+        async fn chat(
+            &self,
+            _system: Option<&str>,
+            _messages: &[Message],
+            _tools: &[argentor_skills::SkillDescriptor],
+        ) -> ArgentorResult<crate::llm::LlmResponse> {
+            Err(ArgentorError::Agent("nop".into()))
+        }
+
+        async fn chat_stream(
+            &self,
+            _system: Option<&str>,
+            _messages: &[Message],
+            _tools: &[argentor_skills::SkillDescriptor],
+        ) -> ArgentorResult<(
+            tokio::sync::mpsc::Receiver<StreamEvent>,
+            tokio::task::JoinHandle<ArgentorResult<crate::llm::LlmResponse>>,
+        )> {
+            Err(ArgentorError::Agent("nop".into()))
+        }
+    }
+
+    fn make_runner(skills: Arc<SkillRegistry>) -> AgentRunner {
+        // AuditLog::new spawns a background task, so it must run inside a Tokio
+        // runtime.  Tests that call this helper must be annotated #[tokio::test].
+        let audit = Arc::new(AuditLog::new(PathBuf::from("/tmp/audit-test")));
+        AgentRunner::from_backend(Box::new(NopBackend), skills, PermissionSet::new(), audit, 1)
+    }
+
+    // ── ScaffoldMode helpers — no runtime needed ──────────────────────────
+
+    #[test]
+    fn scaffold_mode_default_is_full() {
+        assert_eq!(ScaffoldMode::default(), ScaffoldMode::Full);
+    }
+
+    #[test]
+    fn scaffold_mode_token_estimates() {
+        assert_eq!(ScaffoldMode::Full.estimated_tokens(), 50);
+        assert_eq!(ScaffoldMode::Minimal.estimated_tokens(), 15);
+    }
+
+    #[test]
+    fn scaffold_mode_savings_vs_full() {
+        // Full saves 0 vs itself; Minimal saves the delta.
+        assert_eq!(ScaffoldMode::Full.token_savings_vs_full(), 0);
+        assert_eq!(ScaffoldMode::Minimal.token_savings_vs_full(), 35);
+        // Minimal token count is strictly below Full.
+        assert!(ScaffoldMode::Minimal.estimated_tokens() < ScaffoldMode::Full.estimated_tokens());
+    }
+
+    // ── token savings are meaningful — no runtime needed ──────────────────
+
+    #[test]
+    fn minimal_prompt_is_shorter_than_full_in_bytes() {
+        // Byte-level sanity: minimal scaffold genuinely reduces prompt size.
+        assert!(MINIMAL_SYSTEM_PROMPT.len() < DEFAULT_SYSTEM_PROMPT.len());
+
+        let savings_bytes = DEFAULT_SYSTEM_PROMPT.len() - MINIMAL_SYSTEM_PROMPT.len();
+        // At roughly 4 chars/token, byte savings should imply at least 20 tokens saved.
+        assert!(
+            savings_bytes / 4 >= 20,
+            "expected ≥20 tokens saved, got ~{}",
+            savings_bytes / 4
+        );
+    }
+
+    // ── effective_system_prompt — requires Tokio runtime ─────────────────
+
+    #[tokio::test]
+    async fn full_mode_returns_configured_prompt() {
+        let runner = make_runner(Arc::new(SkillRegistry::new()))
+            .with_scaffold_mode(ScaffoldMode::Full)
+            .with_system_prompt("custom prompt");
+
+        assert_eq!(runner.effective_system_prompt(), "custom prompt");
+    }
+
+    #[tokio::test]
+    async fn minimal_mode_no_tools_returns_minimal_prompt() {
+        // Empty registry → Minimal scaffold takes effect.
+        let runner =
+            make_runner(Arc::new(SkillRegistry::new())).with_scaffold_mode(ScaffoldMode::Minimal);
+
+        let prompt = runner.effective_system_prompt();
+        assert_eq!(prompt, MINIMAL_SYSTEM_PROMPT);
+        // Minimal prompt is strictly shorter than the full default.
+        assert!(prompt.len() < DEFAULT_SYSTEM_PROMPT.len());
+    }
+
+    #[tokio::test]
+    async fn minimal_mode_with_tools_falls_back_to_full() {
+        use argentor_builtins::register_builtins;
+
+        let registry = Arc::new(SkillRegistry::new());
+        register_builtins(&registry);
+
+        let runner = make_runner(registry).with_scaffold_mode(ScaffoldMode::Minimal);
+
+        // Tools are registered → must fall back to Full so the LLM sees skill descriptions.
+        let prompt = runner.effective_system_prompt();
+        assert_eq!(prompt, DEFAULT_SYSTEM_PROMPT);
+        assert_ne!(prompt, MINIMAL_SYSTEM_PROMPT);
+    }
+
+    // ── suggest_scaffold_mode — requires Tokio runtime ────────────────────
+
+    #[tokio::test]
+    async fn suggest_minimal_when_registry_empty() {
+        let runner = make_runner(Arc::new(SkillRegistry::new()));
+        assert_eq!(runner.suggest_scaffold_mode(), ScaffoldMode::Minimal);
+    }
+
+    #[tokio::test]
+    async fn suggest_full_when_tools_registered() {
+        use argentor_builtins::register_builtins;
+
+        let registry = Arc::new(SkillRegistry::new());
+        register_builtins(&registry);
+
+        let runner = make_runner(registry);
+        assert_eq!(runner.suggest_scaffold_mode(), ScaffoldMode::Full);
+    }
+
+    // ── builder round-trip — requires Tokio runtime ───────────────────────
+
+    #[tokio::test]
+    async fn with_scaffold_mode_builder_round_trip() {
+        let runner =
+            make_runner(Arc::new(SkillRegistry::new())).with_scaffold_mode(ScaffoldMode::Minimal);
+        assert_eq!(runner.scaffold_mode(), ScaffoldMode::Minimal);
+
+        let runner2 =
+            make_runner(Arc::new(SkillRegistry::new())).with_scaffold_mode(ScaffoldMode::Full);
+        assert_eq!(runner2.scaffold_mode(), ScaffoldMode::Full);
     }
 }

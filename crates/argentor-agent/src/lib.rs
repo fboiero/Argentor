@@ -201,7 +201,7 @@ pub use reward::{
     AggregateMethod, ProcessRewardModel, ProcessRewardResult, RewardConfig, RewardFlag,
     StepCategory, StepReward, TrajectoryQuality,
 };
-pub use runner::AgentRunner;
+pub use runner::{AgentRunner, ScaffoldMode};
 pub use stream::StreamEvent;
 pub use structured_output::{
     ExtractedOutput, ExtractionPattern, FieldDefinition, FieldType, OutputSchema,
