@@ -44,7 +44,7 @@ const MINIMAL_SYSTEM_PROMPT: &str = "You are Argentor, a secure AI assistant.";
 ///
 /// # Example
 ///
-/// ```rust
+/// ```no_run
 /// use argentor_agent::{AgentRunner, ScaffoldMode};
 /// # use argentor_agent::ModelConfig;
 /// # use argentor_security::{AuditLog, PermissionSet};

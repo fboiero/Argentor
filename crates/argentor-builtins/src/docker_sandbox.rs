@@ -399,6 +399,7 @@ impl DockerShellSkill {
                 required_capabilities: vec![Capability::ShellExec {
                     allowed_commands: vec!["*".into()],
                 }],
+                requires_approval: true,
             },
             sandbox,
         }
