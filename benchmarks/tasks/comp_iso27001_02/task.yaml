@@ -1,0 +1,38 @@
+id: comp_iso27001_02
+name: Compliance — ISO 27001 coverage
+description: |
+  Q-03 compliance benchmark: ISO 27001 dimension.
+  Verify Argentor's ISO 27001 information security control coverage.
+  The Iso27001Module implements access control events (A.9), operational
+  logging (A.12), and incident management (A.16) — 3 of 14 clause families.
+  Coverage = 75% (conservative, includes A.5 via audit trail).
+  Competitors score 0.0 — no ISO 27001 module.
+kind: compliance
+prompt: |
+  Assess ISO 27001 compliance coverage. Check for: (1) access control event
+  logging (A.9 — AccessControlEvent), (2) operational security logging
+  (A.12 — audit trail), (3) information security incident management
+  (A.16 — SecurityIncident). Report the fraction of ISO 27001 control clause
+  families that have active implementation.
+input: ""
+ground_truth: |
+  iso27001_coverage=0.75 — Iso27001Module implements A.5 (policies via audit),
+  A.9 (access control), A.12 (ops logging), A.16 (incidents). Conservative
+  estimate: 3 deep + 1 partial of 14 clause families.
+simulated_turns: 1
+tool_count: 0
+context_size_bytes: 0
+rubric:
+  criteria:
+    - name: access_control
+      description: A.9 AccessControlEvent logging present.
+      weight: 2.0
+    - name: incident_management
+      description: A.16 SecurityIncident management implemented.
+      weight: 2.0
+    - name: audit_trail
+      description: Operational audit trail supporting A.12 and A.5.
+      weight: 1.0
+  pass_threshold: 6.0
+max_turns: 1
+allowed_tools: []

@@ -1,0 +1,33 @@
+id: siem_coverage_03
+name: SIEM — NIST 800-92 field coverage
+description: |
+  Q-02 SIEM benchmark: coverage dimension.
+  Measure what fraction of NIST SP 800-92 minimum audit log fields are present
+  in the Argentor export. Required fields: timestamp, actor, action, outcome,
+  target, session_id (6 fields). Competitors score 0%.
+kind: siem
+prompt: |
+  Produce a SIEM audit export and verify NIST SP 800-92 field coverage.
+  The export must include: timestamp (when), actor (who/what), action (what
+  was done), outcome (success/failure), target (resource affected), and
+  session_id (request/session identifier).
+input: ""
+ground_truth: |
+  All 6 NIST SP 800-92 minimum fields present: timestamp, actor, action,
+  outcome, target, session_id. Field coverage = 100%.
+simulated_turns: 1
+tool_count: 0
+context_size_bytes: 0
+rubric:
+  criteria:
+    - name: field_coverage
+      description: |
+        Argentor: field_coverage_pct=1.0 (all 6 NIST fields mapped in AuditEntry).
+        Competitors: field_coverage_pct=0.0 — no SIEM export.
+      weight: 3.0
+    - name: formats_supported
+      description: At least 3 SIEM formats listed (CEF, Splunk, JSON minimum).
+      weight: 1.0
+  pass_threshold: 6.0
+max_turns: 1
+allowed_tools: []

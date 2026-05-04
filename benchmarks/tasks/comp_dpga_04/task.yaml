@@ -1,0 +1,40 @@
+id: comp_dpga_04
+name: Compliance — DPGA indicator evaluation
+description: |
+  Q-03 compliance benchmark: DPGA dimension.
+  Verify that Argentor's DpgaAssessment evaluates all 9 Digital Public Goods
+  Alliance indicators. DPGA requires open source, open data, open standards,
+  open content, adherence to best practices, and no vendor lock-in.
+  Competitors score 0 — no DPGA assessment module.
+kind: compliance
+prompt: |
+  Assess DPGA (Digital Public Goods Alliance) compliance. Evaluate all 9
+  DPGA indicators: (1) relevance to SDGs, (2) open license,
+  (3) documentation, (4) mechanism for extraction of data,
+  (5) adherence to privacy and security best practices,
+  (6) adherence to standards and best practices, (7) no vendor lock-in,
+  (8) country ownership, (9) financial sustainability. Report total indicators
+  evaluated and passed.
+input: ""
+ground_truth: |
+  dpga_indicators=9 — DpgaAssessment evaluates all 9 DPGA indicators.
+  Argentor: AGPL-3.0 license, SDG-aligned, documented, open data extraction,
+  security audit, open standards (MCP/JSON-RPC), no lock-in, public repo,
+  community-funded.
+simulated_turns: 1
+tool_count: 0
+context_size_bytes: 0
+rubric:
+  criteria:
+    - name: all_indicators_evaluated
+      description: All 9 DPGA indicators assessed by DpgaAssessment.
+      weight: 3.0
+    - name: open_license
+      description: AGPL-3.0-only license confirmed as DPGA-compatible.
+      weight: 1.0
+    - name: open_standards
+      description: MCP and JSON-RPC 2.0 cited as open standards compliance.
+      weight: 1.0
+  pass_threshold: 6.0
+max_turns: 1
+allowed_tools: []

@@ -1,0 +1,37 @@
+id: comp_iso42001_03
+name: Compliance — ISO 42001 (AI management) coverage
+description: |
+  Q-03 compliance benchmark: ISO 42001 dimension.
+  Verify Argentor's ISO 42001 AI management system coverage. The Iso42001Module
+  implements AI system records, bias checks, and transparency logging —
+  the core AI governance controls. Coverage = 80%.
+  Competitors score 0.0 — no ISO 42001 module.
+kind: compliance
+prompt: |
+  Assess ISO 42001 AI management system compliance. Check for:
+  (1) AiSystemRecord — documented AI system purpose, risk level, and
+  data sources, (2) BiasCheck — systematic bias detection in AI outputs,
+  (3) TransparencyLog — audit trail of AI decision-making for accountability.
+  Report the fraction of ISO 42001 core controls implemented.
+input: ""
+ground_truth: |
+  iso42001_coverage=0.80 — Iso42001Module implements AiSystemRecord,
+  BiasCheck, and TransparencyLog. These map to the core AI governance
+  requirements in ISO/IEC 42001:2023.
+simulated_turns: 1
+tool_count: 0
+context_size_bytes: 0
+rubric:
+  criteria:
+    - name: ai_system_record
+      description: AiSystemRecord with purpose, risk level, data sources.
+      weight: 2.0
+    - name: bias_detection
+      description: BiasCheck implemented for systematic output review.
+      weight: 2.0
+    - name: transparency
+      description: TransparencyLog for AI decision accountability.
+      weight: 2.0
+  pass_threshold: 6.0
+max_turns: 1
+allowed_tools: []

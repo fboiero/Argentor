@@ -131,6 +131,16 @@ pub enum TaskKind {
     /// debate, ensemble, supervisor, and swarm. Measures coordination overhead,
     /// total turns across all agents, and completion rate.
     MultiAgent,
+    /// SIEM integration benchmark — measures audit event throughput, CEF/LEEF/
+    /// Splunk schema validity, and NIST 800-92 field coverage. Argentor-only
+    /// capability; competitors score zero.
+    Siem,
+    /// Compliance benchmark — measures coverage across GDPR, ISO 27001,
+    /// ISO 42001, and DPGA. Argentor-only capability; competitors score zero.
+    Compliance,
+    /// Integrations coverage benchmark — counts native skills, MCP servers, and
+    /// total effective integrations. Honest comparison against LangChain et al.
+    Integrations,
 }
 
 /// Input data for a task — either inline text or a file reference.

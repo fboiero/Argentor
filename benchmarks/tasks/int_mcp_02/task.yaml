@@ -1,0 +1,37 @@
+id: int_mcp_02
+name: Integrations — MCP server accessibility
+description: |
+  Q-05 integrations benchmark: MCP server count dimension.
+  Count MCP (Model Context Protocol) servers accessible via the framework.
+  Argentor ships a native McpClient (JSON-RPC 2.0 stdio) and can access all
+  ~5 800 servers in the MCP ecosystem. LangChain has partial MCP support
+  (~100 via mcp-use). Claude-Agent-SDK is on par with Argentor (~5 800).
+kind: integrations
+prompt: |
+  Count the number of MCP (Model Context Protocol) servers accessible via
+  this framework's MCP client. MCP provides a standard protocol for connecting
+  AI agents to external tools and data sources. Report the count and the
+  connection method (native client vs adapter library).
+input: ""
+ground_truth: |
+  Argentor: ~5 800 (McpClient native, JSON-RPC 2.0 stdio — full MCP ecosystem).
+  Claude-Agent-SDK: ~5 800 (native MCP, same ecosystem).
+  LangChain: ~100 (mcp-use adapter, limited support).
+  CrewAI/PydanticAI: ~50 (partial support via third-party adapters).
+simulated_turns: 1
+tool_count: 0
+context_size_bytes: 0
+rubric:
+  criteria:
+    - name: mcp_server_count
+      description: |
+        Argentor and Claude-Agent-SDK: ~5800 (native MCP).
+        LangChain: ~100 (mcp-use).
+        CrewAI / PydanticAI: ~50.
+      weight: 3.0
+    - name: native_protocol
+      description: Native JSON-RPC 2.0 MCP client vs adapter library.
+      weight: 1.0
+  pass_threshold: 6.0
+max_turns: 1
+allowed_tools: []

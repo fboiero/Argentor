@@ -5,22 +5,28 @@
 //! - Quality (LLM-as-judge, stubbed for now)
 
 pub mod block_rate;
+pub mod compliance;
 pub mod cost;
 pub mod dx;
+pub mod integrations;
 pub mod long_horizon;
 pub mod multi_agent;
 pub mod quality;
+pub mod siem;
 pub mod stats;
 
 use crate::task::{Task, TaskResult};
 use serde::{Deserialize, Serialize};
 
 pub use block_rate::{compute_block_rate, BlockRateMetric};
+pub use compliance::{ComplianceMetric, ComplianceSummary};
 pub use cost::CostMetric;
 pub use dx::{compute_all as compute_dx_scores, DxMetric, ErrorScenarioScore};
+pub use integrations::{IntegrationMetric, IntegrationSummary};
 pub use long_horizon::{LongHorizonMetrics, LongHorizonSummary};
 pub use multi_agent::{MultiAgentMetrics, MultiAgentSummary};
 pub use quality::QualityMetric;
+pub use siem::{SiemMetric, SiemSummary};
 pub use stats::{PairedTTest, Stats};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

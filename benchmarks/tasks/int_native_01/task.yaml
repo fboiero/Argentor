@@ -1,0 +1,33 @@
+id: int_native_01
+name: Integrations — Native integration count
+description: |
+  Q-05 integrations benchmark: native count dimension.
+  Count built-in / native integrations (skills, tools, connectors) for each
+  framework. LangChain wins on this dimension with ~5 000 community integrations.
+  Argentor has ~50 native skills. Honest comparison.
+kind: integrations
+prompt: |
+  Count the number of native built-in integrations available in this framework
+  without installing any additional packages. Include built-in skills, tool
+  connectors, and API clients that ship with the core framework.
+input: ""
+ground_truth: |
+  Argentor: ~50 native (argentor-builtins: echo, time, help, memory_store,
+  memory_search + argentor-mcp skills).
+  LangChain: ~5 000 (community integrations package, 2024 count).
+  CrewAI: ~100 (crewai-tools).
+  LangChain WINS on native count — this is documented honestly.
+simulated_turns: 1
+tool_count: 0
+context_size_bytes: 0
+rubric:
+  criteria:
+    - name: accurate_count
+      description: Native count matches documented source (builtins package).
+      weight: 2.0
+    - name: honest_comparison
+      description: LangChain's larger native count acknowledged.
+      weight: 1.0
+  pass_threshold: 6.0
+max_turns: 1
+allowed_tools: []

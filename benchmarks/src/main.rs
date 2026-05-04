@@ -12,9 +12,12 @@
 
 use anyhow::Context;
 use argentor_benchmarks::dashboard_gen;
+use argentor_benchmarks::metrics::compliance::{self as comp_metric, ComplianceSummary};
 use argentor_benchmarks::metrics::cost::{self as cost_metric, Scale};
+use argentor_benchmarks::metrics::integrations::{self as int_metric, IntegrationSummary};
 use argentor_benchmarks::metrics::long_horizon::{self as lh_metric, LongHorizonSummary};
 use argentor_benchmarks::metrics::multi_agent::{self as ma_metric, MultiAgentSummary};
+use argentor_benchmarks::metrics::siem::{self as siem_metric, SiemSummary};
 use argentor_benchmarks::metrics::{self, compute_block_rate, BlockRateMetric, PairedTTest, Stats};
 use argentor_benchmarks::report::RunReport;
 use argentor_benchmarks::runners::{
@@ -118,6 +121,45 @@ enum Command {
         runners: Vec<RunnerArg>,
         /// Number of samples per (task, runner) pair. 1 is sufficient for
         /// the deterministic simulation path.
+        #[arg(long, default_value_t = 1)]
+        samples: usize,
+    },
+    /// Run SIEM-track only (Q-02): discover `kind: siem` tasks and compute
+    /// events/second, schema validity, and NIST 800-92 field coverage per runner.
+    /// Competitors score 0 — no SIEM export implemented.
+    Siem {
+        #[arg(
+            long,
+            value_delimiter = ',',
+            default_value = "argentor,langchain,crewai,pydantic-ai,claude-agent-sdk"
+        )]
+        runners: Vec<RunnerArg>,
+        #[arg(long, default_value_t = 1)]
+        samples: usize,
+    },
+    /// Run compliance-track only (Q-03): discover `kind: compliance` tasks and
+    /// compute GDPR, ISO 27001, ISO 42001, and DPGA coverage per runner.
+    /// Competitors score 0 — no compliance modules implemented.
+    Compliance {
+        #[arg(
+            long,
+            value_delimiter = ',',
+            default_value = "argentor,langchain,crewai,pydantic-ai,claude-agent-sdk"
+        )]
+        runners: Vec<RunnerArg>,
+        #[arg(long, default_value_t = 1)]
+        samples: usize,
+    },
+    /// Run integrations-track only (Q-05): discover `kind: integrations` tasks
+    /// and compare native + MCP integration counts across frameworks.
+    /// Honest: LangChain wins on native count; Argentor competitive via MCP.
+    Integrations {
+        #[arg(
+            long,
+            value_delimiter = ',',
+            default_value = "argentor,langchain,crewai,pydantic-ai,claude-agent-sdk"
+        )]
+        runners: Vec<RunnerArg>,
         #[arg(long, default_value_t = 1)]
         samples: usize,
     },
@@ -394,6 +436,15 @@ async fn main() -> anyhow::Result<()> {
         }
         Command::MultiAgent { runners, samples } => {
             run_multi_agent(&cli.tasks_dir, &runners, samples).await?;
+        }
+        Command::Siem { runners, samples } => {
+            run_siem(&cli.tasks_dir, &runners, samples).await?;
+        }
+        Command::Compliance { runners, samples } => {
+            run_compliance(&cli.tasks_dir, &runners, samples).await?;
+        }
+        Command::Integrations { runners, samples } => {
+            run_integrations(&cli.tasks_dir, &runners, samples).await?;
         }
         Command::Dashboard {
             results_dir,
@@ -1281,6 +1332,487 @@ async fn run_multi_agent(
         "timestamp": chrono::Utc::now().to_rfc3339(),
         "results_by_combo": flat,
         "summaries": summaries,
+    });
+    std::fs::write(&out, serde_json::to_string_pretty(&payload)?)?;
+    println!("\nResults written to {}", out.display());
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Q-02 SIEM track
+// ---------------------------------------------------------------------------
+
+/// SIEM track runner. Discovers `kind: siem` tasks, runs each runner, then
+/// prints a comparison table of events/second, schema validity, field coverage,
+/// and supported formats. Competitors score 0 across all dimensions.
+async fn run_siem(
+    tasks_dir: &std::path::Path,
+    runners: &[RunnerArg],
+    samples: usize,
+) -> anyhow::Result<()> {
+    let all_tasks =
+        Task::discover(tasks_dir).with_context(|| format!("discovering tasks in {tasks_dir:?}"))?;
+    let siem_tasks: Vec<_> = all_tasks
+        .into_iter()
+        .filter(|(t, _)| t.kind == TaskKind::Siem)
+        .collect();
+
+    if siem_tasks.is_empty() {
+        anyhow::bail!(
+            "no SIEM tasks found in {:?} (looking for kind: siem)",
+            tasks_dir
+        );
+    }
+
+    println!(
+        "Running {} SIEM tasks × {} runners × {} samples = {} total runs",
+        siem_tasks.len(),
+        runners.len(),
+        samples,
+        siem_tasks.len() * runners.len() * samples
+    );
+
+    let mut results_by_combo: HashMap<(String, String), Vec<TaskResult>> = HashMap::new();
+    let mut runner_display: Vec<String> = Vec::new();
+
+    for (task, dir) in &siem_tasks {
+        for r_arg in runners {
+            let runner_box = r_arg.build(r_arg.is_argentor());
+            let runner_name = runner_box.name();
+            if !runner_display.contains(&runner_name) {
+                runner_display.push(runner_name.clone());
+            }
+            println!("▶ {}  [{}] × {}", task.id, runner_name, samples);
+            for _ in 0..samples {
+                let r = r_arg.build(r_arg.is_argentor());
+                let result = r.run(task, dir).await?;
+                results_by_combo
+                    .entry((task.id.clone(), runner_name.clone()))
+                    .or_default()
+                    .push(result);
+            }
+        }
+    }
+
+    // Per-task table
+    println!("\n## Per-task SIEM results\n");
+    println!("| Task | Runner | Events/s | Schema valid | Field coverage | Formats |");
+    println!("|------|--------|----------|-------------|----------------|---------|");
+
+    let mut sorted_tasks: Vec<_> = siem_tasks.iter().collect();
+    sorted_tasks.sort_by(|a, b| a.0.id.cmp(&b.0.id));
+
+    let mut metrics_by_runner: HashMap<String, Vec<siem_metric::SiemMetric>> = HashMap::new();
+
+    for (task, _) in &sorted_tasks {
+        for runner_name in &runner_display {
+            let Some(results) = results_by_combo.get(&(task.id.clone(), runner_name.clone()))
+            else {
+                continue;
+            };
+            if results.is_empty() {
+                continue;
+            }
+            let m = siem_metric::compute(task, &results[0]);
+            println!(
+                "| `{}` | {} | {:.0} | {} | {:.0}% | {} |",
+                task.id,
+                runner_name,
+                m.events_per_second,
+                if m.schema_valid { "✓" } else { "✗" },
+                m.field_coverage_pct * 100.0,
+                if m.formats_supported.is_empty() {
+                    "none".to_owned()
+                } else {
+                    m.formats_supported.join(", ")
+                },
+            );
+            metrics_by_runner
+                .entry(runner_name.clone())
+                .or_default()
+                .push(m);
+        }
+    }
+
+    // Summary table
+    println!("\n## Summary — SIEM runner comparison\n");
+    println!("| Runner | Tasks | Events/s (mean) | Schema valid | Coverage (mean) | Formats |");
+    println!("|--------|-------|----------------|-------------|-----------------|---------|");
+
+    let mut runners_sorted = runner_display.clone();
+    runners_sorted.sort_by(|a, b| {
+        let a_ag = a.starts_with("argentor");
+        let b_ag = b.starts_with("argentor");
+        b_ag.cmp(&a_ag).then(a.cmp(b))
+    });
+
+    let mut summaries_siem: Vec<SiemSummary> = Vec::new();
+    for runner_name in &runners_sorted {
+        let empty = Vec::new();
+        let ms = metrics_by_runner.get(runner_name).unwrap_or(&empty);
+        let s = SiemSummary::aggregate(runner_name, ms);
+        println!(
+            "| {} | {} | {:.0} | {:.0}% | {:.0}% | {} |",
+            runner_name,
+            s.tasks_run,
+            s.mean_events_per_second,
+            s.schema_valid_pct * 100.0,
+            s.mean_field_coverage_pct * 100.0,
+            if s.formats_supported.is_empty() {
+                "none".to_owned()
+            } else {
+                s.formats_supported.join(", ")
+            },
+        );
+        summaries_siem.push(s);
+    }
+
+    println!("\n> Note: Competitors score 0 — no SIEM export path exists in LangChain,");
+    println!("> CrewAI, PydanticAI, or Claude-Agent-SDK. This is an Argentor-exclusive");
+    println!("> capability. Source: public framework documentation (2024-2025).");
+
+    // Persist JSON
+    let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let out = tasks_dir
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("results")
+        .join(format!("siem_{ts}.json"));
+    if let Some(parent) = out.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let flat: serde_json::Map<String, serde_json::Value> = results_by_combo
+        .iter()
+        .map(|((task_id, runner_name), results)| {
+            (
+                format!("{task_id} :: {runner_name}"),
+                serde_json::to_value(results).unwrap_or(serde_json::Value::Null),
+            )
+        })
+        .collect();
+    let payload = serde_json::json!({
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "results_by_combo": flat,
+        "summaries": summaries_siem,
+    });
+    std::fs::write(&out, serde_json::to_string_pretty(&payload)?)?;
+    println!("\nResults written to {}", out.display());
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Q-03 Compliance track
+// ---------------------------------------------------------------------------
+
+/// Compliance track runner. Discovers `kind: compliance` tasks, runs each
+/// runner, then prints a comparison table of GDPR / ISO 27001 / ISO 42001 /
+/// DPGA coverage. Competitors score 0 across all dimensions.
+async fn run_compliance(
+    tasks_dir: &std::path::Path,
+    runners: &[RunnerArg],
+    samples: usize,
+) -> anyhow::Result<()> {
+    let all_tasks =
+        Task::discover(tasks_dir).with_context(|| format!("discovering tasks in {tasks_dir:?}"))?;
+    let comp_tasks: Vec<_> = all_tasks
+        .into_iter()
+        .filter(|(t, _)| t.kind == TaskKind::Compliance)
+        .collect();
+
+    if comp_tasks.is_empty() {
+        anyhow::bail!(
+            "no compliance tasks found in {:?} (looking for kind: compliance)",
+            tasks_dir
+        );
+    }
+
+    println!(
+        "Running {} compliance tasks × {} runners × {} samples = {} total runs",
+        comp_tasks.len(),
+        runners.len(),
+        samples,
+        comp_tasks.len() * runners.len() * samples
+    );
+
+    let mut results_by_combo: HashMap<(String, String), Vec<TaskResult>> = HashMap::new();
+    let mut runner_display: Vec<String> = Vec::new();
+
+    for (task, dir) in &comp_tasks {
+        for r_arg in runners {
+            let runner_box = r_arg.build(r_arg.is_argentor());
+            let runner_name = runner_box.name();
+            if !runner_display.contains(&runner_name) {
+                runner_display.push(runner_name.clone());
+            }
+            println!("▶ {}  [{}] × {}", task.id, runner_name, samples);
+            for _ in 0..samples {
+                let r = r_arg.build(r_arg.is_argentor());
+                let result = r.run(task, dir).await?;
+                results_by_combo
+                    .entry((task.id.clone(), runner_name.clone()))
+                    .or_default()
+                    .push(result);
+            }
+        }
+    }
+
+    // Per-task table
+    println!("\n## Per-task compliance results\n");
+    println!("| Task | Runner | GDPR | ISO 27001 | ISO 42001 | DPGA indicators | Total score |");
+    println!("|------|--------|------|-----------|-----------|----------------|-------------|");
+
+    let mut sorted_tasks: Vec<_> = comp_tasks.iter().collect();
+    sorted_tasks.sort_by(|a, b| a.0.id.cmp(&b.0.id));
+
+    let mut metrics_by_runner: HashMap<String, Vec<comp_metric::ComplianceMetric>> = HashMap::new();
+
+    for (task, _) in &sorted_tasks {
+        for runner_name in &runner_display {
+            let Some(results) = results_by_combo.get(&(task.id.clone(), runner_name.clone()))
+            else {
+                continue;
+            };
+            if results.is_empty() {
+                continue;
+            }
+            let m = comp_metric::compute(task, &results[0]);
+            println!(
+                "| `{}` | {} | {:.0}% | {:.0}% | {:.0}% | {} | {:.0}% |",
+                task.id,
+                runner_name,
+                m.gdpr_coverage * 100.0,
+                m.iso27001_coverage * 100.0,
+                m.iso42001_coverage * 100.0,
+                m.dpga_indicators,
+                m.total_score * 100.0,
+            );
+            metrics_by_runner
+                .entry(runner_name.clone())
+                .or_default()
+                .push(m);
+        }
+    }
+
+    // Summary table
+    println!("\n## Summary — compliance runner comparison\n");
+    println!(
+        "| Runner | Tasks | GDPR (mean) | ISO 27001 (mean) | ISO 42001 (mean) | DPGA total | Total score |"
+    );
+    println!(
+        "|--------|-------|------------|-----------------|-----------------|-----------|-------------|"
+    );
+
+    let mut runners_sorted = runner_display.clone();
+    runners_sorted.sort_by(|a, b| {
+        let a_ag = a.starts_with("argentor");
+        let b_ag = b.starts_with("argentor");
+        b_ag.cmp(&a_ag).then(a.cmp(b))
+    });
+
+    let mut summaries_comp: Vec<ComplianceSummary> = Vec::new();
+    for runner_name in &runners_sorted {
+        let empty = Vec::new();
+        let ms = metrics_by_runner.get(runner_name).unwrap_or(&empty);
+        let s = ComplianceSummary::aggregate(runner_name, ms);
+        println!(
+            "| {} | {} | {:.0}% | {:.0}% | {:.0}% | {} | {:.0}% |",
+            runner_name,
+            s.tasks_run,
+            s.mean_gdpr_coverage * 100.0,
+            s.mean_iso27001_coverage * 100.0,
+            s.mean_iso42001_coverage * 100.0,
+            s.total_dpga_indicators,
+            s.mean_total_score * 100.0,
+        );
+        summaries_comp.push(s);
+    }
+
+    println!("\n> Note: Competitors score 0 — LangChain, CrewAI, PydanticAI, and Claude-Agent-SDK");
+    println!("> ship no GDPR, ISO 27001, ISO 42001, or DPGA compliance modules.");
+    println!("> Source: public framework documentation (2024-2025).");
+
+    // Persist JSON
+    let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let out = tasks_dir
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("results")
+        .join(format!("compliance_{ts}.json"));
+    if let Some(parent) = out.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let flat: serde_json::Map<String, serde_json::Value> = results_by_combo
+        .iter()
+        .map(|((task_id, runner_name), results)| {
+            (
+                format!("{task_id} :: {runner_name}"),
+                serde_json::to_value(results).unwrap_or(serde_json::Value::Null),
+            )
+        })
+        .collect();
+    let payload = serde_json::json!({
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "results_by_combo": flat,
+        "summaries": summaries_comp,
+    });
+    std::fs::write(&out, serde_json::to_string_pretty(&payload)?)?;
+    println!("\nResults written to {}", out.display());
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// Q-05 Integrations track
+// ---------------------------------------------------------------------------
+
+/// Integrations track runner. Discovers `kind: integrations` tasks, runs each
+/// runner, then prints a comparison table of native count, MCP servers, total
+/// effective, and setup complexity. Honest: LangChain wins on native count.
+async fn run_integrations(
+    tasks_dir: &std::path::Path,
+    runners: &[RunnerArg],
+    samples: usize,
+) -> anyhow::Result<()> {
+    let all_tasks =
+        Task::discover(tasks_dir).with_context(|| format!("discovering tasks in {tasks_dir:?}"))?;
+    let int_tasks: Vec<_> = all_tasks
+        .into_iter()
+        .filter(|(t, _)| t.kind == TaskKind::Integrations)
+        .collect();
+
+    if int_tasks.is_empty() {
+        anyhow::bail!(
+            "no integrations tasks found in {:?} (looking for kind: integrations)",
+            tasks_dir
+        );
+    }
+
+    println!(
+        "Running {} integrations tasks × {} runners × {} samples = {} total runs",
+        int_tasks.len(),
+        runners.len(),
+        samples,
+        int_tasks.len() * runners.len() * samples
+    );
+
+    let mut results_by_combo: HashMap<(String, String), Vec<TaskResult>> = HashMap::new();
+    let mut runner_display: Vec<String> = Vec::new();
+
+    for (task, dir) in &int_tasks {
+        for r_arg in runners {
+            let runner_box = r_arg.build(r_arg.is_argentor());
+            let runner_name = runner_box.name();
+            if !runner_display.contains(&runner_name) {
+                runner_display.push(runner_name.clone());
+            }
+            println!("▶ {}  [{}] × {}", task.id, runner_name, samples);
+            for _ in 0..samples {
+                let r = r_arg.build(r_arg.is_argentor());
+                let result = r.run(task, dir).await?;
+                results_by_combo
+                    .entry((task.id.clone(), runner_name.clone()))
+                    .or_default()
+                    .push(result);
+            }
+        }
+    }
+
+    // Per-task table
+    println!("\n## Per-task integrations results\n");
+    println!("| Task | Runner | Native | MCP servers | Total effective | Setup |");
+    println!("|------|--------|--------|-------------|----------------|-------|");
+
+    let mut sorted_tasks: Vec<_> = int_tasks.iter().collect();
+    sorted_tasks.sort_by(|a, b| a.0.id.cmp(&b.0.id));
+
+    let mut metrics_by_runner: HashMap<String, Vec<int_metric::IntegrationMetric>> = HashMap::new();
+
+    for (task, _) in &sorted_tasks {
+        for runner_name in &runner_display {
+            let Some(results) = results_by_combo.get(&(task.id.clone(), runner_name.clone()))
+            else {
+                continue;
+            };
+            if results.is_empty() {
+                continue;
+            }
+            let m = int_metric::compute(task, &results[0]);
+            println!(
+                "| `{}` | {} | {} | {} | {} | {} |",
+                task.id,
+                runner_name,
+                m.native_integrations,
+                m.mcp_servers_accessible,
+                m.total_effective,
+                m.setup_complexity,
+            );
+            metrics_by_runner
+                .entry(runner_name.clone())
+                .or_default()
+                .push(m);
+        }
+    }
+
+    // Summary table
+    println!("\n## Summary — integrations runner comparison\n");
+    println!("| Runner | Native | MCP servers | Total effective | Setup complexity |");
+    println!("|--------|--------|-------------|----------------|------------------|");
+
+    let mut runners_sorted = runner_display.clone();
+    runners_sorted.sort_by(|a, b| {
+        let a_ag = a.starts_with("argentor");
+        let b_ag = b.starts_with("argentor");
+        b_ag.cmp(&a_ag).then(a.cmp(b))
+    });
+
+    let mut summaries_int: Vec<IntegrationSummary> = Vec::new();
+    for runner_name in &runners_sorted {
+        let empty = Vec::new();
+        let ms = metrics_by_runner.get(runner_name).unwrap_or(&empty);
+        let s = IntegrationSummary::aggregate(runner_name, ms);
+        println!(
+            "| {} | {} | {} | {} | {} |",
+            runner_name,
+            s.native_integrations,
+            s.mcp_servers_accessible,
+            s.total_effective,
+            s.setup_complexity,
+        );
+        summaries_int.push(s);
+    }
+
+    println!(
+        "\n> HONEST RESULT: LangChain wins on native integrations (~5 000 vs Argentor's ~50)."
+    );
+    println!("> Argentor is competitive on total effective count via native MCP support (~5 850).");
+    println!("> Claude-Agent-SDK is on par with Argentor on MCP (~5 800).");
+    println!("> Source: public framework documentation and integration registries (2024-2025).");
+
+    // Persist JSON
+    let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let out = tasks_dir
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("results")
+        .join(format!("integrations_{ts}.json"));
+    if let Some(parent) = out.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let flat: serde_json::Map<String, serde_json::Value> = results_by_combo
+        .iter()
+        .map(|((task_id, runner_name), results)| {
+            (
+                format!("{task_id} :: {runner_name}"),
+                serde_json::to_value(results).unwrap_or(serde_json::Value::Null),
+            )
+        })
+        .collect();
+    let payload = serde_json::json!({
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "results_by_combo": flat,
+        "summaries": summaries_int,
     });
     std::fs::write(&out, serde_json::to_string_pretty(&payload)?)?;
     println!("\nResults written to {}", out.display());

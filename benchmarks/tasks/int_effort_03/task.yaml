@@ -1,0 +1,41 @@
+id: int_effort_03
+name: Integrations — Setup complexity / total effective
+description: |
+  Q-05 integrations benchmark: setup effort and total effective count.
+  Measures how many steps are required to add a new integration end-to-end,
+  and reports total effective integrations (native + MCP).
+  Argentor: low complexity (McpSkill::connect), total ~5 850.
+  LangChain: medium complexity (pip install + loader + chain wiring), total ~5 100.
+kind: integrations
+prompt: |
+  Assess the effort required to add a new integration to this framework.
+  Rate complexity as: low (1-2 steps, single function call), medium (3-5
+  steps, config + install + wiring), or high (6+ steps, custom code required).
+  Also report total effective integrations = native + MCP servers accessible.
+input: ""
+ground_truth: |
+  Argentor: complexity=low (McpSkill::connect(url) — 1 line), total=5850.
+  LangChain: complexity=medium (pip install langchain-<pkg> + loader + chain),
+    total=5100.
+  CrewAI: complexity=medium, total=150.
+  PydanticAI: complexity=medium, total=80.
+  Claude-Agent-SDK: complexity=low, total=5820.
+  WINNER total effective: Argentor (5850) and Claude-Agent-SDK (5820) tie.
+  WINNER native: LangChain (5000). Honest result.
+simulated_turns: 1
+tool_count: 0
+context_size_bytes: 0
+rubric:
+  criteria:
+    - name: complexity_rating
+      description: Complexity correctly classified per documented setup steps.
+      weight: 2.0
+    - name: total_effective_count
+      description: Total = native + MCP servers, correctly summed.
+      weight: 2.0
+    - name: honest_langchain_acknowledgement
+      description: LangChain native advantage acknowledged in output.
+      weight: 1.0
+  pass_threshold: 6.0
+max_turns: 1
+allowed_tools: []

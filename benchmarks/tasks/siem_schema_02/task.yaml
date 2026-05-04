@@ -1,0 +1,31 @@
+id: siem_schema_02
+name: SIEM — CEF schema validity
+description: |
+  Q-02 SIEM benchmark: schema dimension.
+  Verify that the CEF output produced by Argentor contains all 7 mandatory
+  header fields: CEF:0, vendor, product, version, event_id, name, severity.
+  Competitors score false — no CEF output path.
+kind: siem
+prompt: |
+  Generate a sample CEF audit event and validate it contains all mandatory
+  header fields: CEF:0|vendor|product|version|event_id|event_name|severity|
+  followed by extension key-value pairs including src, outcome, and msg.
+input: ""
+ground_truth: |
+  CEF:0|Argentor|AgentRuntime|1.0|<action>|<action>|<0-10>|src=... outcome=... msg=...
+simulated_turns: 1
+tool_count: 0
+context_size_bytes: 0
+rubric:
+  criteria:
+    - name: schema_valid
+      description: |
+        Argentor: schema_valid=true — CEF encoder guarantees 7-field header.
+        Competitors: schema_valid=false — no CEF output.
+      weight: 3.0
+    - name: mandatory_fields_present
+      description: All 7 CEF header segments separated by pipe characters.
+      weight: 2.0
+  pass_threshold: 6.0
+max_turns: 1
+allowed_tools: []

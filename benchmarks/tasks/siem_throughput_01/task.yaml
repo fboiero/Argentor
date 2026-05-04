@@ -1,0 +1,29 @@
+id: siem_throughput_01
+name: SIEM — Audit event throughput
+description: |
+  Q-02 SIEM benchmark: throughput dimension.
+  Export 1 000 synthetic AuditEntry records through the Argentor SIEM pipeline
+  and measure events per second. Competitors score 0 (no SIEM export).
+kind: siem
+prompt: |
+  Export 1000 audit events in CEF format and report the throughput
+  (events per second). Include timestamp, actor, action, outcome, target,
+  and session_id fields on each event.
+input: ""
+ground_truth: null
+simulated_turns: 1
+tool_count: 0
+context_size_bytes: 0
+rubric:
+  criteria:
+    - name: throughput
+      description: |
+        Argentor: events_per_second > 0 (pipeline exercised).
+        Competitors: score 0 — no SIEM export path exists.
+      weight: 2.0
+    - name: format_output
+      description: Output references CEF format and event count.
+      weight: 1.0
+  pass_threshold: 6.0
+max_turns: 1
+allowed_tools: []
