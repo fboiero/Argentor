@@ -19,6 +19,7 @@
 //! ```
 
 pub mod cost_sim;
+pub mod dashboard_gen;
 pub mod datasets;
 pub mod metrics;
 pub mod report;
@@ -27,7 +28,8 @@ pub mod task;
 
 pub use cost_sim::{simulate as simulate_cost, CostBreakdown, CostWorkload, Framework};
 pub use metrics::{
-    CostMetric, LatencyMetric, LongHorizonMetrics, LongHorizonSummary, QualityMetric, TaskMetrics,
+    CostMetric, LatencyMetric, LongHorizonMetrics, LongHorizonSummary, MultiAgentMetrics,
+    MultiAgentSummary, QualityMetric, TaskMetrics,
 };
 pub use runners::{Runner, RunnerKind};
 pub use task::{Rubric, Task, TaskInput, TaskKind, TaskResult};

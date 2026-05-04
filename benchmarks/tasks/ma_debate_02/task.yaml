@@ -1,0 +1,41 @@
+id: ma_debate_02
+name: Structured Debate — Two agents argue, third judges
+description: |
+  Agent 1 argues FOR AI regulation. Agent 2 argues AGAINST. A third Judge
+  agent evaluates both arguments and delivers a verdict with reasoning.
+  Tests adversarial multi-agent coordination and impartial synthesis.
+kind: multi_agent
+agent_count: 3
+pattern: debate
+prompt: |
+  Topic: "Should AI be regulated by government?"
+
+  Agent 1 (Pro): Present 3 arguments FOR government AI regulation.
+  Agent 2 (Con): Present 3 arguments AGAINST government AI regulation.
+  Agent 3 (Judge): Evaluate both sides impartially and declare a winner with
+  a 2-sentence rationale.
+
+  Return all arguments and the judge's verdict.
+input: "Should AI be regulated by government?"
+ground_truth: |
+  Three distinct arguments per side (safety/accountability/market-distortion
+  for Pro; innovation/overreach/enforcement-difficulty for Con) and a judge
+  verdict with reasoning that cites specific arguments from both sides.
+simulated_turns: 3
+max_turns: 9
+rubric:
+  criteria:
+    - name: pro_arguments
+      description: At least 3 distinct arguments FOR regulation are presented.
+      weight: 2.0
+    - name: con_arguments
+      description: At least 3 distinct arguments AGAINST regulation are presented.
+      weight: 2.0
+    - name: judge_verdict
+      description: Judge delivers a verdict citing both sides.
+      weight: 3.0
+    - name: argument_quality
+      description: Arguments are substantive, not repetitive, and address different dimensions.
+      weight: 1.0
+  pass_threshold: 6.0
+allowed_tools: []

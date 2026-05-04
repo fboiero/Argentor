@@ -1,0 +1,44 @@
+id: ma_swarm_05
+name: Swarm — 5 agents, no central coordinator, peer-to-peer messaging
+description: |
+  Five agents collaborate with no central coordinator. Each agent sees the
+  shared problem and can pass messages to any peer. The swarm must converge
+  on a consensus answer through peer-to-peer negotiation. Tests emergent
+  coordination and decentralized consensus.
+kind: multi_agent
+agent_count: 5
+pattern: swarm
+prompt: |
+  Problem: "Rank these 5 programming languages by suitability for building
+  autonomous AI agents: Python, Rust, Go, TypeScript, Java."
+
+  Five agents participate. Each agent independently proposes a ranking and
+  broadcasts it to the group. Agents may revise their ranking once after
+  seeing peers' proposals. Final answer is the ranking with the most consensus
+  votes across all 5 agents (majority-wins on each position).
+
+  Return each agent's initial proposal, any revisions, and the final
+  consensus ranking.
+input: "Rank Python, Rust, Go, TypeScript, Java by suitability for autonomous AI agents."
+ground_truth: |
+  Five individual rankings followed by at least one round of peer review and
+  a final consensus ranking. Expected consensus top-2: Python and TypeScript
+  (ecosystem/SDK support). The swarm must produce a single agreed-upon list.
+simulated_turns: 10
+max_turns: 20
+rubric:
+  criteria:
+    - name: all_agents_participated
+      description: All 5 agents produced at least one output (initial ranking).
+      weight: 3.0
+    - name: peer_communication
+      description: Agents reference each other's proposals in revisions (decentralized coordination).
+      weight: 2.0
+    - name: consensus_convergence
+      description: A single final consensus ranking emerges from the swarm.
+      weight: 3.0
+    - name: ranking_rationale
+      description: The consensus ranking is accompanied by at least one justification.
+      weight: 1.0
+  pass_threshold: 6.0
+allowed_tools: []

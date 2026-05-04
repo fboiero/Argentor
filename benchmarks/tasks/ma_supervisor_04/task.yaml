@@ -1,0 +1,44 @@
+id: ma_supervisor_04
+name: Supervisor — assigns subtasks to 2 workers, aggregates results
+description: |
+  A Supervisor agent decomposes a research goal into two subtasks and assigns
+  one to each Worker. Workers complete their subtasks independently. Supervisor
+  aggregates results into a final report. Tests task decomposition and
+  hierarchical coordination.
+kind: multi_agent
+agent_count: 3
+pattern: supervisor
+prompt: |
+  Goal: "Produce a brief competitive analysis of Python vs Rust for systems
+  programming."
+
+  Supervisor: Decompose into 2 subtasks and assign:
+    Worker 1: Research Python's strengths and weaknesses for systems programming.
+    Worker 2: Research Rust's strengths and weaknesses for systems programming.
+  Supervisor: Aggregate the two workers' outputs into a 4-point comparison
+  table (performance, safety, ecosystem, learning curve).
+
+  Return the full subtask outputs and the final aggregated table.
+input: "Produce a brief competitive analysis of Python vs Rust for systems programming."
+ground_truth: |
+  Per-language analysis (2+ strengths and 2+ weaknesses each) and a final
+  comparison table covering at least: performance (Rust wins), memory safety
+  (Rust wins), ecosystem (Python broader), learning curve (Python easier).
+simulated_turns: 3
+max_turns: 9
+rubric:
+  criteria:
+    - name: task_decomposition
+      description: Supervisor clearly assigns distinct, non-overlapping subtasks.
+      weight: 2.0
+    - name: worker_completion
+      description: Both workers return substantive, relevant outputs.
+      weight: 2.0
+    - name: aggregation_quality
+      description: Final table covers all 4 dimensions with accurate comparisons.
+      weight: 3.0
+    - name: supervisor_coordination
+      description: Supervisor synthesizes without duplicating worker content verbatim.
+      weight: 1.0
+  pass_threshold: 6.0
+allowed_tools: []

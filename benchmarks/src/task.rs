@@ -73,6 +73,18 @@ pub struct Task {
     /// Used to compute `memory_recall_rate`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub memory_checkpoints: Option<Vec<String>>,
+
+    // ── Multi-agent fields ─────────────────────────────────────────────────
+    /// For multi-agent tasks: number of agents participating.
+    /// Default 1 for non-multi-agent tasks (field is ignored).
+    #[serde(default = "default_agent_count")]
+    pub agent_count: u32,
+
+    /// For multi-agent tasks: orchestration pattern (e.g. "pipeline",
+    /// "debate", "ensemble", "supervisor", "swarm").
+    /// Empty string for non-multi-agent tasks.
+    #[serde(default)]
+    pub pattern: String,
 }
 
 fn default_max_turns() -> u32 {
@@ -84,6 +96,10 @@ fn default_simulated_turns() -> u32 {
 }
 
 fn default_required_turns() -> u32 {
+    1
+}
+
+fn default_agent_count() -> u32 {
     1
 }
 
@@ -111,6 +127,10 @@ pub enum TaskKind {
     /// Measures turns-to-completion, token accumulation, goal drift, and
     /// memory recall accuracy across extended sessions (10+ turns).
     LongHorizon,
+    /// Multi-agent benchmark — tests orchestration patterns such as pipeline,
+    /// debate, ensemble, supervisor, and swarm. Measures coordination overhead,
+    /// total turns across all agents, and completion rate.
+    MultiAgent,
 }
 
 /// Input data for a task — either inline text or a file reference.
@@ -277,6 +297,8 @@ mod tests {
             required_turns: 1,
             min_tool_calls: 0,
             memory_checkpoints: None,
+            agent_count: 1,
+            pattern: String::new(),
         };
         let yaml = serde_yaml::to_string(&task).unwrap();
         let back: Task = serde_yaml::from_str(&yaml).unwrap();
@@ -312,6 +334,8 @@ mod tests {
             required_turns: 1,
             min_tool_calls: 0,
             memory_checkpoints: None,
+            agent_count: 1,
+            pattern: String::new(),
         };
         let yaml = serde_yaml::to_string(&task).unwrap();
         let back: Task = serde_yaml::from_str(&yaml).unwrap();
@@ -362,6 +386,8 @@ mod tests {
             required_turns: 5,
             min_tool_calls: 4,
             memory_checkpoints: Some(vec!["fix_applied".into(), "tests_passing".into()]),
+            agent_count: 1,
+            pattern: String::new(),
         };
         let yaml = serde_yaml::to_string(&task).unwrap();
         let back: Task = serde_yaml::from_str(&yaml).unwrap();

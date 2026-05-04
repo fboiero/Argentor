@@ -1,0 +1,43 @@
+id: ma_ensemble_03
+name: Ensemble — 3 independent answers, orchestrator picks best
+description: |
+  Three agents answer the same question independently (no communication).
+  An orchestrator agent scores each response and selects the best one with
+  justification. Tests ensemble quality and orchestrator selection accuracy.
+kind: multi_agent
+agent_count: 4
+pattern: ensemble
+prompt: |
+  Question: "What is the most important technical challenge in deploying
+  production AI agents at scale?"
+
+  Agent 1: Answer independently.
+  Agent 2: Answer independently.
+  Agent 3: Answer independently.
+  Orchestrator: Score each answer 1-10 on depth and accuracy. Pick the best
+  one and explain why in 1 sentence.
+
+  Return all answers and the orchestrator's selection.
+input: "What is the most important technical challenge in deploying production AI agents at scale?"
+ground_truth: |
+  Three distinct answers covering different dimensions (e.g. reliability/cost/
+  context management/security) and an orchestrator that selects the most
+  comprehensive answer with a coherent rationale.
+simulated_turns: 4
+max_turns: 12
+rubric:
+  criteria:
+    - name: answer_diversity
+      description: The three answers are meaningfully different from each other.
+      weight: 2.0
+    - name: answer_quality
+      description: At least one answer identifies a genuine technical challenge with depth.
+      weight: 2.0
+    - name: orchestrator_selection
+      description: Orchestrator picks the best answer with a clear rationale.
+      weight: 3.0
+    - name: scoring_rationale
+      description: Orchestrator provides per-answer scores or comparative reasoning.
+      weight: 1.0
+  pass_threshold: 6.0
+allowed_tools: []

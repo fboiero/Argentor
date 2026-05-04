@@ -122,6 +122,8 @@ mod tests {
             required_turns: 1,
             min_tool_calls: 0,
             memory_checkpoints: None,
+            agent_count: 1,
+            pattern: String::new(),
         }
     }
 

@@ -207,6 +207,8 @@ mod tests {
             required_turns: simulated_turns,
             min_tool_calls: 0,
             memory_checkpoints: Some(checkpoints),
+            agent_count: 1,
+            pattern: String::new(),
         }
     }
 

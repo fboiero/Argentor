@@ -8,6 +8,7 @@ pub mod block_rate;
 pub mod cost;
 pub mod dx;
 pub mod long_horizon;
+pub mod multi_agent;
 pub mod quality;
 pub mod stats;
 
@@ -18,6 +19,7 @@ pub use block_rate::{compute_block_rate, BlockRateMetric};
 pub use cost::CostMetric;
 pub use dx::{compute_all as compute_dx_scores, DxMetric, ErrorScenarioScore};
 pub use long_horizon::{LongHorizonMetrics, LongHorizonSummary};
+pub use multi_agent::{MultiAgentMetrics, MultiAgentSummary};
 pub use quality::QualityMetric;
 pub use stats::{PairedTTest, Stats};
 
@@ -100,6 +102,8 @@ mod tests {
             required_turns: 1,
             min_tool_calls: 0,
             memory_checkpoints: None,
+            agent_count: 1,
+            pattern: String::new(),
         }
     }
 

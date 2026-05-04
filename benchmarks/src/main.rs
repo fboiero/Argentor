@@ -11,8 +11,10 @@
 //! ```
 
 use anyhow::Context;
+use argentor_benchmarks::dashboard_gen;
 use argentor_benchmarks::metrics::cost::{self as cost_metric, Scale};
 use argentor_benchmarks::metrics::long_horizon::{self as lh_metric, LongHorizonSummary};
+use argentor_benchmarks::metrics::multi_agent::{self as ma_metric, MultiAgentSummary};
 use argentor_benchmarks::metrics::{self, compute_block_rate, BlockRateMetric, PairedTTest, Stats};
 use argentor_benchmarks::report::RunReport;
 use argentor_benchmarks::runners::{
@@ -103,6 +105,31 @@ enum Command {
         /// deterministic simulation path.
         #[arg(long, default_value_t = 1)]
         samples: usize,
+    },
+    /// Run multi-agent track only: discover `kind: multi_agent` tasks and
+    /// measure completion rate, total turns, total tokens, and coordination
+    /// overhead per runner.
+    MultiAgent {
+        #[arg(
+            long,
+            value_delimiter = ',',
+            default_value = "argentor,langchain,crewai,pydantic-ai,claude-agent-sdk"
+        )]
+        runners: Vec<RunnerArg>,
+        /// Number of samples per (task, runner) pair. 1 is sufficient for
+        /// the deterministic simulation path.
+        #[arg(long, default_value_t = 1)]
+        samples: usize,
+    },
+    /// Generate the static benchmark dashboard from `benchmarks/results/*.json`.
+    /// Writes `benchmarks/dashboard/index.html`.
+    Dashboard {
+        /// Directory containing benchmark result JSON files.
+        #[arg(long, default_value = "benchmarks/results")]
+        results_dir: PathBuf,
+        /// Output path for the generated HTML file.
+        #[arg(long, default_value = "benchmarks/dashboard/index.html")]
+        output: PathBuf,
     },
 }
 
@@ -364,6 +391,17 @@ async fn main() -> anyhow::Result<()> {
         }
         Command::LongHorizon { runners, samples } => {
             run_long_horizon(&cli.tasks_dir, &runners, samples).await?;
+        }
+        Command::MultiAgent { runners, samples } => {
+            run_multi_agent(&cli.tasks_dir, &runners, samples).await?;
+        }
+        Command::Dashboard {
+            results_dir,
+            output,
+        } => {
+            println!("Generating dashboard from {:?} ...", results_dir);
+            dashboard_gen::generate(&results_dir, &output)?;
+            println!("Dashboard written to {}", output.display());
         }
     }
 
@@ -1082,6 +1120,169 @@ async fn run_long_horizon(
         "summaries": summaries,
     });
     std::fs::write(&out, serde_json::to_string_pretty(&payload_lh)?)?;
+    println!("\nResults written to {}", out.display());
+
+    Ok(())
+}
+
+/// Multi-agent track runner. Discovers `kind: multi_agent` tasks, runs each
+/// runner, then prints a comparison table of completion rate, total turns,
+/// total tokens, and coordination overhead per pattern.
+async fn run_multi_agent(
+    tasks_dir: &std::path::Path,
+    runners: &[RunnerArg],
+    samples: usize,
+) -> anyhow::Result<()> {
+    let all_tasks =
+        Task::discover(tasks_dir).with_context(|| format!("discovering tasks in {tasks_dir:?}"))?;
+    let ma_tasks: Vec<_> = all_tasks
+        .into_iter()
+        .filter(|(t, _)| t.kind == TaskKind::MultiAgent)
+        .collect();
+
+    if ma_tasks.is_empty() {
+        anyhow::bail!(
+            "no multi-agent tasks found in {:?} (looking for kind: multi_agent)",
+            tasks_dir
+        );
+    }
+
+    println!(
+        "Running {} multi-agent tasks × {} runners × {} samples = {} total runs",
+        ma_tasks.len(),
+        runners.len(),
+        samples,
+        ma_tasks.len() * runners.len() * samples
+    );
+
+    let mut results_by_combo: HashMap<(String, String), Vec<TaskResult>> = HashMap::new();
+    let mut runner_display: Vec<String> = Vec::new();
+
+    for (task, dir) in &ma_tasks {
+        for r_arg in runners {
+            let runner_box = r_arg.build(r_arg.is_argentor());
+            let runner_name = runner_box.name();
+            if !runner_display.contains(&runner_name) {
+                runner_display.push(runner_name.clone());
+            }
+            println!(
+                "▶ {}  [{}] (agents={}, pattern={}) × {}",
+                task.id, runner_name, task.agent_count, task.pattern, samples
+            );
+            for _ in 0..samples {
+                let r = r_arg.build(r_arg.is_argentor());
+                let result = r.run(task, dir).await?;
+                results_by_combo
+                    .entry((task.id.clone(), runner_name.clone()))
+                    .or_default()
+                    .push(result);
+            }
+        }
+    }
+
+    // Per-task table
+    println!("\n## Per-task multi-agent results\n");
+    println!(
+        "| Task | Pattern | Agents | Runner | Completion | Turns | Tokens | Coord. overhead | Success |"
+    );
+    println!(
+        "|------|---------|--------|--------|------------|-------|--------|-----------------|---------|"
+    );
+
+    let mut sorted_tasks: Vec<_> = ma_tasks.iter().collect();
+    sorted_tasks.sort_by(|a, b| a.0.id.cmp(&b.0.id));
+
+    let mut metrics_by_runner: HashMap<String, Vec<ma_metric::MultiAgentMetrics>> = HashMap::new();
+
+    for (task, _) in &sorted_tasks {
+        for runner_name in &runner_display {
+            let Some(results) = results_by_combo.get(&(task.id.clone(), runner_name.clone()))
+            else {
+                continue;
+            };
+            if results.is_empty() {
+                continue;
+            }
+            let m = ma_metric::compute(task, &results[0]);
+            println!(
+                "| `{}` | {} | {} | {} | {:.0}% | {} | {} | {} | {} |",
+                task.id,
+                m.pattern,
+                m.agent_count,
+                runner_name,
+                m.completion_rate * 100.0,
+                m.total_turns,
+                m.total_tokens,
+                m.coordination_overhead,
+                if m.success { "✓" } else { "✗" },
+            );
+            metrics_by_runner
+                .entry(runner_name.clone())
+                .or_default()
+                .push(m);
+        }
+    }
+
+    // Summary table
+    println!("\n## Summary — multi-agent runner comparison\n");
+    println!(
+        "| Runner | Tasks | Succeeded | Completion | Total turns | Total tokens | Coord. overhead | Wall ms |"
+    );
+    println!(
+        "|--------|-------|-----------|------------|-------------|--------------|-----------------|---------|"
+    );
+
+    let mut runners_sorted = runner_display.clone();
+    runners_sorted.sort_by(|a, b| {
+        let a_ag = a.starts_with("argentor");
+        let b_ag = b.starts_with("argentor");
+        b_ag.cmp(&a_ag).then(a.cmp(b))
+    });
+
+    let mut summaries: Vec<MultiAgentSummary> = Vec::new();
+    for runner_name in &runners_sorted {
+        let empty = Vec::new();
+        let ms = metrics_by_runner.get(runner_name).unwrap_or(&empty);
+        let s = MultiAgentSummary::aggregate(runner_name, ms);
+        println!(
+            "| {} | {} | {} | {:.0}% | {:.1} | {:.0} | {:.0} | {:.1} |",
+            runner_name,
+            s.tasks_run,
+            s.tasks_succeeded,
+            s.mean_completion_rate * 100.0,
+            s.mean_total_turns,
+            s.mean_total_tokens,
+            s.mean_coordination_overhead,
+            s.mean_wall_time_ms,
+        );
+        summaries.push(s);
+    }
+
+    // Persist JSON
+    let ts = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let out = tasks_dir
+        .parent()
+        .unwrap_or(std::path::Path::new("."))
+        .join("results")
+        .join(format!("multi_agent_{ts}.json"));
+    if let Some(parent) = out.parent() {
+        std::fs::create_dir_all(parent).ok();
+    }
+    let flat: serde_json::Map<String, serde_json::Value> = results_by_combo
+        .iter()
+        .map(|((task_id, runner_name), results)| {
+            (
+                format!("{task_id} :: {runner_name}"),
+                serde_json::to_value(results).unwrap_or(serde_json::Value::Null),
+            )
+        })
+        .collect();
+    let payload = serde_json::json!({
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "results_by_combo": flat,
+        "summaries": summaries,
+    });
+    std::fs::write(&out, serde_json::to_string_pretty(&payload)?)?;
     println!("\nResults written to {}", out.display());
 
     Ok(())

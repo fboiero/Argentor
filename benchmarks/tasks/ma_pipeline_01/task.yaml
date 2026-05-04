@@ -1,0 +1,42 @@
+id: ma_pipeline_01
+name: Sequential Pipeline — Researcher → Writer → Editor
+description: |
+  Three agents work in a sequential pipeline. Researcher gathers facts on the
+  topic, Writer drafts an article from those facts, Editor polishes it.
+  Tests linear handoff fidelity and token accumulation across stages.
+kind: multi_agent
+agent_count: 3
+pattern: pipeline
+prompt: |
+  You are orchestrating a 3-agent pipeline. The topic is "The impact of
+  large language models on scientific research".
+
+  Agent 1 (Researcher): gather 5 key facts about the topic.
+  Agent 2 (Writer): write a 3-paragraph article using those facts.
+  Agent 3 (Editor): polish the article for clarity and grammar.
+
+  Return the final polished article.
+input: "The impact of large language models on scientific research"
+ground_truth: |
+  A polished article (3+ paragraphs) covering LLM use in science, citing
+  specific facts such as accelerated literature review, hypothesis generation,
+  protein folding, and reproducibility concerns.
+simulated_turns: 3
+max_turns: 9
+agent_count: 3
+rubric:
+  criteria:
+    - name: pipeline_completion
+      description: All three stages (research, write, edit) are evident in the output.
+      weight: 3.0
+    - name: factual_content
+      description: Article contains at least 3 specific facts about LLMs in science.
+      weight: 2.0
+    - name: editorial_polish
+      description: Final output is well-structured and grammatically correct.
+      weight: 2.0
+    - name: handoff_fidelity
+      description: Writer used the Researcher's facts; Editor improved the Writer's draft.
+      weight: 1.0
+  pass_threshold: 6.0
+allowed_tools: []
