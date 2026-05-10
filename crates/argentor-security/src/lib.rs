@@ -77,7 +77,7 @@ pub use observability::{
     ToolMetricsSummary,
 };
 pub use rate_limit::RateLimiter;
-pub use rbac::{RbacDecision, RbacPolicy, Role};
+pub use rbac::{check_permission, Permission, PolicyBinding, RbacDecision, RbacPolicy, Role};
 pub use sanitizer::Sanitizer;
 pub use sla_tracker::{Incident, SlaComplianceReport, SlaDefinition, SlaStatus, SlaTracker};
 pub use tls::TlsConfig;

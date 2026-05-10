@@ -14,7 +14,9 @@
 //! # Modules
 //!
 //! - [`tenant`] — Multi-tenant management
-//! - [`quota`] — Per-tenant quota enforcement
+//! - [`quota`] — Per-tenant quota enforcement (billing-period based)
+//! - [`quotas`] — Daily quota tracking with auto-reset (enterprise)
+//! - [`isolation`] — Tenant isolation: session, skill, and memory scoping
 //! - [`runtime`] — Managed agent runtime with isolation
 //! - [`dashboard`] — Hosted dashboard adapter
 //! - [`billing`] — Usage-based billing integration
@@ -27,8 +29,12 @@ pub mod audit;
 pub mod billing;
 /// Hosted dashboard adapter (read-only telemetry view).
 pub mod dashboard;
-/// Per-tenant quota tracking and enforcement.
+/// Tenant isolation — hard data boundaries between tenants.
+pub mod isolation;
+/// Per-tenant quota tracking and enforcement (billing-period).
 pub mod quota;
+/// Daily quota manager with atomic counters and midnight auto-reset.
+pub mod quotas;
 /// Managed agent runtime with tenant isolation.
 pub mod runtime;
 /// Multi-tenant work scheduler.
@@ -39,7 +45,9 @@ pub mod tenant;
 pub use audit::{AuditEvent, AuditEventKind, AuditLog, AuditSink};
 pub use billing::{BillingError, BillingProvider, Invoice, InvoiceLineItem, UsageMeter};
 pub use dashboard::{DashboardAdapter, DashboardSnapshot, TenantMetrics};
+pub use isolation::{IsolationError, TenantConfig, TenantIsolation};
 pub use quota::{QuotaEnforcer, QuotaError, QuotaUsage};
+pub use quotas::{QuotaAction, QuotaExceeded, QuotaManager, QuotaSnapshot, TenantQuotaLimits};
 pub use runtime::{ManagedError, ManagedRunConfig, ManagedRunResult, ManagedRuntime};
 pub use scheduler::{CloudScheduler, ScheduledJob, SchedulerError};
 pub use tenant::{DataRegion, Tenant, TenantManager, TenantPlan, TenantStatus};

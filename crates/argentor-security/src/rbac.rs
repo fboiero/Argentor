@@ -1,10 +1,55 @@
 //! Role-Based Access Control (RBAC) for enterprise deployments.
 //!
-//! Defines roles with associated permission sets and policy evaluation.
+//! Defines roles, fine-grained permissions, and policy evaluation.
 
 use crate::capability::{Capability, PermissionSet};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+
+/// Fine-grained actions that can be individually granted or denied.
+///
+/// Use [`check_permission`] to evaluate whether a [`Role`] holds a given
+/// `Permission` under the default policy.
+#[derive(Debug, Clone, Copy, Hash, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Permission {
+    /// Create and register new agent instances.
+    CreateAgent,
+    /// Execute an agent run.
+    RunAgent,
+    /// Install, update, or remove skills from the registry.
+    ManageSkills,
+    /// View audit logs and session history.
+    ViewLogs,
+    /// Create, suspend, or delete tenant accounts.
+    ManageTenants,
+    /// Read and write guardrail profiles.
+    ConfigureGuardrails,
+}
+
+/// Check whether the default built-in policy grants `permission` to `role`.
+///
+/// Default policy table:
+///
+/// | Role     | Permissions |
+/// |----------|-------------|
+/// | Admin    | all |
+/// | Operator | RunAgent, ManageSkills, ViewLogs |
+/// | Developer | RunAgent, ViewLogs |
+/// | Viewer   | ViewLogs |
+/// | Custom   | none (use explicit policy bindings) |
+pub fn check_permission(role: &Role, permission: &Permission) -> bool {
+    match role {
+        Role::Admin => true,
+        Role::Operator => matches!(
+            permission,
+            Permission::RunAgent | Permission::ManageSkills | Permission::ViewLogs
+        ),
+        Role::Developer => matches!(permission, Permission::RunAgent | Permission::ViewLogs),
+        Role::Viewer => matches!(permission, Permission::ViewLogs),
+        Role::Custom(_) => false,
+    }
+}
 
 /// Built-in roles with predefined permission levels.
 #[derive(Debug, Clone, Hash, Eq, PartialEq, Serialize, Deserialize)]
@@ -14,6 +59,8 @@ pub enum Role {
     Admin,
     /// Execute skills and tools, but cannot modify policies.
     Operator,
+    /// Run agents and view logs, but cannot modify infrastructure.
+    Developer,
     /// Read-only access — view audit logs, session history, skill list.
     Viewer,
     /// Custom role with a specific name.
@@ -51,7 +98,7 @@ impl RbacPolicy {
         Self::default()
     }
 
-    /// Create a default policy with Admin, Operator, and Viewer roles.
+    /// Create a default policy with Admin, Operator, Developer, and Viewer roles.
     pub fn with_defaults() -> Self {
         let mut policy = Self::new();
 
@@ -79,7 +126,7 @@ impl RbacPolicy {
             rate_limit_rpm: 0,
         });
 
-        // Operator — tool execution with restrictions
+        // Operator — tool execution with restrictions, can manage skills
         let mut op_perms = PermissionSet::new();
         op_perms.grant(Capability::FileRead {
             allowed_paths: vec!["/tmp".into(), "/workspace".into()],
@@ -97,6 +144,23 @@ impl RbacPolicy {
             allowed_skills: vec![],
             denied_skills: vec!["shell_exec".into()],
             rate_limit_rpm: 60,
+        });
+
+        // Developer — run agents and view logs, workspace read-only
+        let mut dev_perms = PermissionSet::new();
+        dev_perms.grant(Capability::FileRead {
+            allowed_paths: vec!["/workspace".into()],
+        });
+        dev_perms.grant(Capability::NetworkAccess {
+            allowed_hosts: vec!["*".into()],
+        });
+
+        policy.add_binding(PolicyBinding {
+            role: Role::Developer,
+            permissions: dev_perms,
+            allowed_skills: vec![],
+            denied_skills: vec!["shell_exec".into(), "file_write".into()],
+            rate_limit_rpm: 120,
         });
 
         // Viewer — read-only
@@ -209,6 +273,7 @@ fn role_key(role: &Role) -> String {
     match role {
         Role::Admin => "admin".into(),
         Role::Operator => "operator".into(),
+        Role::Developer => "developer".into(),
         Role::Viewer => "viewer".into(),
         Role::Custom(name) => format!("custom:{name}"),
     }
@@ -220,9 +285,87 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_policy_has_three_roles() {
+    fn default_policy_has_four_roles() {
         let policy = RbacPolicy::with_defaults();
-        assert_eq!(policy.roles().len(), 3);
+        assert_eq!(policy.roles().len(), 4);
+    }
+
+    // ── check_permission (default policy) ───────────────────────────────────
+
+    #[test]
+    fn admin_has_all_permissions() {
+        for perm in [
+            Permission::CreateAgent,
+            Permission::RunAgent,
+            Permission::ManageSkills,
+            Permission::ViewLogs,
+            Permission::ManageTenants,
+            Permission::ConfigureGuardrails,
+        ] {
+            assert!(
+                check_permission(&Role::Admin, &perm),
+                "Admin must have {perm:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn operator_has_run_manage_view() {
+        assert!(check_permission(&Role::Operator, &Permission::RunAgent));
+        assert!(check_permission(&Role::Operator, &Permission::ManageSkills));
+        assert!(check_permission(&Role::Operator, &Permission::ViewLogs));
+        assert!(!check_permission(&Role::Operator, &Permission::CreateAgent));
+        assert!(!check_permission(
+            &Role::Operator,
+            &Permission::ManageTenants
+        ));
+    }
+
+    #[test]
+    fn developer_has_run_and_view_only() {
+        assert!(check_permission(&Role::Developer, &Permission::RunAgent));
+        assert!(check_permission(&Role::Developer, &Permission::ViewLogs));
+        assert!(!check_permission(
+            &Role::Developer,
+            &Permission::ManageSkills
+        ));
+        assert!(!check_permission(
+            &Role::Developer,
+            &Permission::CreateAgent
+        ));
+        assert!(!check_permission(
+            &Role::Developer,
+            &Permission::ManageTenants
+        ));
+        assert!(!check_permission(
+            &Role::Developer,
+            &Permission::ConfigureGuardrails
+        ));
+    }
+
+    #[test]
+    fn viewer_has_view_logs_only() {
+        assert!(check_permission(&Role::Viewer, &Permission::ViewLogs));
+        assert!(!check_permission(&Role::Viewer, &Permission::RunAgent));
+        assert!(!check_permission(&Role::Viewer, &Permission::CreateAgent));
+        assert!(!check_permission(&Role::Viewer, &Permission::ManageTenants));
+    }
+
+    #[test]
+    fn custom_role_has_no_default_permissions() {
+        for perm in [
+            Permission::CreateAgent,
+            Permission::RunAgent,
+            Permission::ManageSkills,
+            Permission::ViewLogs,
+            Permission::ManageTenants,
+            Permission::ConfigureGuardrails,
+        ] {
+            assert!(
+                !check_permission(&Role::Custom("analyst".into()), &perm),
+                "Custom role must have no default permissions, but {perm:?} was granted"
+            );
+        }
     }
 
     #[test]
@@ -319,6 +462,6 @@ mod tests {
         let policy = RbacPolicy::with_defaults();
         let json = serde_json::to_string(&policy).unwrap();
         let parsed: RbacPolicy = serde_json::from_str(&json).unwrap();
-        assert_eq!(parsed.roles().len(), 3);
+        assert_eq!(parsed.roles().len(), 4);
     }
 }
