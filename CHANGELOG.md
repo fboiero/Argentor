@@ -10,6 +10,36 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.0] - 2026-05-10
+
+### Security
+- Output PII redaction (S-04) — automatic scrubbing of PII from agent outputs before delivery
+- Per-tenant guardrail profiles (S-05) — each tenant can define independent guardrail rule sets
+- RBAC `Permission` enum and `check_permission` function — fine-grained action-level access control
+- `TenantIsolation` — hard isolation boundaries for sessions, skills, and memory between tenants
+- `TenantConfig` — per-tenant policy: max_sessions, max_tokens_per_day, allowed_models, guardrail_profile
+
+### Memory
+- Multi-tier memory architecture (L-02): short-term, long-term, and entity memory with promotion logic
+
+### Enterprise
+- `QuotaManager` with daily token, request, and session tracking per tenant; auto-resets at midnight UTC
+- Default limits enforced per tenant: 1M tokens/day, 10K requests/day, 100 concurrent sessions
+
+### Benchmarks
+- Multi-agent benchmark track (Q-04) — latency and throughput measurements for orchestrator scenarios
+- SIEM, compliance, and integrations benchmark tracks (Q-02, Q-03, Q-05)
+- Benchmark dashboard generator (I-02) — HTML report from benchmark JSON output
+
+### Infrastructure
+- Minimal scaffold mode (C-02) — `argentor init --minimal` generates a lean single-agent starter
+- E2E validation suite — full pipeline smoke tests covering all major subsystems
+- Demo script for asciinema recording
+- Enterprise readiness endpoint (`GET /health/enterprise`) reporting feature flag status
+- All-features build fix — `cargo build --all-features --workspace` compiles cleanly
+
+---
+
 ## [1.3.0] - 2026-05-02
 
 ### Multimodal

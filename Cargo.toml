@@ -26,7 +26,7 @@ exclude = [
 ]
 
 [workspace.package]
-version = "1.3.0"
+version = "1.4.0"
 edition = "2021"
 rust-version = "1.80"
 license = "AGPL-3.0-only"
@@ -88,19 +88,19 @@ rusqlite = { version = "0.32", features = ["bundled"] }
 wiremock = "0.6"
 
 # Internal crates
-argentor-core = { path = "crates/argentor-core", version = "1.3.0" }
-argentor-security = { path = "crates/argentor-security", version = "1.3.0" }
-argentor-session = { path = "crates/argentor-session", version = "1.3.0" }
-argentor-skills = { path = "crates/argentor-skills", version = "1.3.0" }
-argentor-agent = { path = "crates/argentor-agent", version = "1.3.0" }
-argentor-channels = { path = "crates/argentor-channels", version = "1.3.0" }
-argentor-gateway = { path = "crates/argentor-gateway", version = "1.3.0" }
-argentor-builtins = { path = "crates/argentor-builtins", version = "1.3.0" }
-argentor-memory = { path = "crates/argentor-memory", version = "1.3.0" }
-argentor-mcp = { path = "crates/argentor-mcp", version = "1.3.0" }
-argentor-orchestrator = { path = "crates/argentor-orchestrator", version = "1.3.0" }
-argentor-compliance = { path = "crates/argentor-compliance", version = "1.3.0" }
-argentor-a2a = { path = "crates/argentor-a2a", version = "1.3.0" }
+argentor-core = { path = "crates/argentor-core", version = "1.4.0" }
+argentor-security = { path = "crates/argentor-security", version = "1.4.0" }
+argentor-session = { path = "crates/argentor-session", version = "1.4.0" }
+argentor-skills = { path = "crates/argentor-skills", version = "1.4.0" }
+argentor-agent = { path = "crates/argentor-agent", version = "1.4.0" }
+argentor-channels = { path = "crates/argentor-channels", version = "1.4.0" }
+argentor-gateway = { path = "crates/argentor-gateway", version = "1.4.0" }
+argentor-builtins = { path = "crates/argentor-builtins", version = "1.4.0" }
+argentor-memory = { path = "crates/argentor-memory", version = "1.4.0" }
+argentor-mcp = { path = "crates/argentor-mcp", version = "1.4.0" }
+argentor-orchestrator = { path = "crates/argentor-orchestrator", version = "1.4.0" }
+argentor-compliance = { path = "crates/argentor-compliance", version = "1.4.0" }
+argentor-a2a = { path = "crates/argentor-a2a", version = "1.4.0" }
 futures-util = "0.3"
 tokio-stream = "0.1"
 
