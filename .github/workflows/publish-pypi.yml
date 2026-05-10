@@ -32,7 +32,7 @@ jobs:
         run: python -c "from argentor import Agent; print('import OK')"
       - name: Run tests
         working-directory: python
-        run: python -m pytest tests/ -v --tb=short || true
+        run: python -m pytest tests/ -v --tb=short
 
   publish:
     name: Build and publish to PyPI

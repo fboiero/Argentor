@@ -229,6 +229,7 @@ dependencies = [
  "bollard",
  "chrono",
  "fantoccini",
+ "futures-util",
  "git2",
  "hex",
  "hmac",

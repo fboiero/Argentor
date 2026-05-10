@@ -37,7 +37,7 @@ from argentor.models import (
 )
 from argentor.streaming import SSEStream, AsyncSSEStream
 
-__version__ = "1.0.0"
+__version__ = "1.3.0"
 
 __all__ = [
     # Clients -- REST API

@@ -25,6 +25,8 @@ pub mod connection;
 pub mod control_plane;
 /// Embedded web dashboard for monitoring and management.
 pub mod dashboard;
+/// Enterprise readiness report for the secure gateway product surface.
+pub mod enterprise_readiness;
 /// Graceful shutdown manager with cleanup hooks and connection draining.
 pub mod graceful_shutdown;
 /// REST API endpoints for the skill marketplace.
@@ -88,6 +90,10 @@ pub use billing::{
 pub use channel_bridge::ChannelBridge;
 pub use control_plane::{control_plane_router, ControlPlaneState};
 pub use dashboard::dashboard_router;
+pub use enterprise_readiness::{
+    build_enterprise_readiness_report, EnterpriseReadinessCheck, EnterpriseReadinessInput,
+    EnterpriseReadinessReport, EnterpriseRuntimeSnapshot, ReadinessPosture, ReadinessStatus,
+};
 pub use graceful_shutdown::{
     HookResult, ShutdownHook, ShutdownManager, ShutdownPhase, ShutdownReport,
 };

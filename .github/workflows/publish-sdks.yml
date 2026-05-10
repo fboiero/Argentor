@@ -33,7 +33,7 @@ jobs:
         working-directory: sdks/python
         run: |
           pip install mypy
-          mypy argentor/ --ignore-missing-imports || true
+          mypy argentor/ --ignore-missing-imports
 
   test-typescript:
     name: Test TypeScript SDK
@@ -53,7 +53,7 @@ jobs:
           npm run build
       - name: Run tests
         working-directory: sdks/typescript
-        run: npm test || true
+        run: npm test
       - name: Type check
         working-directory: sdks/typescript
         run: npx tsc --noEmit

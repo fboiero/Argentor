@@ -1,4 +1,4 @@
-# @argentor/sdk v1.0.0
+# @argentor/sdk v1.3.0
 
 TypeScript SDK client for the [Argentor](https://github.com/fboiero/Agentor) AI agent framework REST API.
 

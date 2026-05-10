@@ -409,6 +409,22 @@ impl OpenApiGenerator {
             "/dashboard",
             "Web dashboard",
         ));
+        gen.add_endpoint(
+            ApiEndpoint::new(
+                HttpMethod::Get,
+                "/api/v1/enterprise/readiness",
+                "Enterprise readiness report",
+            )
+            .with_description(
+                "Summarizes runtime readiness, available enterprise controls, and recommended next actions.",
+            )
+            .with_tag("Enterprise")
+            .with_response(
+                ApiResponse::json(200, "Enterprise readiness report").with_example(
+                    r#"{"version":"1.3.0","posture":"ready","score":78,"runtime":{"skills_registered":42,"active_connections":0,"active_sessions":0,"uptime_seconds":60},"checks":[],"next_actions":[]}"#,
+                ),
+            ),
+        );
 
         // Sessions
         gen.add_endpoint(

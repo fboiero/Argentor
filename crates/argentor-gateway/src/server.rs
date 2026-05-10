@@ -1,6 +1,9 @@
 use crate::connection::{Connection, ConnectionManager};
 use crate::control_plane::{control_plane_router, ControlPlaneState};
 use crate::dashboard::dashboard_router;
+use crate::enterprise_readiness::{
+    build_enterprise_readiness_report, EnterpriseReadinessInput, EnterpriseReadinessReport,
+};
 use crate::graceful_shutdown::{ShutdownManager, ShutdownPhase};
 use crate::middleware::{
     auth_middleware, per_key_rate_limit_middleware, rate_limit_middleware, AuthConfig,
@@ -33,6 +36,7 @@ use axum::{
     routing::{get, post},
     Router,
 };
+use chrono::Utc;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::sync::mpsc;
@@ -59,6 +63,12 @@ pub struct AppState {
     pub per_key_rate_limiter: Option<Arc<PerKeyRateLimiter>>,
     /// Optional request-level observability metrics.
     pub request_metrics: Option<Arc<RequestMetrics>>,
+    /// Whether API authentication is configured.
+    pub auth_enabled: bool,
+    /// Whether proxy management routes are mounted.
+    pub proxy_management_mounted: bool,
+    /// Whether A2A protocol routes are mounted.
+    pub a2a_mounted: bool,
 }
 
 // ---------------------------------------------------------------------------
@@ -239,6 +249,9 @@ impl GatewayServer {
         let router = Arc::new(MessageRouter::new(agent, sessions, connections.clone()));
 
         let webhook_state = webhooks.map(|configs| WebhookState { webhooks: configs });
+        let auth_enabled = auth_config.is_enabled();
+        let proxy_management_mounted = proxy_management.is_some();
+        let a2a_mounted = a2a.is_some();
 
         let request_metrics = Arc::new(RequestMetrics::new());
 
@@ -259,6 +272,9 @@ impl GatewayServer {
             shutdown_manager,
             per_key_rate_limiter: per_key_rate_limiter.clone(),
             request_metrics: Some(Arc::clone(&request_metrics)),
+            auth_enabled,
+            proxy_management_mounted,
+            a2a_mounted,
         });
 
         let mut app = Router::new()
@@ -267,7 +283,11 @@ impl GatewayServer {
             .route("/health/live", get(health_live_handler))
             .route("/health/ready", get(health_ready_handler))
             .route("/metrics", get(prometheus_metrics_handler))
-            .route("/openapi.json", get(openapi_handler));
+            .route("/openapi.json", get(openapi_handler))
+            .route(
+                "/api/v1/enterprise/readiness",
+                get(enterprise_readiness_handler),
+            );
 
         // Add webhook route if webhooks are configured
         if state.webhooks.is_some() {
@@ -361,6 +381,9 @@ impl GatewayServer {
         let router = Arc::new(MessageRouter::new(agent, sessions, connections.clone()));
 
         let webhook_state = webhooks.map(|configs| WebhookState { webhooks: configs });
+        let auth_enabled = auth_config.is_enabled();
+        let proxy_management_mounted = proxy_management.is_some();
+        let a2a_mounted = a2a.is_some();
 
         let request_metrics = Arc::new(RequestMetrics::new());
 
@@ -381,6 +404,9 @@ impl GatewayServer {
             shutdown_manager,
             per_key_rate_limiter: None,
             request_metrics: Some(Arc::clone(&request_metrics)),
+            auth_enabled,
+            proxy_management_mounted,
+            a2a_mounted,
         });
 
         let mut app = Router::new()
@@ -389,7 +415,11 @@ impl GatewayServer {
             .route("/health/live", get(health_live_handler))
             .route("/health/ready", get(health_ready_handler))
             .route("/metrics", get(prometheus_metrics_handler))
-            .route("/openapi.json", get(openapi_handler));
+            .route("/openapi.json", get(openapi_handler))
+            .route(
+                "/api/v1/enterprise/readiness",
+                get(enterprise_readiness_handler),
+            );
 
         // Add webhook route if webhooks are configured
         if state.webhooks.is_some() {
@@ -756,6 +786,48 @@ async fn openapi_handler() -> impl IntoResponse {
         StatusCode::OK,
         [(header::CONTENT_TYPE, "application/json")],
         serde_json::to_string_pretty(&spec).unwrap_or_default(),
+    )
+        .into_response()
+}
+
+/// Enterprise readiness report endpoint.
+async fn enterprise_readiness_handler(State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    let active_connections = state.connections.connection_count().await;
+    let active_sessions = state.connections.session_ids().await.len();
+    let rest_api_mounted = state.rest_api.is_some();
+
+    let (skills_registered, uptime_seconds, sessions_reachable) =
+        if let Some(rest_api) = &state.rest_api {
+            let uptime = Utc::now().signed_duration_since(rest_api.started_at);
+            (
+                rest_api.skills.skill_count(),
+                uptime.num_seconds(),
+                rest_api.sessions.list().await.is_ok(),
+            )
+        } else {
+            (0, 0, false)
+        };
+
+    let report: EnterpriseReadinessReport =
+        build_enterprise_readiness_report(EnterpriseReadinessInput {
+            skills_registered,
+            active_connections,
+            active_sessions,
+            uptime_seconds,
+            sessions_reachable,
+            rest_api_mounted,
+            auth_configured: state.auth_enabled,
+            per_key_rate_limit_configured: state.per_key_rate_limiter.is_some(),
+            control_plane_mounted: state.control_plane.is_some(),
+            proxy_management_mounted: state.proxy_management_mounted,
+            a2a_mounted: state.a2a_mounted,
+            metrics_configured: state.metrics.is_some() || state.request_metrics.is_some(),
+        });
+
+    (
+        StatusCode::OK,
+        [(header::CONTENT_TYPE, "application/json")],
+        serde_json::to_string(&report).unwrap_or_default(),
     )
         .into_response()
 }

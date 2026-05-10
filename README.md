@@ -96,6 +96,7 @@ Full report: [docs/BENCHMARK_SYNTHESIS.md](docs/BENCHMARK_SYNTHESIS.md) — incl
 - Config hot-reload via file watcher (500ms debounce)
 - CLI REPL with 12 commands for interactive agent debugging
 - Observability dashboard at `/dashboard` — pure HTML/JS, no build step
+- Enterprise readiness report at `/api/v1/enterprise/readiness` — runtime score, active checks, available controls, and next actions
 
 ### Integrations
 - 14 LLM providers: Claude, OpenAI, Gemini, OpenRouter, Groq, Ollama, Mistral, xAI, Azure OpenAI, Cerebras, Together, DeepSeek, Cohere, HuggingFace

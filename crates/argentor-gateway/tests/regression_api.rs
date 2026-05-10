@@ -137,6 +137,74 @@ async fn start_full_server() -> (
     (addr, tmp, sessions, skills)
 }
 
+/// Start a gateway with auth, per-key rate limits, REST, metrics, and control plane.
+async fn start_enterprise_configured_server() -> (String, tempfile::TempDir, Arc<SkillRegistry>) {
+    let tmp = tempfile::tempdir().unwrap();
+    let audit = Arc::new(AuditLog::new(tmp.path().join("audit")));
+    let sessions: Arc<dyn SessionStore> = Arc::new(
+        FileSessionStore::new(tmp.path().join("sessions"))
+            .await
+            .unwrap(),
+    );
+
+    let registry = SkillRegistry::new();
+    argentor_builtins::register_builtins(&registry);
+    let skills = Arc::new(registry);
+    let permissions = PermissionSet::new();
+    let agent = Arc::new(AgentRunner::new(
+        test_model_config(),
+        skills.clone(),
+        permissions,
+        audit,
+    ));
+
+    let connections = argentor_gateway::connection::ConnectionManager::new();
+    let router = Arc::new(argentor_gateway::router::MessageRouter::new(
+        agent.clone(),
+        sessions.clone(),
+        connections.clone(),
+    ));
+    let rest_api = Arc::new(RestApiState {
+        router,
+        connections,
+        sessions: sessions.clone(),
+        skills: skills.clone(),
+        started_at: chrono::Utc::now(),
+    });
+
+    let per_key_config = argentor_gateway::rate_limit_per_key::RateLimitConfig {
+        requests_per_minute: 100,
+        requests_per_hour: 1000,
+        tokens_per_day: 1_000_000,
+    };
+    let per_key = Arc::new(argentor_gateway::PerKeyRateLimiter::new(per_key_config));
+    let auth = AuthConfig::new(vec!["enterprise-test-key".to_string()]);
+
+    let app = GatewayServer::build_complete_with_per_key(
+        agent,
+        sessions,
+        None,
+        auth,
+        None,
+        Some(AgentMetricsCollector::new()),
+        Some(Arc::new(ControlPlaneState::new())),
+        Some(rest_api),
+        None,
+        None,
+        None,
+        Some(per_key),
+    );
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = format!("127.0.0.1:{}", listener.local_addr().unwrap().port());
+    tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+    tokio::time::sleep(std::time::Duration::from_millis(80)).await;
+
+    (addr, tmp, skills)
+}
+
 // ---------------------------------------------------------------------------
 // Health endpoints
 // ---------------------------------------------------------------------------
@@ -432,6 +500,47 @@ async fn test_rate_limit_headers_present() {
 // ---------------------------------------------------------------------------
 
 #[tokio::test]
+async fn test_api_v1_enterprise_readiness_report() {
+    let (addr, _tmp, skills) = start_enterprise_configured_server().await;
+
+    let resp = reqwest::Client::new()
+        .get(format!("http://{addr}/api/v1/enterprise/readiness"))
+        .header("Authorization", "Bearer enterprise-test-key")
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(resp.status(), 200);
+
+    let body: serde_json::Value = resp.json().await.unwrap();
+    assert_eq!(body["version"], env!("CARGO_PKG_VERSION"));
+    assert_eq!(body["posture"], "ready");
+    assert_eq!(
+        body["runtime"]["skills_registered"].as_u64().unwrap(),
+        skills.skill_count() as u64
+    );
+    assert!(
+        body["score"].as_u64().unwrap() >= 70,
+        "full server should have an enterprise readiness score"
+    );
+
+    let checks = body["checks"].as_array().unwrap();
+    assert!(checks
+        .iter()
+        .any(|check| check["id"] == "rest_api" && check["status"] == "active"));
+    assert!(checks
+        .iter()
+        .any(|check| { check["id"] == "per_key_rate_limits" && check["status"] == "active" }));
+    assert!(checks
+        .iter()
+        .any(|check| { check["id"] == "enterprise_gateway" && check["status"] == "available" }));
+    assert!(body["next_actions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|action| { action.as_str().unwrap_or_default().contains("golden path") }));
+}
+
+#[tokio::test]
 async fn test_openapi_json_valid() {
     let (addr, _tmp) = start_basic_server().await;
     let resp = reqwest::get(&format!("http://{addr}/openapi.json"))
@@ -455,6 +564,13 @@ async fn test_openapi_json_valid() {
     assert!(
         !paths.is_empty(),
         "paths object should contain documented endpoints"
+    );
+    assert!(
+        paths
+            .get("/api/v1/enterprise/readiness")
+            .and_then(|path| path.get("get"))
+            .is_some(),
+        "OpenAPI spec should document enterprise readiness"
     );
 }
 

@@ -28,7 +28,7 @@ class TestVersion:
     def test_version_is_set(self):
         assert argentor.__version__ is not None
         assert isinstance(argentor.__version__, str)
-        assert argentor.__version__ == "1.0.0"
+        assert argentor.__version__ == "1.3.0"
 
     def test_version_follows_semver(self):
         parts = argentor.__version__.split(".")

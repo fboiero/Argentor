@@ -133,9 +133,9 @@ fn bench_descriptor_generation(c: &mut Criterion) {
                     "required": ["path"]
                 }),
                 required_capabilities: vec![argentor_security::Capability::FileRead {
-                    requires_approval: false,
                     allowed_paths: vec!["/tmp".into(), "/workspace".into()],
                 }],
+                requires_approval: false,
             })
         });
     });
@@ -153,9 +153,9 @@ fn bench_descriptor_generation(c: &mut Criterion) {
                 "required": ["command"]
             }),
             required_capabilities: vec![argentor_security::Capability::ShellExec {
-                requires_approval: false,
                 allowed_commands: vec!["ls".into(), "echo".into(), "cat".into()],
             }],
+            requires_approval: false,
         };
         b.iter(|| serde_json::to_string(black_box(&desc)));
     });
