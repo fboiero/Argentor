@@ -301,6 +301,12 @@ class ArgentorClient:
         _handle_error(resp)
         return resp.text
 
+    def enterprise_readiness(self) -> dict:
+        """Retrieve the enterprise readiness report (``GET /api/v1/enterprise/readiness``)."""
+        resp = self._http.get("/api/v1/enterprise/readiness")
+        _handle_error(resp)
+        return resp.json()
+
     # -- connections ---------------------------------------------------------
 
     def list_connections(self) -> list:
@@ -591,6 +597,12 @@ class AsyncArgentorClient:
         resp = await self._http.get("/api/v1/metrics")
         _handle_error(resp)
         return resp.text
+
+    async def enterprise_readiness(self) -> dict:
+        """Retrieve the enterprise readiness report (``GET /api/v1/enterprise/readiness``)."""
+        resp = await self._http.get("/api/v1/enterprise/readiness")
+        _handle_error(resp)
+        return resp.json()
 
     # -- connections ---------------------------------------------------------
 

@@ -22,6 +22,7 @@ import type {
   CreatePersonaResponse,
   EvaluateParams,
   EvaluationResult,
+  EnterpriseReadinessReport,
   HealthStatus,
   InstallSkillResponse,
   ListPersonasResponse,
@@ -335,6 +336,13 @@ export class ArgentorClient {
    */
   async metrics(): Promise<string> {
     return this.requestText('GET', '/api/v1/metrics');
+  }
+
+  /**
+   * Retrieve the enterprise readiness report.
+   */
+  async enterpriseReadiness(): Promise<EnterpriseReadinessReport> {
+    return this.request<EnterpriseReadinessReport>('GET', '/api/v1/enterprise/readiness');
   }
 
   // -- connections ----------------------------------------------------------

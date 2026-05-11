@@ -183,6 +183,36 @@ class ReadinessResponse(BaseModel):
     checks: Optional[Dict[str, Any]] = None
 
 
+class EnterpriseRuntimeSnapshot(BaseModel):
+    """Runtime counters in the enterprise readiness report."""
+
+    skills_registered: int
+    active_connections: int
+    active_sessions: int
+    uptime_seconds: int
+
+
+class EnterpriseReadinessCheck(BaseModel):
+    """A single enterprise readiness check."""
+
+    id: str
+    category: str
+    title: str
+    status: str
+    detail: str
+
+
+class EnterpriseReadinessReport(BaseModel):
+    """Response from GET /api/v1/enterprise/readiness."""
+
+    version: str
+    posture: str
+    score: int
+    runtime: EnterpriseRuntimeSnapshot
+    checks: List[EnterpriseReadinessCheck]
+    next_actions: List[str]
+
+
 # ---------------------------------------------------------------------------
 # Agent Chat
 # ---------------------------------------------------------------------------

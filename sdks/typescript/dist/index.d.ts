@@ -9,7 +9,7 @@
  * const result = await client.runTask({ role: 'assistant', context: 'Hello!' });
  * ```
  */
-import type { AgentChatParams, AgentChatResponse, BatchResponse, BatchTask, ClientOptions, ConnectionInfo, CreatePersonaResponse, EvaluateParams, EvaluationResult, HealthStatus, InstallSkillResponse, ListPersonasResponse, MarketplaceEntry, PersonaConfig, ReadinessStatus, RunTaskParams, RunTaskResponse, SessionInfo, SkillDescriptor, StreamEvent, ToolResult, UsageBreakdown, WebhookProxyParams, WebhookProxyResponse } from './types';
+import type { AgentChatParams, AgentChatResponse, BatchResponse, BatchTask, ClientOptions, ConnectionInfo, CreatePersonaResponse, EvaluateParams, EvaluationResult, EnterpriseReadinessReport, HealthStatus, InstallSkillResponse, ListPersonasResponse, MarketplaceEntry, PersonaConfig, ReadinessStatus, RunTaskParams, RunTaskResponse, SessionInfo, SkillDescriptor, StreamEvent, ToolResult, UsageBreakdown, WebhookProxyParams, WebhookProxyResponse } from './types';
 export declare class ArgentorClient {
     private readonly baseUrl;
     private readonly headers;
@@ -94,6 +94,10 @@ export declare class ArgentorClient {
      * Retrieve Prometheus-format metrics as a raw string.
      */
     metrics(): Promise<string>;
+    /**
+     * Retrieve the enterprise readiness report.
+     */
+    enterpriseReadiness(): Promise<EnterpriseReadinessReport>;
     /**
      * List active WebSocket connections.
      */

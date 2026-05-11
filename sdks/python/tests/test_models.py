@@ -21,6 +21,9 @@ from argentor.models import (
     InstallSkillResponse,
     MarketplaceEntry,
     ReadinessResponse,
+    EnterpriseReadinessCheck,
+    EnterpriseReadinessReport,
+    EnterpriseRuntimeSnapshot,
     RunTaskRequest,
     RunTaskResponse,
     SessionInfo,
@@ -205,6 +208,31 @@ class TestHealthModels:
     def test_readiness_response(self):
         r = ReadinessResponse(ready=True, checks={"db": "ok"})
         assert r.ready is True
+
+    def test_enterprise_readiness_report(self):
+        report = EnterpriseReadinessReport(
+            version="1.3.0",
+            posture="ready",
+            score=86,
+            runtime=EnterpriseRuntimeSnapshot(
+                skills_registered=42,
+                active_connections=1,
+                active_sessions=1,
+                uptime_seconds=60,
+            ),
+            checks=[
+                EnterpriseReadinessCheck(
+                    id="rest_api",
+                    category="runtime",
+                    title="REST API mounted",
+                    status="active",
+                    detail="REST management endpoints are available.",
+                )
+            ],
+            next_actions=["Run the enterprise golden path smoke test."],
+        )
+        assert report.runtime.skills_registered == 42
+        assert report.checks[0].status == "active"
 
 
 class TestMiscModels:

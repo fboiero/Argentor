@@ -251,6 +251,33 @@ class TestSyncClientMethods:
         result = client.metrics()
         assert "requests_total" in result
 
+    @patch("argentor.client.httpx.Client")
+    def test_enterprise_readiness(self, mock_client_cls):
+        mock_http = MagicMock()
+        mock_client_cls.return_value = mock_http
+        mock_resp = MagicMock()
+        mock_resp.is_success = True
+        mock_resp.json.return_value = {
+            "version": "1.3.0",
+            "posture": "ready",
+            "score": 86,
+            "runtime": {
+                "skills_registered": 42,
+                "active_connections": 0,
+                "active_sessions": 0,
+                "uptime_seconds": 10,
+            },
+            "checks": [],
+            "next_actions": [],
+        }
+        mock_http.get.return_value = mock_resp
+
+        client = ArgentorClient()
+        result = client.enterprise_readiness()
+        mock_http.get.assert_called_with("/api/v1/enterprise/readiness")
+        assert result["posture"] == "ready"
+        assert result["score"] == 86
+
 
 # ---------------------------------------------------------------------------
 # Exception hierarchy

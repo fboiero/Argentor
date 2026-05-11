@@ -174,6 +174,33 @@ export interface ReadinessStatus {
   checks?: Record<string, unknown>;
 }
 
+export type EnterpriseReadinessPosture = 'ready' | 'needs_configuration' | 'not_ready';
+export type EnterpriseReadinessCheckStatus = 'active' | 'available' | 'attention';
+
+export interface EnterpriseRuntimeSnapshot {
+  skills_registered: number;
+  active_connections: number;
+  active_sessions: number;
+  uptime_seconds: number;
+}
+
+export interface EnterpriseReadinessCheck {
+  id: string;
+  category: string;
+  title: string;
+  status: EnterpriseReadinessCheckStatus;
+  detail: string;
+}
+
+export interface EnterpriseReadinessReport {
+  version: string;
+  posture: EnterpriseReadinessPosture;
+  score: number;
+  runtime: EnterpriseRuntimeSnapshot;
+  checks: EnterpriseReadinessCheck[];
+  next_actions: string[];
+}
+
 // ---------------------------------------------------------------------------
 // Connections
 // ---------------------------------------------------------------------------

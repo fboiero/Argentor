@@ -270,6 +270,12 @@ export class ArgentorClient {
     async metrics() {
         return this.requestText('GET', '/api/v1/metrics');
     }
+    /**
+     * Retrieve the enterprise readiness report.
+     */
+    async enterpriseReadiness() {
+        return this.request('GET', '/api/v1/enterprise/readiness');
+    }
     // -- connections ----------------------------------------------------------
     /**
      * List active WebSocket connections.

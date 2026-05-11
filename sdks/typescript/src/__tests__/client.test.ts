@@ -23,6 +23,7 @@ import type {
   EvaluationResult,
   StreamEvent,
   ConnectionInfo,
+  EnterpriseReadinessReport,
   MarketplaceEntry,
   InstallSkillResponse,
   BatchTask,
@@ -209,6 +210,31 @@ describe('Type exports', () => {
     expect(ev.content).toBe('text');
   });
 
+  it('EnterpriseReadinessReport type is usable', () => {
+    const report: EnterpriseReadinessReport = {
+      version: '1.3.0',
+      posture: 'ready',
+      score: 86,
+      runtime: {
+        skills_registered: 42,
+        active_connections: 0,
+        active_sessions: 0,
+        uptime_seconds: 60,
+      },
+      checks: [
+        {
+          id: 'rest_api',
+          category: 'runtime',
+          title: 'REST API mounted',
+          status: 'active',
+          detail: 'REST management endpoints are available.',
+        },
+      ],
+      next_actions: ['Run the enterprise golden path smoke test.'],
+    };
+    expect(report.checks[0].status).toBe('active');
+  });
+
   it('BatchTask type is usable', () => {
     const task: BatchTask = { agent_role: 'analyst', context: 'data' };
     expect(task.agent_role).toBe('analyst');
@@ -309,6 +335,38 @@ describe('Client methods with mocked fetch', () => {
 
     const result = await client.listSkills();
     expect(result).toHaveLength(2);
+
+    vi.unstubAllGlobals();
+  });
+
+  it('enterpriseReadiness() calls GET /api/v1/enterprise/readiness', async () => {
+    const mockReport: EnterpriseReadinessReport = {
+      version: '1.3.0',
+      posture: 'ready',
+      score: 86,
+      runtime: {
+        skills_registered: 42,
+        active_connections: 0,
+        active_sessions: 0,
+        uptime_seconds: 60,
+      },
+      checks: [],
+      next_actions: [],
+    };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(mockReport),
+      }),
+    );
+
+    const result = await client.enterpriseReadiness();
+    expect(result.posture).toBe('ready');
+    expect(fetch).toHaveBeenCalledWith(
+      'http://test:8080/api/v1/enterprise/readiness',
+      expect.objectContaining({ method: 'GET' }),
+    );
 
     vi.unstubAllGlobals();
   });

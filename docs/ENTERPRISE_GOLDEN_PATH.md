@@ -80,10 +80,30 @@ cd ../sdks/python && python3 -m pytest tests/ -q
 cd ../typescript && npm test -- --run
 ```
 
+## SDK Access
+
+Python:
+
+```python
+from argentor import ArgentorClient
+
+report = ArgentorClient(api_key="...").enterprise_readiness()
+print(report["posture"], report["score"])
+```
+
+TypeScript:
+
+```ts
+import { ArgentorClient } from '@argentor/sdk';
+
+const client = new ArgentorClient({ apiKey: '...' });
+const report = await client.enterpriseReadiness();
+console.log(report.posture, report.score);
+```
+
 ## Follow-Up Evolutions
 
 1. Add deployment config input so readiness can distinguish configured SSO,
    approval policy, and data-residency policy.
-2. Add SDK methods for the readiness endpoint after the REST contract settles.
-3. Add a CI smoke job that boots the gateway and asserts readiness posture.
-4. Add dashboard UI integration once the endpoint contract is stable.
+2. Add a CI smoke job that boots the gateway and asserts readiness posture.
+3. Add dashboard UI integration once the endpoint contract is stable.
