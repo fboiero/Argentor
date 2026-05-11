@@ -1528,6 +1528,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "epec-legal-agent"
+version = "1.4.0"
+dependencies = [
+ "anyhow",
+ "argentor-agent",
+ "argentor-core",
+ "argentor-memory",
+ "clap",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "equivalent"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

@@ -19,6 +19,7 @@ members = [
     "crates/argentor-cloud",
     "experiments/comparison",
     "benchmarks",
+    "examples/epec-legal-agent",
 ]
 exclude = [
     "skills/*",
