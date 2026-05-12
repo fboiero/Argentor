@@ -88,6 +88,88 @@ Argentor is a Cargo workspace of focused crates. Each crate has a single clear r
 
 If you propose a new crate, include justification in the PR description (why it does not fit in an existing crate).
 
+## Adding a new skill
+
+Skills are the unit of capability in Argentor. A skill is anything that implements the `Skill` trait in `argentor-skills`.
+
+### Native Rust skill (simplest)
+
+1. Add your struct to `crates/argentor-builtins/src/` or create a new file:
+
+```rust
+use argentor_core::{ToolCall, ToolResult};
+use argentor_skills::Skill;
+use async_trait::async_trait;
+
+pub struct MySkill;
+
+#[async_trait]
+impl Skill for MySkill {
+    fn name(&self) -> &str { "my_skill" }
+    fn description(&self) -> &str { "What this skill does in one sentence." }
+
+    async fn execute(&self, call: &ToolCall) -> ToolResult {
+        let input = call.input.get("text").and_then(|v| v.as_str()).unwrap_or("");
+        ToolResult::success(format!("processed: {input}"))
+    }
+}
+```
+
+2. Register it in `register_builtins` (or in your own registry setup):
+
+```rust
+registry.register(Arc::new(MySkill));
+```
+
+3. Add a test in the same file under `#[cfg(test)] mod tests`.
+
+### WASM skill (sandboxed, for untrusted code)
+
+Use `rustup target add wasm32-wasip1` to build WASM targets. The WASM module must export a `execute` function that reads a JSON `ToolCall` from stdin and writes a JSON `ToolResult` to stdout. See `crates/argentor-skills/src/wasm_runtime.rs` for the host-side contract.
+
+Capability grants are set at load time — the module cannot exceed them at runtime:
+
+```rust
+let permissions = PermissionSet::builder()
+    .allow_file_read("/tmp")
+    .allow_network("api.example.com")
+    .deny_shell()
+    .build();
+wasm_runtime.load_plugin("my-skill.wasm", permissions)?;
+```
+
+Every capability grant is logged to the audit trail.
+
+## Adding a new LLM backend
+
+LLM backends are defined in `crates/argentor-agent/src/backends/`. Each backend implements the `LlmBackend` trait:
+
+```rust
+#[async_trait]
+pub trait LlmBackend: Send + Sync {
+    async fn complete(&self, messages: &[Message], config: &ModelConfig) -> Result<Message>;
+    async fn stream(&self, messages: &[Message], config: &ModelConfig)
+        -> Result<Pin<Box<dyn Stream<Item = Result<String>> + Send>>>;
+    fn name(&self) -> &str;
+}
+```
+
+Steps:
+
+1. Add a new file `crates/argentor-agent/src/backends/my_provider.rs`.
+2. Implement `LlmBackend` for your struct. Handle auth (API key, OAuth, SigV4, etc.) inside the backend — callers never touch credentials directly.
+3. Add a variant to `LlmProvider` in `crates/argentor-core/src/types.rs`:
+   ```rust
+   pub enum LlmProvider {
+       // existing variants...
+       MyProvider,
+   }
+   ```
+4. Wire the new variant in `AgentRunner::new` where `LlmProvider` is matched to a backend instance.
+5. If the backend requires a feature flag (e.g., heavy dependencies, platform-specific auth like SigV4), gate it with a `[features]` entry in `crates/argentor-agent/Cargo.toml` and wrap the impl in `#[cfg(feature = "my-provider")]`.
+6. Add integration tests in `crates/argentor-agent/tests/my_provider.rs`. Use a mock HTTP server (e.g., `wiremock`) — do not require live credentials in CI.
+7. Update `README.md` (integration table) and `CHANGELOG.md` (under the next release).
+
 ## Making a change
 
 1. **Open an issue first for non-trivial work.** Bug fixes and tiny docs changes are fine without one, but features, refactors, and API changes should be discussed first so nobody wastes effort on a direction we cannot accept.
