@@ -29,3 +29,4 @@ sdks/typescript/package-lock.json
 !skills/**/*.key
 credentials.json
 secrets.json
+epec_index/
