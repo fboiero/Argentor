@@ -31,6 +31,16 @@ impl LegalIndex {
         Ok(Self { bundle })
     }
 
+    /// Total number of indexed chunks.
+    pub fn total_chunks(&self) -> usize {
+        self.bundle.chunk_count
+    }
+
+    /// Total number of source documents.
+    pub fn total_docs(&self) -> usize {
+        self.bundle.doc_count
+    }
+
     /// BM25 search — returns top-k `(score, ChunkMeta)` pairs.
     pub fn search(&self, query: &str, top_k: usize) -> Vec<(f32, &ChunkMeta)> {
         let bm25 = &self.bundle.bm25;

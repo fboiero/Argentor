@@ -3,11 +3,12 @@
 //! Subcommands:
 //! - `ingest` — reads the JSONL corpus, builds a BM25 index and persists it.
 //! - `query`  — searches the index and optionally calls Claude for an answer.
-//! - `serve`  — placeholder (not yet implemented).
+//! - `serve`  — starts a web chat interface on the given port (default 3000).
 
 mod config;
 mod ingest;
 mod query;
+mod serve;
 
 use std::io::{self, BufRead, Write};
 use std::path::PathBuf;
@@ -59,8 +60,12 @@ enum Command {
         no_llm: bool,
     },
 
-    /// Start the Argentor gateway with the legal agent pre-loaded (not yet implemented).
-    Serve,
+    /// Start the web chat interface (serves on http://localhost:<port>).
+    Serve {
+        /// TCP port to listen on (default: 3000)
+        #[arg(long, short)]
+        port: Option<u16>,
+    },
 }
 
 // ---------------------------------------------------------------------------
@@ -129,8 +134,8 @@ async fn main() -> anyhow::Result<()> {
             }
         }
 
-        Command::Serve => {
-            println!("cargo run -- serve not yet implemented, use query mode");
+        Command::Serve { port } => {
+            serve::run(port.unwrap_or(3000)).await?;
         }
     }
 
