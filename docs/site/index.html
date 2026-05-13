@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Argentor Docs</title>
+  <meta name="description" content="Argentor documentation — the secure AI agent framework built in Rust.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="topnav">
+  <a class="logo" href="../index.html">ARGENTOR</a>
+  <div class="nav-links">
+    <a href="index.html">Docs</a>
+    <a href="getting-started.html">Get Started</a>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="enterprise.html">Enterprise</a>
+    <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+  </div>
+  <button class="hamburger" aria-label="Toggle menu">&#9776;</button>
+</nav>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-section">Overview</div>
+    <a href="index.html">Introduction</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="demo.html">Demo</a>
+
+    <div class="sidebar-section">Reference</div>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="enterprise.html">Enterprise</a>
+
+    <div class="sidebar-section">Resources</div>
+    <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+    <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a>
+    <a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a>
+  </nav>
+
+  <main class="main">
+    <h1>Argentor Documentation</h1>
+    <p>Welcome to the Argentor docs. Argentor is a production-grade autonomous AI agent framework built in Rust — secure by default, composable by design.</p>
+
+    <div class="callout">
+      <strong>v1.3.0 stable</strong> &mdash; 17 crates &middot; 5,359 tests &middot; 8 LLM backends &middot; AGPL-3.0-only
+    </div>
+
+    <h2>Why Argentor?</h2>
+    <ul>
+      <li><strong>Security-first:</strong> 6-layer guardrails — PII detection, prompt injection, toxicity, shell injection, base64 exfiltration, unicode smuggling — all before any LLM call.</li>
+      <li><strong>Minimal overhead:</strong> ~2 ms framework overhead vs 11–55 ms for Python alternatives. Measured with paired t-tests at p &lt; 0.0001.</li>
+      <li><strong>Cost-optimised:</strong> 7.9× fewer tokens on tool-heavy workloads vs LangChain. $491 K/yr savings vs CrewAI at 100 K req/day.</li>
+      <li><strong>Composable:</strong> 13 focused crates — include only what your agent needs.</li>
+      <li><strong>Multi-agent:</strong> Orchestrator-Workers pattern, TaskQueue, AgentMonitor, human-in-the-loop.</li>
+    </ul>
+
+    <h2>Quick Navigation</h2>
+    <table>
+      <tr>
+        <th>Goal</th>
+        <th>Start here</th>
+      </tr>
+      <tr><td>First time using Argentor</td><td><a href="getting-started.html">Getting Started</a></td></tr>
+      <tr><td>See it running live</td><td><a href="demo.html">Demo</a></td></tr>
+      <tr><td>Compare to LangChain / CrewAI</td><td><a href="benchmarks.html">Benchmarks</a></td></tr>
+      <tr><td>Deploy for your organisation</td><td><a href="enterprise.html">Enterprise</a></td></tr>
+      <tr><td>Full API surface</td><td><a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a></td></tr>
+    </table>
+
+    <h2>Architecture at a Glance</h2>
+    <p>The workspace contains 13 crates arranged in layers:</p>
+    <pre>argentor-core          ← types, errors, event bus
+argentor-security      ← permissions, RBAC, audit, crypto
+argentor-session       ← session management, conversation history
+argentor-skills        ← Skill trait, WASM runtime, marketplace
+argentor-agent         ← AgentRunner, 14 LLM backends, guardrails
+argentor-channels      ← Channel trait (Slack, WebChat)
+argentor-gateway       ← HTTP/WS gateway, REST API, dashboard
+argentor-builtins      ← 50+ built-in skills
+argentor-memory        ← vector store, RAG, embeddings
+argentor-mcp           ← MCP client/server, credential vault
+argentor-orchestrator  ← multi-agent engine, workflows
+argentor-compliance    ← GDPR, ISO 27001, ISO 42001
+argentor-cli           ← CLI binary + demos</pre>
+
+    <h2>License</h2>
+    <p>All Argentor crates are released under <a href="https://github.com/fboiero/Agentor/blob/master/LICENSE" target="_blank">AGPL-3.0-only</a>.</p>
+  </main>
+</div>
+
+<footer>
+  <span>&copy; 2025 Argentor contributors &mdash; <a href="https://github.com/fboiero/Agentor/blob/master/LICENSE" target="_blank">AGPL-3.0-only</a></span>
+  <span><a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a> &middot; <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a> &middot; <a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a></span>
+</footer>
+<script src="nav.js"></script>
+</body>
+</html>

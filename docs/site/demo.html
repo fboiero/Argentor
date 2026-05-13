@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Demo — Argentor</title>
+  <link rel="stylesheet" href="style.css">
+  <style>
+    .demo-grid { display: grid; grid-template-columns: repeat(2,1fr); gap: 16px; margin: 1.2em 0; }
+    @media (max-width: 600px) { .demo-grid { grid-template-columns: 1fr; } }
+    .demo-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 22px; transition: border-color 0.2s; }
+    .demo-card:hover { border-color: var(--cyan); }
+    .demo-card h3 { font-size: 1rem; margin-bottom: 8px; color: var(--text); }
+    .demo-card p  { font-size: 0.86rem; color: var(--text2); margin: 0 0 12px; }
+    .demo-card code { font-size: 0.8rem; }
+    .terminal { background: #000; border: 1px solid var(--border); border-radius: 8px; padding: 20px; font-family: 'SF Mono','Fira Code',Consolas,monospace; font-size: 0.85rem; line-height: 1.7; margin: 1.2em 0; overflow-x: auto; }
+    .t-prompt { color: var(--green); }
+    .t-out    { color: var(--text2); }
+    .t-cyan   { color: var(--cyan); }
+    .t-orange { color: var(--orange); }
+    .t-green  { color: var(--green); }
+  </style>
+</head>
+<body>
+<nav class="topnav">
+  <a class="logo" href="../index.html">ARGENTOR</a>
+  <div class="nav-links">
+    <a href="index.html">Docs</a>
+    <a href="getting-started.html">Get Started</a>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="enterprise.html">Enterprise</a>
+    <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+  </div>
+  <button class="hamburger" aria-label="Toggle menu">&#9776;</button>
+</nav>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-section">Overview</div>
+    <a href="index.html">Introduction</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="demo.html">Demo</a>
+    <div class="sidebar-section">Reference</div>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="enterprise.html">Enterprise</a>
+    <div class="sidebar-section">Resources</div>
+    <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+    <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a>
+    <a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a>
+  </nav>
+
+  <main class="main">
+    <h1>Demo</h1>
+    <p>All demos run without API keys using the built-in <code>DemoBackend</code> — real tool execution, real multi-agent coordination, zero credentials required.</p>
+
+    <div class="callout">
+      <strong>Prerequisites:</strong> Rust 1.80+ and <code>git clone https://github.com/fboiero/Agentor</code>
+    </div>
+
+    <h2>Available Demos</h2>
+    <div class="demo-grid">
+      <div class="demo-card">
+        <h3>Full Pipeline</h3>
+        <p>8-step pipeline: file I/O, shell, vector memory, report generation. The canonical end-to-end showcase.</p>
+        <code>cargo run -p argentor-cli --example demo_full_pipeline</code>
+      </div>
+      <div class="demo-card">
+        <h3>DevOps Team</h3>
+        <p>4 specialised agents (Planner, Coder, Tester, Reviewer) working as a team. Demonstrates Orchestrator-Workers pattern.</p>
+        <code>cargo run -p argentor-cli --example demo_team</code>
+      </div>
+      <div class="demo-card">
+        <h3>Skills Toolkit</h3>
+        <p>Showcases 18 built-in utility skills: crypto, datetime, math, JSON transform, markdown, HTTP mock, and more.</p>
+        <code>cargo run -p argentor-cli --example demo_skills_toolkit</code>
+      </div>
+      <div class="demo-card">
+        <h3>SaaS Factory</h3>
+        <p>Multi-agent pipeline that generates a SaaS backend specification, scaffolds files, and writes tests.</p>
+        <code>cargo run -p argentor-cli --example demo_saas_factory</code>
+      </div>
+      <div class="demo-card">
+        <h3>Security Challenge</h3>
+        <p>A penetration-testing agent that tries to bypass Argentor's own guardrails. Useful for red-team exercises.</p>
+        <code>cargo run -p argentor-cli --example demo_security_challenge</code>
+      </div>
+      <div class="demo-card">
+        <h3>Gateway Dashboard</h3>
+        <p>Start the full HTTP/WebSocket gateway and explore the control plane, playground, and metrics live.</p>
+        <code>cargo run -p argentor-cli -- serve --bind 0.0.0.0:8080</code>
+      </div>
+    </div>
+
+    <h2>Example: Full Pipeline Output</h2>
+    <p>What you see when you run <code>demo_full_pipeline</code>:</p>
+    <div class="terminal">
+<span class="t-prompt">$</span> cargo run -p argentor-cli --example demo_full_pipeline<br>
+<br>
+<span class="t-cyan">[ argentor ]</span> Starting demo pipeline — DemoBackend (no API keys)<br>
+<span class="t-cyan">[ step 1/8 ]</span> <span class="t-out">Initialising skill registry... 50 skills registered</span><br>
+<span class="t-cyan">[ step 2/8 ]</span> <span class="t-out">Writing task manifest to /tmp/demo/tasks.json</span><br>
+<span class="t-green">  ✓</span> <span class="t-out">file_write: tasks.json (1.2 KB)</span><br>
+<span class="t-cyan">[ step 3/8 ]</span> <span class="t-out">Running shell analysis</span><br>
+<span class="t-green">  ✓</span> <span class="t-out">shell_exec: uname -a → Linux demo 6.6.0</span><br>
+<span class="t-cyan">[ step 4/8 ]</span> <span class="t-out">Embedding documents into vector store</span><br>
+<span class="t-green">  ✓</span> <span class="t-out">memory_store: 5 documents, 384-dim embeddings</span><br>
+<span class="t-cyan">[ step 5/8 ]</span> <span class="t-out">Semantic search: "security guardrails"</span><br>
+<span class="t-green">  ✓</span> <span class="t-out">memory_search: 3 results (top score 0.94)</span><br>
+<span class="t-cyan">[ step 6/8 ]</span> <span class="t-out">Guardrail scan on retrieved context</span><br>
+<span class="t-green">  ✓</span> <span class="t-out">No PII or injection detected — PASS</span><br>
+<span class="t-cyan">[ step 7/8 ]</span> <span class="t-out">LLM synthesis (DemoBackend)</span><br>
+<span class="t-green">  ✓</span> <span class="t-out">Agent response: 312 tokens</span><br>
+<span class="t-cyan">[ step 8/8 ]</span> <span class="t-out">Writing final report</span><br>
+<span class="t-green">  ✓</span> <span class="t-out">file_write: /tmp/demo/report.md (2.4 KB)</span><br>
+<br>
+<span class="t-orange">Pipeline complete</span> — 8 steps, 148 ms, 0 errors
+    </div>
+
+    <h2>Web UI — Gateway Dashboard</h2>
+    <p>Start the gateway and open <code>http://localhost:8080/dashboard</code> to access:</p>
+    <ul>
+      <li><strong>Control plane</strong> — live skill registry, active sessions, connection count</li>
+      <li><strong>Playground</strong> — interactive chat with full tool call visibility</li>
+      <li><strong>Metrics</strong> — Prometheus endpoint with latency histograms and guardrail hit rates</li>
+      <li><strong>OpenAPI</strong> — interactive API explorer at <code>/openapi.json</code></li>
+      <li><strong>Readiness</strong> — enterprise readiness score at <code>/api/v1/enterprise/readiness</code></li>
+    </ul>
+
+    <h2>Recording</h2>
+    <p>An asciinema recording of the full pipeline demo is embedded on the <a href="../index.html">landing page</a>. To play it locally:</p>
+    <pre>asciinema play docs/demo_pipeline.cast</pre>
+
+    <h2>Source Code</h2>
+    <p>All demo source files live in <a href="https://github.com/fboiero/Agentor/tree/master/examples" target="_blank"><code>examples/</code></a> and <a href="https://github.com/fboiero/Agentor/tree/master/crates/argentor-cli/examples" target="_blank"><code>crates/argentor-cli/examples/</code></a>.</p>
+  </main>
+</div>
+
+<footer>
+  <span>&copy; 2025 Argentor contributors &mdash; <a href="https://github.com/fboiero/Agentor/blob/master/LICENSE" target="_blank">AGPL-3.0-only</a></span>
+  <span><a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a> &middot; <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a> &middot; <a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a></span>
+</footer>
+<script src="nav.js"></script>
+</body>
+</html>

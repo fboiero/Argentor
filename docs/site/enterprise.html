@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Enterprise — Argentor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="topnav">
+  <a class="logo" href="../index.html">ARGENTOR</a>
+  <div class="nav-links">
+    <a href="index.html">Docs</a>
+    <a href="getting-started.html">Get Started</a>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="enterprise.html">Enterprise</a>
+    <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+  </div>
+  <button class="hamburger" aria-label="Toggle menu">&#9776;</button>
+</nav>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-section">Overview</div>
+    <a href="index.html">Introduction</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="demo.html">Demo</a>
+    <div class="sidebar-section">Reference</div>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="enterprise.html">Enterprise</a>
+    <div class="sidebar-section">Resources</div>
+    <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+    <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a>
+    <a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a>
+  </nav>
+
+  <main class="main">
+    <h1>Enterprise</h1>
+    <p>Argentor ships enterprise-grade infrastructure — RBAC, multi-tenancy, quotas, compliance modules, and a readiness endpoint — without external plugins.</p>
+
+    <h2>Readiness Endpoint</h2>
+    <p>A single endpoint reports the complete deployment posture:</p>
+    <pre>GET /api/v1/enterprise/readiness</pre>
+
+    <p>Example response:</p>
+    <pre>{
+  "version": "1.3.0",
+  "posture": "ready",
+  "score": 71,
+  "runtime": {
+    "skills_registered": 42,
+    "active_connections": 0,
+    "active_sessions": 0,
+    "uptime_seconds": 60
+  },
+  "checks": [
+    {
+      "id": "rest_api",
+      "category": "runtime",
+      "title": "REST API mounted",
+      "status": "active",
+      "detail": "REST management endpoints are available under /api/v1."
+    }
+  ],
+  "next_actions": [
+    "Wire deployment-specific auth, SSO, rate limits, and approval policy."
+  ]
+}</pre>
+
+    <h3>Check statuses</h3>
+    <table>
+      <tr><th>Status</th><th>Meaning</th></tr>
+      <tr><td><span class="badge badge-green">active</span></td><td>Verified against the running gateway instance</td></tr>
+      <tr><td><span class="badge badge-cyan">available</span></td><td>Compiled in, ready to wire for a deployment</td></tr>
+      <tr><td><span class="badge badge-orange">attention</span></td><td>Missing runtime wiring or failed runtime check</td></tr>
+    </table>
+
+    <h2>RBAC &amp; Permissions</h2>
+    <p>Role-based access control is built into <code>argentor-security</code>. Each agent runs with an explicit <code>PermissionSet</code> that controls which skills it can invoke and which resources it can access.</p>
+    <pre>use argentor_security::{PermissionSet, Capability};
+
+let permissions = PermissionSet::builder()
+    .allow(Capability::FileRead)
+    .allow(Capability::WebFetch)
+    .deny(Capability::ShellExec)
+    .build();
+
+let runner = AgentRunner::new(config, registry)
+    .with_permissions(permissions);</pre>
+
+    <h2>Multi-Tenancy</h2>
+    <p>The gateway supports multi-tenant deployments where each tenant has isolated sessions, separate rate limits, and audited access logs.</p>
+    <ul>
+      <li>Per-tenant API keys with independent quotas</li>
+      <li>Session isolation — one tenant cannot read another's conversation history</li>
+      <li>Per-tenant audit trails exportable to SIEM (JSON/CEF)</li>
+      <li>Per-key rate limiting configurable at the gateway level</li>
+    </ul>
+
+    <h2>Compliance Modules</h2>
+    <p>The <code>argentor-compliance</code> crate ships four compliance frameworks out of the box:</p>
+    <table>
+      <tr><th>Module</th><th>Coverage</th></tr>
+      <tr><td>GDPR</td><td>Data subject requests, retention policies, audit logs, PII scanning</td></tr>
+      <tr><td>ISO 27001</td><td>Access control evidence, incident logging, asset registry</td></tr>
+      <tr><td>ISO 42001</td><td>AI risk register, model governance, human oversight hooks</td></tr>
+      <tr><td>DPGA</td><td>Data processing agreements, transfer impact assessments</td></tr>
+    </table>
+
+    <h2>Security Guardrails</h2>
+    <p>The 6-layer <code>GuardrailEngine</code> runs on every request and response:</p>
+    <ol>
+      <li><strong>PII detection</strong> — names, emails, phone numbers, credit cards, SSNs</li>
+      <li><strong>Prompt injection</strong> — jailbreak patterns, instruction overrides</li>
+      <li><strong>Toxicity</strong> — harmful, violent, or discriminatory content</li>
+      <li><strong>Shell injection</strong> — command metacharacters in tool arguments</li>
+      <li><strong>Base64 exfiltration</strong> — encoded payloads in outputs</li>
+      <li><strong>Unicode smuggling</strong> — homoglyphs, zero-width characters</li>
+    </ol>
+    <pre>let guardrails = GuardrailEngine::builder()
+    .with_pii_scanning(PiiScanMode::RedactAndLog)
+    .with_prompt_injection(InjectionMode::Block)
+    .with_toxicity_threshold(0.8)
+    .build();</pre>
+
+    <h2>Observability</h2>
+    <p>Argentor exposes first-class observability without external plugins:</p>
+    <ul>
+      <li><strong>Prometheus metrics</strong> at <code>/metrics</code> — latency histograms, skill call counters, guardrail hit rates</li>
+      <li><strong>OpenTelemetry traces</strong> — every agent turn, skill call, and LLM request is a span</li>
+      <li><strong>Structured audit log</strong> — JSON/CEF, queryable, SIEM-exportable</li>
+      <li><strong>Health endpoint</strong> at <code>/health</code> — liveness + readiness signals</li>
+    </ul>
+
+    <h2>Quotas &amp; Rate Limiting</h2>
+    <pre>cargo run -p argentor-cli -- serve \
+  --bind 0.0.0.0:8080 \
+  --rate-limit-per-key 1000/min \
+  --max-concurrent-sessions 500 \
+  --token-quota-per-day 10000000</pre>
+
+    <h2>Human-in-the-Loop</h2>
+    <p>The orchestrator supports approval gates — pause execution and wait for a human decision before a specific skill executes:</p>
+    <pre>use argentor_orchestrator::ApprovalPolicy;
+
+let policy = ApprovalPolicy::require_approval_for(vec![
+    "shell_exec",
+    "file_delete",
+    "api_key_rotate",
+]);
+
+let orchestrator = Orchestrator::new(config)
+    .with_approval_policy(policy);</pre>
+
+    <h2>Smoke Test</h2>
+    <pre>cargo test -p argentor-gateway --test regression_api enterprise_readiness</pre>
+
+    <h2>Production Deployment</h2>
+    <p>See the full deployment guide for Docker, Kubernetes, Helm, and multi-region setups:</p>
+    <ul>
+      <li><a href="https://github.com/fboiero/Agentor/blob/master/docs/DEPLOYMENT.md" target="_blank">DEPLOYMENT.md</a></li>
+      <li><a href="https://github.com/fboiero/Agentor/blob/master/docs/ENTERPRISE_GOLDEN_PATH.md" target="_blank">ENTERPRISE_GOLDEN_PATH.md</a></li>
+    </ul>
+  </main>
+</div>
+
+<footer>
+  <span>&copy; 2025 Argentor contributors &mdash; <a href="https://github.com/fboiero/Agentor/blob/master/LICENSE" target="_blank">AGPL-3.0-only</a></span>
+  <span><a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a> &middot; <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a> &middot; <a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a></span>
+</footer>
+<script src="nav.js"></script>
+</body>
+</html>

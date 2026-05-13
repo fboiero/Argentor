@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Benchmarks — Argentor</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<nav class="topnav">
+  <a class="logo" href="../index.html">ARGENTOR</a>
+  <div class="nav-links">
+    <a href="index.html">Docs</a>
+    <a href="getting-started.html">Get Started</a>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="enterprise.html">Enterprise</a>
+    <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+  </div>
+  <button class="hamburger" aria-label="Toggle menu">&#9776;</button>
+</nav>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-section">Overview</div>
+    <a href="index.html">Introduction</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="demo.html">Demo</a>
+    <div class="sidebar-section">Reference</div>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="enterprise.html">Enterprise</a>
+    <div class="sidebar-section">Resources</div>
+    <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+    <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a>
+    <a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a>
+  </nav>
+
+  <main class="main">
+    <h1>Benchmarks</h1>
+    <p>Argentor vs LangChain vs CrewAI vs PydanticAI vs Claude Agent SDK — measured across 5 independent tracks. All runs are reproducible from <code>benchmarks/</code>.</p>
+
+    <div class="callout">
+      <strong>Methodology:</strong> Same mock LLM (50 ms simulated delay), same tasks, same hardware, back-to-back runs. Latency comparisons use N=10 paired t-tests, all at p &lt; 0.0001 with Cohen's d &gt; 0.8. Numbers are verbatim from committed run artifacts.
+    </div>
+
+    <h2>Latency — Framework Overhead</h2>
+    <p>Argentor adds ~2 ms of framework overhead per request. All differences are statistically significant.</p>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Mean end-to-end latency (ms) — lower is better</div>
+      <canvas id="latencyChart"></canvas>
+    </div>
+
+    <table>
+      <tr><th>Framework</th><th>Mean latency</th><th>Framework overhead</th><th>vs Argentor</th></tr>
+      <tr><td><strong>Argentor</strong></td><td><strong>51.7 ms</strong></td><td><strong>~2 ms</strong></td><td>—</td></tr>
+      <tr><td>PydanticAI</td><td>62.7 ms</td><td>~13 ms</td><td>+11 ms</td></tr>
+      <tr><td>Claude Agent SDK</td><td>67.5 ms</td><td>~17 ms</td><td>+16 ms</td></tr>
+      <tr><td>LangChain</td><td>71.4 ms</td><td>~21 ms</td><td>+20 ms</td></tr>
+      <tr><td>CrewAI</td><td>106.6 ms</td><td>~57 ms</td><td>+55 ms</td></tr>
+    </table>
+
+    <h2>Security — Default Posture</h2>
+    <p>Argentor is the <em>only</em> framework in the comparison set that ships security guardrails out of the box. 15-prompt adversarial test set, zero false positives.</p>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Security block rate (%) — higher is better</div>
+      <canvas id="securityChart"></canvas>
+    </div>
+
+    <table>
+      <tr><th>Framework</th><th>Block rate</th><th>Precision</th><th>False positives</th><th>F1</th></tr>
+      <tr><td><strong>Argentor</strong></td><td><strong>58.3%</strong></td><td><strong>1.00</strong></td><td><strong>0</strong></td><td><strong>0.74</strong></td></tr>
+      <tr><td>Claude Agent SDK</td><td>0.0%</td><td>—</td><td>0</td><td>0.00</td></tr>
+      <tr><td>CrewAI</td><td>0.0%</td><td>—</td><td>0</td><td>0.00</td></tr>
+      <tr><td>LangChain</td><td>0.0%</td><td>—</td><td>0</td><td>0.00</td></tr>
+      <tr><td>PydanticAI</td><td>0.0%</td><td>—</td><td>0</td><td>0.00</td></tr>
+    </table>
+
+    <h2>Cost — Tool-Heavy Workloads</h2>
+    <p>At 100 K req/day (Claude Sonnet 4 pricing). The biggest gap: on a 50-tool registry, Argentor ships 350 tokens/call vs 2,750 (LangChain) / 3,050 (CrewAI) — a 7.9–8.7× reduction via tool-discovery filtering.</p>
+
+    <div class="chart-wrap">
+      <div class="chart-title">Annual cost at 100K req/day ($M/year) — lower is better</div>
+      <canvas id="costChart"></canvas>
+    </div>
+
+    <table>
+      <tr><th>Framework</th><th>Tokens/task</th><th>$/day</th><th>$/year</th><th>vs Argentor</th></tr>
+      <tr><td><strong>Argentor</strong></td><td><strong>21,517</strong></td><td><strong>$7,153</strong></td><td><strong>$2.61 M</strong></td><td>—</td></tr>
+      <tr><td>PydanticAI</td><td>22,282</td><td>$7,382</td><td>$2.69 M</td><td>+$85 K/yr</td></tr>
+      <tr><td>Claude Agent SDK</td><td>22,747</td><td>$7,521</td><td>$2.75 M</td><td>+$135 K/yr</td></tr>
+      <tr><td>LangChain</td><td>23,212</td><td>$7,661</td><td>$2.80 M</td><td>+$185 K/yr</td></tr>
+      <tr><td>CrewAI</td><td>26,002</td><td>$8,498</td><td>$3.10 M</td><td>+$491 K/yr</td></tr>
+    </table>
+
+    <h2>Composite Score</h2>
+    <p>Normalised 0–100 per dimension (100 = best observed), weighted: Security 30%, Cost 25%, Latency 20%, Long-horizon 15%, Adversarial security 10%.</p>
+
+    <table>
+      <tr><th>Framework</th><th>Security (basic)</th><th>Security (adv)</th><th>Cost</th><th>Latency</th><th>Long-horizon</th><th><strong>Total</strong></th></tr>
+      <tr><td><strong>Argentor</strong></td><td>100.0</td><td>100.0</td><td>100.0</td><td>100.0</td><td>100.0</td><td><strong>100.0</strong></td></tr>
+      <tr><td>PydanticAI</td><td>0.0</td><td>0.0</td><td>83.7</td><td>80.0</td><td>88.9</td><td>50.3</td></tr>
+      <tr><td>Claude Agent SDK</td><td>0.0</td><td>0.0</td><td>71.4</td><td>71.2</td><td>77.8</td><td>43.7</td></tr>
+      <tr><td>LangChain</td><td>0.0</td><td>0.0</td><td>61.2</td><td>64.1</td><td>66.7</td><td>38.1</td></tr>
+      <tr><td>CrewAI</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td><td>0.0</td></tr>
+    </table>
+
+    <h2>Honest Weaknesses</h2>
+    <div class="callout warn">
+      These are confirmed gaps, published openly. Every weakness maps to a roadmap item.
+    </div>
+    <ol>
+      <li><strong>Shell injection at prompt stage:</strong> 0/12 blocked. Mitigation is at the capability layer, not the prompt pipeline. Roadmap S-01.</li>
+      <li><strong>Base64-encoded payloads:</strong> not decoded by the default pipeline. Roadmap S-02.</li>
+      <li><strong>Unicode/homoglyph normalisation:</strong> guardrails don't normalise before matching. Roadmap S-03.</li>
+      <li><strong>Context compaction:</strong> 30K-token trigger never fires on typical 5–12 turn sessions. Roadmap C-01.</li>
+      <li><strong>Quality with live LLMs:</strong> untested — all quality scores used a mock LLM.</li>
+    </ol>
+
+    <h2>Reproduce</h2>
+    <pre>cargo run -p argentor-benchmarks
+# Results land in benchmarks/results/*.json</pre>
+    <p>Full methodology: <a href="https://github.com/fboiero/Agentor/blob/master/docs/BENCHMARK_SYNTHESIS.md" target="_blank">BENCHMARK_SYNTHESIS.md</a></p>
+  </main>
+</div>
+
+<footer>
+  <span>&copy; 2025 Argentor contributors &mdash; <a href="https://github.com/fboiero/Agentor/blob/master/LICENSE" target="_blank">AGPL-3.0-only</a></span>
+  <span><a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a> &middot; <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a> &middot; <a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a></span>
+</footer>
+<script src="nav.js"></script>
+<script>
+const COLORS = {
+  argentor: 'rgba(88,166,255,0.85)',
+  pydantic:  'rgba(63,185,80,0.75)',
+  claude:    'rgba(188,140,255,0.75)',
+  langchain: 'rgba(210,153,34,0.75)',
+  crewai:    'rgba(248,81,73,0.75)',
+};
+const FRAMEWORKS = ['Argentor', 'PydanticAI', 'Claude SDK', 'LangChain', 'CrewAI'];
+const FW_COLORS = [COLORS.argentor, COLORS.pydantic, COLORS.claude, COLORS.langchain, COLORS.crewai];
+const CHART_OPTS = {
+  responsive: true,
+  plugins: { legend: { display: false } },
+  scales: {
+    x: { ticks: { color: '#8b949e' }, grid: { color: 'rgba(48,54,61,0.5)' } },
+    y: { ticks: { color: '#8b949e' }, grid: { color: 'rgba(48,54,61,0.5)' } },
+  },
+};
+
+new Chart(document.getElementById('latencyChart'), {
+  type: 'bar',
+  data: {
+    labels: FRAMEWORKS,
+    datasets: [{ data: [51.7, 62.7, 67.5, 71.4, 106.6], backgroundColor: FW_COLORS, borderRadius: 5 }],
+  },
+  options: { ...CHART_OPTS, scales: { ...CHART_OPTS.scales, y: { ...CHART_OPTS.scales.y, title: { display: true, text: 'ms', color: '#8b949e' } } } },
+});
+
+new Chart(document.getElementById('securityChart'), {
+  type: 'bar',
+  data: {
+    labels: FRAMEWORKS,
+    datasets: [{ data: [58.3, 0, 0, 0, 0], backgroundColor: FW_COLORS, borderRadius: 5 }],
+  },
+  options: { ...CHART_OPTS, scales: { ...CHART_OPTS.scales, y: { ...CHART_OPTS.scales.y, max: 100, title: { display: true, text: '%', color: '#8b949e' } } } },
+});
+
+new Chart(document.getElementById('costChart'), {
+  type: 'bar',
+  data: {
+    labels: FRAMEWORKS,
+    datasets: [{ data: [2.61, 2.69, 2.75, 2.80, 3.10], backgroundColor: FW_COLORS, borderRadius: 5 }],
+  },
+  options: { ...CHART_OPTS, scales: { ...CHART_OPTS.scales, y: { ...CHART_OPTS.scales.y, title: { display: true, text: '$M/year', color: '#8b949e' } } } },
+});
+</script>
+</body>
+</html>

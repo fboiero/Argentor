@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Getting Started — Argentor</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<nav class="topnav">
+  <a class="logo" href="../index.html">ARGENTOR</a>
+  <div class="nav-links">
+    <a href="index.html">Docs</a>
+    <a href="getting-started.html">Get Started</a>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="enterprise.html">Enterprise</a>
+    <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+  </div>
+  <button class="hamburger" aria-label="Toggle menu">&#9776;</button>
+</nav>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-section">Overview</div>
+    <a href="index.html">Introduction</a>
+    <a href="getting-started.html">Getting Started</a>
+    <a href="demo.html">Demo</a>
+    <div class="sidebar-section">Reference</div>
+    <a href="benchmarks.html">Benchmarks</a>
+    <a href="enterprise.html">Enterprise</a>
+    <div class="sidebar-section">Resources</div>
+    <a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a>
+    <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a>
+    <a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a>
+  </nav>
+
+  <main class="main">
+    <h1>Getting Started</h1>
+    <p>You'll be up and running in under 5 minutes. No API keys required for the demo backend.</p>
+
+    <h2>Prerequisites</h2>
+    <ul>
+      <li><strong>Rust 1.80+</strong> — <a href="https://rustup.rs" target="_blank">install via rustup</a></li>
+      <li>An LLM API key (Claude, OpenAI, or Gemini) for live runs — OR use the demos which need no keys</li>
+    </ul>
+
+    <h2>1. Install from Source</h2>
+    <pre>git clone https://github.com/fboiero/Agentor.git
+cd Agentor
+cargo build --release</pre>
+    <p>The binary lands at <code>target/release/argentor</code>.</p>
+
+    <h2>2. Run the Demo (No API Keys)</h2>
+    <p>The fastest way to see Argentor in action:</p>
+    <pre>cargo run -p argentor-cli --example demo_full_pipeline</pre>
+    <p>This runs an 8-step pipeline with real tool execution: shell commands, file I/O, vector memory, and report generation. No mocks, no API keys.</p>
+
+    <h3>More demos</h3>
+    <pre># DevOps team simulation (4 specialized agents)
+cargo run -p argentor-cli --example demo_team
+
+# Skills toolkit showcase (18 utility skills)
+cargo run -p argentor-cli --example demo_skills_toolkit
+
+# Multi-agent SaaS factory
+cargo run -p argentor-cli --example demo_saas_factory
+
+# Security challenge (penetration testing agent)
+cargo run -p argentor-cli --example demo_security_challenge</pre>
+
+    <h2>3. Start the Gateway</h2>
+    <pre># Set your LLM provider key
+export ANTHROPIC_API_KEY="sk-ant-..."
+# Or: export OPENAI_API_KEY="sk-..."
+
+# Start the server
+cargo run -p argentor-cli -- serve --bind 0.0.0.0:8080</pre>
+
+    <p>Open your browser:</p>
+    <table>
+      <tr><th>URL</th><th>What it is</th></tr>
+      <tr><td><code>http://localhost:8080/dashboard</code></td><td>Control plane dashboard</td></tr>
+      <tr><td><code>http://localhost:8080/playground</code></td><td>Interactive chat playground</td></tr>
+      <tr><td><code>http://localhost:8080/health</code></td><td>Health check</td></tr>
+      <tr><td><code>http://localhost:8080/openapi.json</code></td><td>OpenAPI 3.0 specification</td></tr>
+      <tr><td><code>http://localhost:8080/metrics</code></td><td>Prometheus metrics</td></tr>
+    </table>
+
+    <h2>4. Chat via REST API</h2>
+    <h3>Synchronous</h3>
+    <pre>curl -X POST http://localhost:8080/api/v1/agent/chat \
+  -H "Content-Type: application/json" \
+  -d '{"message": "What files are in the current directory?"}'</pre>
+
+    <h3>Streaming (SSE)</h3>
+    <pre>curl -N -X POST http://localhost:8080/api/v1/chat/stream \
+  -H "Content-Type: application/json" \
+  -d '{"message": "Write a haiku about Rust"}'</pre>
+
+    <h2>5. Python SDK</h2>
+    <pre>pip install argentor-sdk</pre>
+    <pre>from argentor import ArgentorClient
+
+client = ArgentorClient("http://localhost:8080")
+
+# Simple chat
+response = client.run_task("Summarize the README.md file")
+print(response.output)
+
+# List available skills
+skills = client.list_skills()
+for skill in skills:
+    print(f"  {skill.name}: {skill.description}")</pre>
+
+    <h2>6. Rust Library</h2>
+    <pre>[dependencies]
+argentor-core    = "1.0"
+argentor-agent   = "1.0"
+argentor-skills  = "1.0"
+argentor-builtins = "1.0"</pre>
+
+    <pre>use argentor_agent::{AgentRunner, ModelConfig, LlmProvider};
+use argentor_skills::SkillRegistry;
+use argentor_builtins::register_builtins;
+
+#[tokio::main]
+async fn main() -> anyhow::Result&lt;()&gt; {
+    let mut registry = SkillRegistry::new();
+    register_builtins(&amp;mut registry);
+
+    let config = ModelConfig::new(LlmProvider::Claude)
+        .with_model("claude-sonnet-4-20250514")
+        .with_max_tokens(4096);
+
+    let mut runner = AgentRunner::new(config, registry);
+    let response = runner.run("What tools do you have available?").await?;
+    println!("{}", response.content);
+    Ok(())
+}</pre>
+
+    <h3>With guardrails</h3>
+    <pre>use argentor_agent::GuardrailEngine;
+
+let guardrails = GuardrailEngine::default(); // PII + injection + toxicity
+let mut runner = AgentRunner::new(config, registry)
+    .with_guardrails(guardrails)
+    .with_cache(1000, std::time::Duration::from_secs(300));
+
+let response = runner.run("Process this customer data").await?;</pre>
+
+    <h2>7. Docker</h2>
+    <pre>docker run -d \
+  --name argentor \
+  -p 8080:8080 \
+  -e ANTHROPIC_API_KEY="sk-ant-..." \
+  ghcr.io/fboiero/argentor:latest serve</pre>
+
+    <h2>Key Concepts</h2>
+    <h3>Skills</h3>
+    <p>Skills are tools the agent can use. Argentor ships 50+ built-in skills (files, shell, git, web search, crypto, etc.) plus a WASM plugin system for custom skills.</p>
+    <pre>cargo run -p argentor-cli -- skill list</pre>
+
+    <h3>Guardrails</h3>
+    <p>Pre/post-execution filters that scan for PII, prompt injection, and policy violations. Integrated directly into the agent loop — zero configuration required.</p>
+
+    <h3>Multi-Agent Orchestration</h3>
+    <pre>use argentor_orchestrator::{Orchestrator, OrchestratorConfig};
+
+let config = OrchestratorConfig::default();
+let orchestrator = Orchestrator::new(config);
+orchestrator.run_pipeline("Build a REST API for a todo app").await?;</pre>
+
+    <h3>MCP Integration</h3>
+    <p>Argentor acts as both MCP client (connect to MCP servers) and MCP server (expose skills as MCP tools).</p>
+    <pre>cargo run -p argentor-cli -- mcp serve</pre>
+
+    <h2>What's Next?</h2>
+    <ul>
+      <li><a href="benchmarks.html">Benchmarks</a> — how Argentor compares to LangChain, CrewAI, PydanticAI</li>
+      <li><a href="enterprise.html">Enterprise</a> — RBAC, multi-tenancy, readiness endpoint</li>
+      <li><a href="https://github.com/fboiero/Agentor/blob/master/docs/DEPLOYMENT.md" target="_blank">Deployment Guide</a> — Docker, Kubernetes, Helm</li>
+      <li><a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a> — full API reference</li>
+    </ul>
+  </main>
+</div>
+
+<footer>
+  <span>&copy; 2025 Argentor contributors &mdash; <a href="https://github.com/fboiero/Agentor/blob/master/LICENSE" target="_blank">AGPL-3.0-only</a></span>
+  <span><a href="https://github.com/fboiero/Agentor" target="_blank">GitHub</a> &middot; <a href="https://crates.io/search?q=argentor" target="_blank">crates.io</a> &middot; <a href="https://docs.rs/argentor-core" target="_blank">docs.rs</a></span>
+</footer>
+<script src="nav.js"></script>
+</body>
+</html>
