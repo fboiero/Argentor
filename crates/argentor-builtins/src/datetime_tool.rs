@@ -129,9 +129,8 @@ impl Default for DateTimeSkill {
 fn parse_timezone(tz: &str) -> Result<FixedOffset, String> {
     let tz = tz.trim();
     if tz.eq_ignore_ascii_case("Z") || tz.eq_ignore_ascii_case("UTC") {
-        // Safety: 0 seconds east is always a valid offset — `east_opt(0)` cannot return `None`.
-        #[allow(clippy::unwrap_used)]
-        return Ok(FixedOffset::east_opt(0).unwrap());
+        // 0 seconds east is always a valid UTC offset — east_opt(0) cannot return None.
+        return Ok(FixedOffset::east_opt(0).expect("UTC offset 0 is always valid"));
     }
 
     // Parse +HH:MM or -HH:MM

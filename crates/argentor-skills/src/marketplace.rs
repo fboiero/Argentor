@@ -851,7 +851,6 @@ impl MarketplaceManager {
                 graph.entry(dep.name.clone()).or_default();
                 graph.entry(current.clone()).or_default();
                 // dep -> current (current depends on dep)
-                graph.get_mut(&dep.name).unwrap_or(&mut Vec::new());
                 graph
                     .entry(dep.name.clone())
                     .or_default()

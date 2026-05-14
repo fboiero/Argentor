@@ -22,8 +22,48 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 use std::time::SystemTime;
 use tracing::info;
+
+// ---------------------------------------------------------------------------
+// Static regex patterns for analyze_imports (compiled once, reused across calls)
+// ---------------------------------------------------------------------------
+
+fn re_rust_use() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"^\s*use\s+(.+);").expect("valid regex"))
+}
+
+fn re_python_import() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"^\s*import\s+(.+)").expect("valid regex"))
+}
+
+fn re_python_from_import() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"^\s*from\s+(\S+)\s+import\s+(.+)").expect("valid regex"))
+}
+
+fn re_js_import() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r"^\s*import\s+(.+)").expect("valid regex"))
+}
+
+fn re_js_require() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r#"require\s*\(\s*['"]([^'"]+)['"]\s*\)"#).expect("valid regex"))
+}
+
+fn re_go_single_import() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r#"^\s*import\s+"([^"]+)""#).expect("valid regex"))
+}
+
+fn re_go_block_import() -> &'static Regex {
+    static RE: OnceLock<Regex> = OnceLock::new();
+    RE.get_or_init(|| Regex::new(r#"^\s*"([^"]+)""#).expect("valid regex"))
+}
 
 /// Directories that are always excluded from traversal.
 const EXCLUDED_DIRS: &[&str] = &[
@@ -836,8 +876,7 @@ async fn execute_analyze_imports(call: &ToolCall) -> ArgentorResult<ToolResult> 
 
     match lang {
         "rust" => {
-            let re = Regex::new(r"^\s*use\s+(.+);")
-                .unwrap_or_else(|_| Regex::new(r"^$").expect("infallible regex"));
+            let re = re_rust_use();
             for (line_num, line) in content.lines().enumerate() {
                 if let Some(caps) = re.captures(line) {
                     if let Some(m) = caps.get(1) {
@@ -851,10 +890,8 @@ async fn execute_analyze_imports(call: &ToolCall) -> ArgentorResult<ToolResult> 
             }
         }
         "python" => {
-            let import_re = Regex::new(r"^\s*import\s+(.+)")
-                .unwrap_or_else(|_| Regex::new(r"^$").expect("infallible regex"));
-            let from_re = Regex::new(r"^\s*from\s+(\S+)\s+import\s+(.+)")
-                .unwrap_or_else(|_| Regex::new(r"^$").expect("infallible regex"));
+            let import_re = re_python_import();
+            let from_re = re_python_from_import();
             for (line_num, line) in content.lines().enumerate() {
                 if let Some(caps) = from_re.captures(line) {
                     let module = caps.get(1).map(|m| m.as_str()).unwrap_or("");
@@ -877,10 +914,8 @@ async fn execute_analyze_imports(call: &ToolCall) -> ArgentorResult<ToolResult> 
             }
         }
         "typescript" | "javascript" => {
-            let re = Regex::new(r#"^\s*import\s+(.+)"#)
-                .unwrap_or_else(|_| Regex::new(r"^$").expect("infallible regex"));
-            let require_re = Regex::new(r#"require\s*\(\s*['"]([^'"]+)['"]\s*\)"#)
-                .unwrap_or_else(|_| Regex::new(r"^$").expect("infallible regex"));
+            let re = re_js_import();
+            let require_re = re_js_require();
             for (line_num, line) in content.lines().enumerate() {
                 if let Some(caps) = re.captures(line) {
                     if let Some(m) = caps.get(1) {
@@ -902,10 +937,8 @@ async fn execute_analyze_imports(call: &ToolCall) -> ArgentorResult<ToolResult> 
             }
         }
         "go" => {
-            let single_re = Regex::new(r#"^\s*import\s+"([^"]+)""#)
-                .unwrap_or_else(|_| Regex::new(r"^$").expect("infallible regex"));
-            let block_import_re = Regex::new(r#"^\s*"([^"]+)""#)
-                .unwrap_or_else(|_| Regex::new(r"^$").expect("infallible regex"));
+            let single_re = re_go_single_import();
+            let block_import_re = re_go_block_import();
             let mut in_import_block = false;
             for (line_num, line) in content.lines().enumerate() {
                 let trimmed = line.trim();
