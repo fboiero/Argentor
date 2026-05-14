@@ -1,0 +1,20 @@
+[agent]
+name = "customer-support"
+model = "claude-sonnet-4"
+max_turns = 20
+scaffold_mode = "full"
+
+[guardrails]
+profile = "strict"
+
+[skills]
+enabled = ["web_search", "human_approval", "memory_search", "file_read"]
+
+[memory]
+tier = "multi"
+short_term_window = 40
+
+[support]
+escalation_enabled = true
+human_approval_timeout_secs = 300
+max_open_tickets = 50

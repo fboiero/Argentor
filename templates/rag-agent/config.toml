@@ -1,0 +1,22 @@
+[agent]
+name = "rag-agent"
+model = "claude-sonnet-4"
+max_turns = 10
+scaffold_mode = "full"
+
+[guardrails]
+profile = "strict"
+
+[skills]
+enabled = ["web_search", "memory_search", "file_read"]
+
+[memory]
+tier = "multi"  # short-term + long-term + entity
+short_term_window = 20
+
+[rag]
+chunk_size = 512
+chunk_overlap = 64
+top_k = 5
+embedding_model = "local"  # uses argentor-memory LocalEmbedding
+similarity_threshold = 0.75

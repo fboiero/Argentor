@@ -1,0 +1,20 @@
+[agent]
+name = "code-reviewer"
+model = "claude-sonnet-4"
+max_turns = 15
+scaffold_mode = "full"
+
+[guardrails]
+profile = "moderate"
+
+[skills]
+enabled = ["code_analysis", "git_tools", "file_read", "memory_search"]
+
+[memory]
+tier = "short"
+short_term_window = 30
+
+[review]
+languages = ["rust", "go", "typescript", "python"]
+severity_levels = ["critical", "warning", "suggestion"]
+auto_fix = false

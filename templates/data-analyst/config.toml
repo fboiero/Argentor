@@ -1,0 +1,20 @@
+[agent]
+name = "data-analyst"
+model = "claude-sonnet-4"
+max_turns = 25
+scaffold_mode = "full"
+
+[guardrails]
+profile = "moderate"
+
+[skills]
+enabled = ["csv_processor", "calculator", "web_fetch", "chart_generation", "file_read", "memory_search"]
+
+[memory]
+tier = "multi"
+short_term_window = 20
+
+[analytics]
+max_file_size_mb = 100
+chart_output_format = "png"
+supported_formats = ["csv", "json", "parquet"]
