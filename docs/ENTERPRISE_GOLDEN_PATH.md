@@ -105,5 +105,5 @@ console.log(report.posture, report.score);
 
 1. Add deployment config input so readiness can distinguish configured SSO,
    approval policy, and data-residency policy.
-2. Add a CI smoke job that boots the gateway and asserts readiness posture.
+2. Watch `.github/workflows/enterprise-readiness-smoke.yml` as the dedicated CI signal for this contract.
 3. Add dashboard UI integration once the endpoint contract is stable.

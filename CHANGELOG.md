@@ -35,7 +35,7 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 - Minimal scaffold mode (C-02) — `argentor init --minimal` generates a lean single-agent starter
 - E2E validation suite — full pipeline smoke tests covering all major subsystems
 - Demo script for asciinema recording
-- Enterprise readiness endpoint (`GET /health/enterprise`) reporting feature flag status
+- Enterprise readiness endpoint (`GET /api/v1/enterprise/readiness`) reporting runtime posture, configured controls, and next actions
 - All-features build fix — `cargo build --all-features --workspace` compiles cleanly
 
 ---
