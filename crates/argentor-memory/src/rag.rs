@@ -20,6 +20,7 @@ use std::time::Instant;
 use argentor_core::ArgentorResult;
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use tracing::instrument;
 use uuid::Uuid;
 
 use crate::embedding::EmbeddingProvider;
@@ -416,6 +417,14 @@ impl RagPipeline {
     }
 
     /// Query the knowledge base and return scored, filtered chunks.
+    #[instrument(
+        skip(self, question),
+        fields(
+            query_length = question.len(),
+            chunks_searched = tracing::field::Empty,
+            results_count = tracing::field::Empty,
+        )
+    )]
     pub async fn query(&self, question: &str, top_k: Option<usize>) -> ArgentorResult<RagResult> {
         let start = Instant::now();
         let k = top_k.unwrap_or(self.config.top_k);
@@ -457,6 +466,10 @@ impl RagPipeline {
         let context_text = format_context(&scored, self.config.max_context_tokens);
 
         let elapsed = start.elapsed().as_millis() as u64;
+
+        tracing::Span::current()
+            .record("chunks_searched", total_chunks_searched)
+            .record("results_count", scored.len());
 
         Ok(RagResult {
             chunks: scored,
