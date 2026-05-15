@@ -178,11 +178,17 @@ streaming semantics.
 
 ## Next Sprint
 
-1. Add request latency/error panels for audit endpoints.
-2. Add pluggable audit sinks for SQLite/Postgres, S3-compatible object storage,
+1. Add pluggable audit sinks for SQLite/Postgres, S3-compatible object storage,
    and SIEM webhook/export.
-3. Add distributed session broadcast adapters for Redis or NATS.
-4. Prototype Replay Lab for policy and model rollout simulation.
+2. Add distributed session broadcast adapters for Redis or NATS.
+3. Prototype Replay Lab for policy and model rollout simulation.
+
+Done in this hardening line:
+
+- Per-route audit endpoint health panel on `/dashboard/audit`, computed from
+  the existing `argentor_http_requests_total` and
+  `argentor_http_request_duration_us` counters (no new server-side metrics
+  required).
 
 ## Release Readiness
 
