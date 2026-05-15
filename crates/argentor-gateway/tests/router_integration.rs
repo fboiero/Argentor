@@ -205,6 +205,34 @@ async fn test_metrics_route_mounted() {
     );
 }
 
+#[tokio::test]
+async fn test_release_operability_smoke() {
+    let (app, _tmp) = build_full_gateway().await;
+
+    let (health_status, health) = get_json(&app, "/health").await;
+    assert_eq!(health_status, StatusCode::OK);
+    assert_eq!(health["status"], "ok");
+
+    let (dashboard_status, dashboard_body) = get(&app, "/dashboard").await;
+    assert_eq!(dashboard_status, StatusCode::OK);
+    assert!(String::from_utf8_lossy(&dashboard_body).contains("/dashboard/audit"));
+
+    let (audit_status, audit_body) = get(&app, "/dashboard/audit").await;
+    assert_eq!(audit_status, StatusCode::OK);
+    let audit_html = String::from_utf8_lossy(&audit_body);
+    assert!(audit_html.contains("/api/v1/audit/logs"));
+    assert!(audit_html.contains("exportLogs"));
+
+    let (metrics_status, metrics_body) = get(&app, "/metrics").await;
+    assert_eq!(metrics_status, StatusCode::OK);
+    assert!(String::from_utf8_lossy(&metrics_body).contains("argentor_http_requests_total"));
+
+    let (openapi_status, openapi) = get_json(&app, "/openapi.json").await;
+    assert_eq!(openapi_status, StatusCode::OK);
+    assert!(openapi["paths"]["/dashboard/audit"]["get"].is_object());
+    assert!(openapi["components"]["schemas"]["ErrorResponse"].is_object());
+}
+
 // ---- Dashboard ------------------------------------------------------------
 
 #[tokio::test]

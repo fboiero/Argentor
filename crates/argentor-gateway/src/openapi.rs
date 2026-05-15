@@ -156,7 +156,8 @@ impl ApiResponse {
 
     /// Standard 401 Unauthorized response.
     pub fn unauthorized() -> Self {
-        Self::error(401, "Authentication required").with_example(r#"{"error":"Authentication required"}"#)
+        Self::error(401, "Authentication required")
+            .with_example(r#"{"error":"Authentication required"}"#)
     }
 
     /// Standard 500 Internal Server Error response.
@@ -698,11 +699,7 @@ mod tests {
     #[test]
     fn test_argentor_default_auth_endpoints_document_401() {
         let gen = OpenApiGenerator::argentor_default();
-        let auth_endpoints: Vec<_> = gen
-            .endpoints
-            .iter()
-            .filter(|e| e.auth_required)
-            .collect();
+        let auth_endpoints: Vec<_> = gen.endpoints.iter().filter(|e| e.auth_required).collect();
         assert!(
             !auth_endpoints.is_empty(),
             "expected at least one auth-required endpoint"
@@ -731,7 +728,10 @@ mod tests {
                 ) && e.path.starts_with("/api/v1/")
             })
             .collect();
-        assert!(!mutating.is_empty(), "expected at least one mutating /api/v1 endpoint");
+        assert!(
+            !mutating.is_empty(),
+            "expected at least one mutating /api/v1 endpoint"
+        );
         for ep in mutating {
             assert!(
                 ep.responses.iter().any(|r| r.status_code == 500),
