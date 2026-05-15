@@ -389,7 +389,7 @@ impl BudgetTracker {
         }
 
         // Sort by role display name for deterministic output.
-        per_agent.sort_by(|a, b| a.role.to_string().cmp(&b.role.to_string()));
+        per_agent.sort_by_key(|entry| entry.role.to_string());
 
         BudgetSummary {
             total_input_tokens: total_input,
