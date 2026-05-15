@@ -93,8 +93,8 @@ cargo run -p argentor-benchmarks --release -- audit-scale \
   --events 10000000 --page-limit 100 --violation-every 1000 --samples 3
 ```
 
-A persisted stats index is still required if cold `/api/v1/audit/stats` must be
-consistently sub-100 ms after process restart on multi-million-event logs.
+The persisted `audit.jsonl.stats.idx` index now removes this cold-path scan when
+the audit JSONL is unchanged after process restart.
 
 ## Phase 2: Scalable Audit Plane
 
@@ -179,5 +179,14 @@ streaming semantics.
 ## Next Sprint
 
 1. Add request latency/error panels for audit endpoints.
-2. Define release checklist for v1.4.x including docs, smoke, benchmark, and
-   known limits.
+2. Add pluggable audit sinks for SQLite/Postgres, S3-compatible object storage,
+   and SIEM webhook/export.
+3. Add distributed session broadcast adapters for Redis or NATS.
+4. Prototype Replay Lab for policy and model rollout simulation.
+
+## Release Readiness
+
+The v1.4.x release checklist is tracked in
+[`RELEASE_CHECKLIST_v1.4.x.md`](RELEASE_CHECKLIST_v1.4.x.md). The remaining
+items in this roadmap are post-release expansion work, not blockers for the
+audit-plane hardening release.

@@ -50,12 +50,12 @@ Full report: [docs/BENCHMARK_SYNTHESIS.md](docs/BENCHMARK_SYNTHESIS.md) — incl
 | Crate | Description |
 |-------|-------------|
 | `argentor-core` | Core types, errors, event bus, metrics export, correlation context |
-| `argentor-security` | Capabilities, RBAC, rate limiting, audit log (rotating, background writer), TLS/mTLS, JWT, encrypted store, alerts, SLA tracking |
+| `argentor-security` | Capabilities, RBAC, rate limiting, audit log with size/age rotation and Zstandard archival compression, background writer, TLS/mTLS, JWT, encrypted store, alerts, SLA tracking |
 | `argentor-session` | Session management, `FileSessionStore`, persistence |
 | `argentor-skills` | Skill trait, `SkillRegistry` (concurrent), WASM sandbox runtime, vetting pipeline, marketplace download/install/cache |
-| `argentor-agent` | AgentRunner, 14 LLM backends, Bedrock (SigV4, feature-gated), failover, streaming, circuit breaker, response cache (concurrent LRU+TTL), token budget, adaptive context compaction |
+| `argentor-agent` | AgentRunner, 14 LLM backends, Bedrock (SigV4, feature-gated), failover, streaming, circuit breaker, transparent `CacheLayer` wrapping any backend (LRU+TTL, SHA-256 keyed), webhook event notifications, token budget, adaptive context compaction |
 | `argentor-channels` | Slack, Discord, Telegram, Webchat adapters |
-| `argentor-gateway` | HTTP/WebSocket gateway, auth, webhooks, Prometheus metrics, observability dashboard (HTML/JS, no deps), OpenAPI |
+| `argentor-gateway` | HTTP/WebSocket gateway, auth, Prometheus metrics, OpenAPI 3.0 spec, REST audit plane (`/api/v1/audit/{logs,violations,stats}` with cursor pagination and persisted indexes), SSE session streaming, operator dashboards (`/dashboard`, `/dashboard/audit`) |
 | `argentor-builtins` | shell, file I/O, HTTP, memory, browser, Docker, code generation, 50+ universal skills |
 | `argentor-memory` | Vector memory, hybrid search (BM25 + embeddings), query expansion, JSONL persistence |
 | `argentor-mcp` | MCP client/server/proxy, proxy orchestrator, credential vault, token pool |
@@ -89,6 +89,15 @@ Full report: [docs/BENCHMARK_SYNTHESIS.md](docs/BENCHMARK_SYNTHESIS.md) — incl
 - Learning Feedback Loop — tool selector improves from execution outcomes
 - 6-phase competitive benchmark suite (vs LangChain, CrewAI, PydanticAI, Claude SDK)
 
+### Operability and Observability
+- REST audit plane: `/api/v1/audit/logs`, `/api/v1/audit/violations`, `/api/v1/audit/stats` with cursor pagination and bounded reads
+- Audit dashboard at `/dashboard/audit` with outcome and date-range filters, JSON detail drawer, and CSV/JSON export
+- Persisted `audit.jsonl.violations.idx` and `audit.jsonl.stats.idx` keep both endpoints near-constant time across process restarts and 10M-event logs
+- SSE session streaming at `/api/v1/stream/{session_id}` for token, tool call, and done events
+- Prometheus audit metric family (`argentor_audit_configured`, `_log_bytes`, `_events_total`, `_events_today`, `_violations_today`, `_block_rate_percent`) plus the existing HTTP/skill/LLM counters
+- Webhook event notifications (`AgentStarted`, `AgentCompleted`, `AgentFailed`, `ToolCalled`, `GuardrailBlocked`, `ApprovalRequired`, `BudgetExhausted`) with HMAC-SHA256 signing
+- Audit-scale benchmark suite (`cargo run -p argentor-benchmarks -- audit-scale`) with recorded 100k/1M/10M latency baselines
+
 ### Developer Experience
 - 5 runnable examples (see `examples/`)
 - Workflow DSL — TOML-based agent workflows, no Rust code required
@@ -97,6 +106,8 @@ Full report: [docs/BENCHMARK_SYNTHESIS.md](docs/BENCHMARK_SYNTHESIS.md) — incl
 - CLI REPL with 12 commands for interactive agent debugging
 - Observability dashboard at `/dashboard` — pure HTML/JS, no build step
 - Enterprise readiness report at `/api/v1/enterprise/readiness` — runtime score, active checks, available controls, and next actions
+- Four ready-to-adapt agent profile templates under `templates/` (code-reviewer, customer-support, data-analyst, rag-agent)
+- Kubernetes Helm chart under `deploy/helm/argentor/` with hardened pod security defaults and HPA support
 
 ### Integrations
 - 14 LLM providers: Claude, OpenAI, Gemini, OpenRouter, Groq, Ollama, Mistral, xAI, Azure OpenAI, Cerebras, Together, DeepSeek, Cohere, HuggingFace
@@ -184,10 +195,16 @@ Async support and 24 typed models included. For native Rust bindings: `pip insta
 
 ```bash
 cargo run --bin argentor -- serve
-# Open http://localhost:3000/dashboard
+# Operator cockpits
+open http://localhost:3000/dashboard         # deployments, agents, health
+open http://localhost:3000/dashboard/audit   # audit log explorer with filters and exports
+# Machine-readable surfaces
+curl http://localhost:3000/metrics            # Prometheus
+curl http://localhost:3000/openapi.json       # OpenAPI 3.0 spec
+curl http://localhost:3000/api/v1/audit/stats # JSON summary
 ```
 
-Pure HTML/JS — no build step, dark-themed SPA with deployment management, agent catalog, and health monitoring.
+Pure HTML/JS — no build step, dark-themed SPA. The audit dashboard adds outcome/date filters, a JSON detail drawer, and one-click CSV/JSON export over the same `/api/v1/audit/*` endpoints used by external tooling.
 
 ---
 

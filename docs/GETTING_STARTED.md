@@ -76,10 +76,31 @@ Open your browser:
 | URL | What it is |
 |-----|-----------|
 | `http://localhost:8080/dashboard` | Control plane dashboard |
+| `http://localhost:8080/dashboard/audit` | Audit log explorer with filters and CSV/JSON export |
 | `http://localhost:8080/playground` | Interactive chat playground |
 | `http://localhost:8080/health` | Health check |
 | `http://localhost:8080/openapi.json` | OpenAPI 3.0 specification |
-| `http://localhost:8080/metrics` | Prometheus metrics |
+| `http://localhost:8080/metrics` | Prometheus metrics (includes the `argentor_audit_*` family) |
+| `http://localhost:8080/api/v1/audit/logs` | REST audit log endpoint with cursor pagination |
+| `http://localhost:8080/api/v1/audit/stats` | Aggregate audit counters |
+
+### Optional: audit storage configuration
+
+Add an `[audit]` section to `argentor.toml` to opt into rotation, retention,
+and compression for the audit log. Without this block the gateway uses the
+defaults (no rotation, JSONL only).
+
+```toml
+[audit]
+# path = "./data/audit/audit.jsonl"   # explicit path, otherwise <data_dir>/audit/audit.jsonl
+max_size_mb = 10                       # rotate the active log past this size
+max_rotated_files = 5                  # keep the N most recent numeric-suffix rotations
+# retention_days = 30                  # also delete rotations older than this many days
+compress_rotated = false               # set true to archive rotated files as <base>.N.zst
+```
+
+See [DEPLOYMENT.md](DEPLOYMENT.md) for the full audit lifecycle and the
+Prometheus metric reference.
 
 ---
 

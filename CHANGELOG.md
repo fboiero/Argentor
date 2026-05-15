@@ -8,6 +8,58 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Audit plane
+- `GET /api/v1/audit/logs` and `GET /api/v1/audit/violations` with `limit` and `cursor` query parameters; responses include an `x-next-cursor` header
+- `GET /api/v1/audit/stats` with aggregate counters for the dashboard summary bar
+- Prometheus audit metric family on `/metrics`: `argentor_audit_configured`, `argentor_audit_log_bytes`, `argentor_audit_events_total`, `argentor_audit_events_today`, `argentor_audit_violations_today`, `argentor_audit_block_rate_percent`. Emitted from process start with zero values until events land, so operator dashboards have stable series on day one.
+- Streaming audit stats: byte-block newline counting plus reverse today's-tail parsing replaces full JSONL materialization. 1M-event cold stats p95 ≤ 1.1 s; 10M-event cold stats p95 ≈ 813 ms.
+- Persisted `audit.jsonl.violations.idx` for fast cursor pagination on the violations endpoint, rebuilt when the audit JSONL changes.
+- Persisted `audit.jsonl.stats.idx` for sub-millisecond warm stats reads across process restarts, invalidated by audit JSONL length or mtime changes.
+- `[audit]` config block (`path`, `max_size_mb`, `max_rotated_files`, `retention_days`, `compress_rotated`) in `argentor.toml`. CLI routes the audit log through `AuditLog::with_file_rotation` when any rotation knob is set.
+- Audit log rotation pipeline with numeric-suffix files, retention by age, and optional Zstandard compression for archived rotations.
+
+### Streaming and integrations
+- `GET /api/v1/stream/{session_id}` server-sent events endpoint for token, tool call, and done events with per-session bounded tokio broadcast and idle-channel pruning.
+- `response_cache_layer::CacheLayer` wraps any `LlmBackend` with a SHA-256-keyed LRU cache and TTL eviction. Skips tool-calling responses by default. Composes via `AgentRunner::with_backend(Box::new(CacheLayer::new(...)))`.
+- `webhooks::WebhookManager` fires HMAC-SHA256-signed POSTs for `AgentStarted`, `AgentCompleted`, `AgentFailed`, and `ToolCalled` events. `GuardrailBlocked`, `ApprovalRequired`, and `BudgetExhausted` are declared and wired through `AgentRunner::with_webhooks(...)`.
+
+### Operator dashboard
+- `/dashboard/audit` cockpit linked from the main dashboard sidebar.
+- Filters: outcome (allowed/denied/error) and date-from/date-to range. Re-render client-side without refetching.
+- Detail drawer with compact pretty-printed JSON of `entry.details`.
+- Export actions for CSV and JSON honoring the active filters.
+
+### OpenAPI
+- `ApiResponse::unauthorized()`, `internal_error()`, and `bad_request(description)` helpers emit the conventional `{"error": "<message>"}` shape.
+- Explicit 400/401/500 responses on every `/api/v1` endpoint (`/enterprise/readiness`, `/sessions`, `/skills`, `/control-plane/deployments`).
+- `/openapi.json` self-documents in its own paths block so the spec endpoint is discoverable.
+- Regression tests: every `requires_auth()` endpoint must declare a 401; every mutating `/api/v1/*` endpoint must declare a 500.
+
+### Observability
+- `#[tracing::instrument]` on `GuardrailEngine::run_pipeline` with `input_length`, `is_output`, `violations_count`, and `processing_time_ms` span fields.
+- `#[tracing::instrument]` on `RagPipeline::query` with `query_length`, `chunks_searched`, and `results_count` span fields.
+- `#[tracing::instrument]` on `ws_handler` with method, path, and status_code fields.
+
+### Benchmarks
+- `audit-scale` subcommand on `argentor-benchmarks`: synthetic JSONL fixture generator plus timing samples for logs first/second page, violations first page, and stats cold/warm. Writes `benchmarks/results/audit_scale_<timestamp>.json`. Used to record the 1M and 10M audit latency baselines in the PSU roadmap.
+
+### Testing
+- `tests/operator_smoke.rs` boots a fully-wired gateway over a real TCP listener and verifies `/dashboard`, `/dashboard/audit`, `/metrics`, and `/openapi.json` respond together with the right content types and that the audit metric family is exposed when `audit_log_path` is configured.
+- `tests/router_integration::test_release_operability_smoke` runs the same surface in-process via the tower stack for CI without socket privileges, and asserts the spec ships an `ErrorResponse` schema.
+- `docs/RELEASE_CHECKLIST_v1.4.x.md` captures release gates, verification
+  commands, optional scale evidence, and known limits for the hardening release.
+
+### Deployment
+- Helm chart fixes (`deploy/helm/argentor/`): four real bugs corrected — `secret.yaml` no longer addresses an array as a map; the auto-generated Secret and ConfigMap are now wired to the container via `envFrom`; the unused `gateway.port` ConfigMap reference was removed in favor of `ARGENTOR_BIND` as the single source of truth; the README defaults were rewritten to match `values.yaml`. A dedicated `secrets:` block (`anthropicApiKey`, `openaiApiKey`, `groqApiKey`) replaces the previous misuse of the `env` array.
+- `helm lint` passes; `helm template` emits all eight resources with the full feature set enabled.
+
+### Templates
+- Four agent profile templates under `templates/` (code-reviewer, customer-support, data-analyst, rag-agent) with config sketches, system prompts, and honest READMEs that document the manual adoption path until the CLI gains first-class template loading.
+
+### Documentation
+- `docs/ROADMAP_PERFORMANCE_SCALABILITY_USABILITY.md` with five phases (operational hardening → scalable audit plane → distributed runtime → operator UX → adaptive control plane), tracked progress, and recorded 100k/1M/10M audit latency baselines.
+- `docs/DEPLOYMENT.md` gains the new audit Prometheus metric entries.
+
 ---
 
 ## [1.4.0] - 2026-05-10
