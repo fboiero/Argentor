@@ -395,7 +395,7 @@ fn extract_topics(turns: &[ConversationTurn]) -> Vec<String> {
     }
 
     let mut sorted: Vec<(String, usize)> = freq.into_iter().collect();
-    sorted.sort_by(|a, b| b.1.cmp(&a.1));
+    sorted.sort_by_key(|entry| std::cmp::Reverse(entry.1));
     sorted.into_iter().take(10).map(|(word, _)| word).collect()
 }
 

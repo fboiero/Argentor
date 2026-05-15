@@ -848,7 +848,7 @@ impl KnowledgeGraph {
             .into_iter()
             .filter_map(|(id, count)| self.entities.get(id).map(|e| (e.name.clone(), count)))
             .collect();
-        most_connected.sort_by(|a, b| b.1.cmp(&a.1));
+        most_connected.sort_by_key(|entry| std::cmp::Reverse(entry.1));
         most_connected.truncate(10);
 
         GraphSummary {
