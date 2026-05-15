@@ -401,11 +401,7 @@ impl ResponseEvaluator {
     /// and formatting elements like code blocks, lists, or numbered items.
     fn score_clarity(&self, response: &str) -> f32 {
         let lines = response.lines().count();
-        let avg_line_len = if lines > 0 {
-            response.len() / lines
-        } else {
-            response.len()
-        };
+        let avg_line_len = response.len().checked_div(lines).unwrap_or(response.len());
 
         let mut score: f32 = 0.5;
         if lines > 1 {

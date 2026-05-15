@@ -470,10 +470,9 @@ impl ContextCompactorEngine {
 
         // Always include recent messages
         let recent_start = messages.len().saturating_sub(self.config.preserve_recent);
-        for (i, msg) in messages.iter().enumerate().skip(recent_start) {
+        for (i, _msg) in messages.iter().enumerate().skip(recent_start) {
             if !selected_indices.contains(&i) {
                 selected_indices.insert(i);
-                current_tokens += msg.token_estimate;
             }
         }
 

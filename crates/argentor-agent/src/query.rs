@@ -107,22 +107,17 @@ pub enum QueryEvent {
 // ---------------------------------------------------------------------------
 
 /// How tools (skills) should be configured for a query.
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub enum ToolConfig {
     /// Register default builtins (requires `argentor-builtins` at call site).
     Builtins,
     /// Use only the named tools from a registry.
     Only(Vec<String>),
     /// No tools available to the agent.
+    #[default]
     None,
     /// Provide a fully custom skill registry.
     Custom(Arc<SkillRegistry>),
-}
-
-impl Default for ToolConfig {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 impl std::fmt::Debug for ToolConfig {

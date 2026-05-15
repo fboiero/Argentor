@@ -1155,7 +1155,7 @@ pub fn redact_pii(text: &str) -> (String, Vec<PiiMatch>) {
     }
 
     // Sort descending by start so replacements don't shift earlier offsets.
-    matches.sort_by(|a, b| b.span.0.cmp(&a.span.0));
+    matches.sort_by_key(|item| std::cmp::Reverse(item.span.0));
 
     // Deduplicate overlapping spans (keep the one that starts first / is longer).
     matches.dedup_by(|a, b| {
@@ -1171,7 +1171,7 @@ pub fn redact_pii(text: &str) -> (String, Vec<PiiMatch>) {
     }
 
     // Re-sort ascending for the caller.
-    matches.sort_by(|a, b| a.span.0.cmp(&b.span.0));
+    matches.sort_by_key(|item| item.span.0);
     (result, matches)
 }
 

@@ -727,17 +727,16 @@ impl CritiqueEngine {
             }
 
             match critique.dimension {
-                CritiqueDimension::Clarity => {
-                    // Add paragraph breaks if response is one long block
-                    if !fixed.contains("\n\n") && fixed.len() > 200 {
-                        let mid = fixed.len() / 2;
-                        // Find nearest sentence boundary
-                        if let Some(pos) = fixed[mid..].find(". ") {
-                            let break_point = mid + pos + 2;
-                            fixed.insert_str(break_point, "\n\n");
-                        }
+                // Add paragraph breaks if response is one long block.
+                CritiqueDimension::Clarity if !fixed.contains("\n\n") && fixed.len() > 200 => {
+                    let mid = fixed.len() / 2;
+                    // Find nearest sentence boundary
+                    if let Some(pos) = fixed[mid..].find(". ") {
+                        let break_point = mid + pos + 2;
+                        fixed.insert_str(break_point, "\n\n");
                     }
                 }
+                CritiqueDimension::Clarity => {}
                 CritiqueDimension::Safety => {
                     // Remove lines containing harmful patterns (aggressive but safe)
                     let harmful = [
