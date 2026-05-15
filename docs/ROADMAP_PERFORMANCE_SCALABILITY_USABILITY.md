@@ -103,11 +103,13 @@ consistently sub-100 ms after process restart on multi-million-event logs.
 - Done: cursor pagination to `/api/v1/audit/logs`.
 - Done: cursor pagination to `/api/v1/audit/violations`.
 - Done: local JSONL audit rotation and retention policy through `[audit]`
-  config (`path`, `max_size_mb`, `max_rotated_files`, `retention_days`).
-- Remaining: compression policy for archived audit logs.
+  config (`path`, `max_size_mb`, `max_rotated_files`, `retention_days`,
+  `compress_rotated`).
+- Done: Zstandard compression policy for archived audit logs.
 - Remaining: add pluggable audit sinks: JSONL, SQLite/Postgres, S3-compatible object
   storage, and SIEM webhook/export.
-- Remaining: add a lightweight violation index for fast policy/security views.
+- Done: lightweight `audit.jsonl.violations.idx` index for fast
+  `/api/v1/audit/violations` pagination, rebuilt when the audit JSONL changes.
 - Remaining: add a persisted stats index if cold stats must be sub-100 ms on
   million-event logs after restart.
 
@@ -176,9 +178,7 @@ streaming semantics.
 
 ## Next Sprint
 
-1. Add compression policy for archived audit logs.
-2. Add request latency/error panels for audit endpoints.
-3. Add persisted stats index design for sub-100 ms cold stats.
-4. Add violation index design for sparse or old violations.
-5. Define release checklist for v1.4.x including docs, smoke, benchmark, and
+1. Add request latency/error panels for audit endpoints.
+2. Add persisted stats index design for sub-100 ms cold stats.
+3. Define release checklist for v1.4.x including docs, smoke, benchmark, and
    known limits.
