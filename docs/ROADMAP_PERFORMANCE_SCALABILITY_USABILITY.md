@@ -69,6 +69,21 @@ Near-term target: keep logs under 10 ms p95 and violations under 100 ms p95
 at 100k events. Phase 2 should add a violation index before treating 1M-event
 violation queries as production-ready.
 
+Follow-up 1M-event baseline after streaming stats optimization:
+
+| Endpoint | 1M-event p95 |
+|----------|--------------|
+| Logs first page | <= 2 ms |
+| Logs second page | <= 2 ms |
+| Violations first page | <= 70 ms |
+| Stats cold scan | <= 1.1 s |
+| Stats warm cache hit | <= 1 ms |
+
+Stats cold now avoids materializing every audit entry and counts total events via
+byte scanning, then parses only today's tail in reverse. A persisted stats index
+is still required if cold `/api/v1/audit/stats` must be consistently sub-100 ms
+on million-event logs after process restart.
+
 ## Phase 2: Scalable Audit Plane
 
 **Goal:** move audit from local JSONL convenience into a production subsystem.
