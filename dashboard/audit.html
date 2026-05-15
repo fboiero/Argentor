@@ -46,11 +46,14 @@
     .filter-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 4px 12px; color: var(--muted); cursor: pointer; font-size: 12px; }
     .filter-btn.active { border-color: var(--blue); color: var(--blue); }
     .filter-input { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; color: var(--text); font-size: 12px; flex: 1; min-width: 160px; font-family: inherit; }
+    .filter-select { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; color: var(--text); font-size: 12px; font-family: inherit; }
     .filter-input:focus { outline: none; border-color: var(--blue); }
     .section-footer { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; justify-content: center; }
     .load-more-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 6px 14px; color: var(--muted); cursor: pointer; font-size: 12px; font-family: inherit; }
     .load-more-btn:hover:not(:disabled) { color: var(--text); border-color: var(--blue); }
     .load-more-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .command-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; color: var(--muted); cursor: pointer; font-size: 12px; font-family: inherit; }
+    .command-btn:hover { color: var(--text); border-color: var(--blue); }
 
     /* Table */
     table { width: 100%; border-collapse: collapse; }
@@ -67,6 +70,8 @@
     .outcome-error { color: var(--yellow); }
     .empty-row td { text-align: center; color: var(--muted); padding: 32px; font-size: 12px; }
     .error-row td { text-align: center; color: var(--red); padding: 32px; font-size: 12px; }
+    .details-btn { background: transparent; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); cursor: pointer; font-size: 11px; padding: 2px 6px; font-family: inherit; }
+    .details-btn:hover { color: var(--blue); border-color: var(--blue); }
 
     /* Violations panel */
     .rule-group { padding: 12px 16px; border-bottom: 1px solid var(--border); }
@@ -80,6 +85,18 @@
     .loading { color: var(--muted); padding: 24px; text-align: center; }
     .dot-anim::after { content: '...'; animation: dots 1.2s infinite; }
     @keyframes dots { 0%,20%{content:'.'}40%,60%{content:'..'}80%,100%{content:'...'} }
+
+    /* Detail drawer */
+    .drawer-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.55); display: none; align-items: stretch; justify-content: flex-end; z-index: 10; }
+    .drawer-backdrop.open { display: flex; }
+    .drawer { width: min(560px, 100%); background: var(--bg2); border-left: 1px solid var(--border); padding: 16px; overflow-y: auto; }
+    .drawer-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
+    .drawer-header h2 { font-size: 14px; color: var(--blue); }
+    .drawer-close { margin-left: auto; }
+    .detail-grid { display: grid; grid-template-columns: 120px 1fr; gap: 8px 12px; margin-bottom: 12px; }
+    .detail-label { color: var(--muted); font-size: 11px; text-transform: uppercase; }
+    .detail-value { word-break: break-word; }
+    .json-block { background: var(--bg); border: 1px solid var(--border); border-radius: 4px; padding: 12px; white-space: pre-wrap; word-break: break-word; max-height: 420px; overflow: auto; }
   </style>
 </head>
 <body>
@@ -123,7 +140,17 @@
       <button class="filter-btn" data-type="action" onclick="setTypeFilter(this)">Action</button>
       <button class="filter-btn" data-type="violation" onclick="setTypeFilter(this)">Violation</button>
       <button class="filter-btn" data-type="auth" onclick="setTypeFilter(this)">Auth</button>
+      <select class="filter-select" id="outcome-filter" onchange="renderLogs()">
+        <option value="all">All outcomes</option>
+        <option value="success">Success</option>
+        <option value="denied">Denied</option>
+        <option value="error">Error</option>
+      </select>
+      <input class="filter-select" id="date-from" type="date" onchange="renderLogs()" />
+      <input class="filter-select" id="date-to" type="date" onchange="renderLogs()" />
       <input class="filter-input" id="log-search" placeholder="Search session, action, skill…" oninput="renderLogs()" />
+      <button class="command-btn" type="button" onclick="exportLogs('json')">JSON</button>
+      <button class="command-btn" type="button" onclick="exportLogs('csv')">CSV</button>
     </div>
     <div style="overflow-x:auto">
       <table>
@@ -162,10 +189,22 @@
   </div>
 </main>
 
+<div class="drawer-backdrop" id="detail-backdrop" onclick="closeDetail(event)">
+  <aside class="drawer" onclick="event.stopPropagation()">
+    <div class="drawer-header">
+      <h2>Audit event</h2>
+      <button class="command-btn drawer-close" type="button" onclick="closeDetail()">Close</button>
+    </div>
+    <div class="detail-grid" id="detail-grid"></div>
+    <pre class="json-block" id="detail-json"></pre>
+  </aside>
+</div>
+
 <script>
   const API = '';
   const REQUEST_TIMEOUT_MS = 8000;
   let logs = [], violations = [], typeFilter = 'all', sortKey = 'timestamp', sortDir = -1;
+  let filteredLogs = [];
   let logNextCursor = null, violationNextCursor = null;
   let lastError = '';
 
@@ -283,16 +322,30 @@
 
   function renderLogs() {
     const q = (document.getElementById('log-search').value || '').toLowerCase();
+    const outcome = document.getElementById('outcome-filter').value;
+    const dateFrom = document.getElementById('date-from').value;
+    const dateTo = document.getElementById('date-to').value;
     let data = [...logs];
 
     if (typeFilter !== 'all') {
       data = data.filter(e => (e.action || '').toLowerCase().includes(typeFilter));
     }
+    if (outcome !== 'all') {
+      data = data.filter(e => (e.outcome || '').toLowerCase() === outcome);
+    }
+    if (dateFrom || dateTo) {
+      data = data.filter(e => {
+        if (!e.timestamp) return false;
+        const day = e.timestamp.slice(0, 10);
+        return (!dateFrom || day >= dateFrom) && (!dateTo || day <= dateTo);
+      });
+    }
     if (q) {
       data = data.filter(e =>
         (e.session_id || '').toLowerCase().includes(q) ||
         (e.action || '').toLowerCase().includes(q) ||
-        (e.skill_name || '').toLowerCase().includes(q)
+        (e.skill_name || '').toLowerCase().includes(q) ||
+        JSON.stringify(e.details || {}).toLowerCase().includes(q)
       );
     }
 
@@ -301,7 +354,8 @@
       return sortDir * (va < vb ? -1 : va > vb ? 1 : 0);
     });
 
-    document.getElementById('log-count').textContent = data.length;
+    filteredLogs = data;
+    document.getElementById('log-count').textContent = `${data.length}/${logs.length}`;
     updateLoadMoreButton('load-more-logs', logNextCursor);
     const tbody = document.getElementById('log-body');
     if (lastError && logs.length === 0) {
@@ -312,16 +366,77 @@
       tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No audit entries found</td></tr>';
       return;
     }
-    tbody.innerHTML = data.map(e => `
+    tbody.innerHTML = data.map((e, idx) => `
       <tr>
         <td class="ts">${e.timestamp ? escapeHtml(new Date(e.timestamp).toLocaleString()) : '-'}</td>
         <td class="ts">${escapeHtml((e.session_id || '').slice(0, 8))}...</td>
         <td><span class="action-tag">${escapeHtml(e.action || '-')}</span></td>
         <td>${e.skill_name ? escapeHtml(e.skill_name) : '<span style="color:var(--muted)">-</span>'}</td>
         <td class="outcome-${escapeHtml(e.outcome || 'success')}">${escapeHtml(e.outcome || '-')}</td>
-        <td style="color:var(--muted);font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(compactJson(e.details))}</td>
+        <td>
+          <button class="details-btn" type="button" onclick="openLogDetail(${idx})">Details</button>
+          <span style="color:var(--muted);font-size:11px;margin-left:8px">${escapeHtml(compactJson(e.details, 120))}</span>
+        </td>
       </tr>
     `).join('');
+  }
+
+  function openLogDetail(index) {
+    const entry = filteredLogs[index];
+    if (!entry) return;
+    const rows = [
+      ['Timestamp', entry.timestamp ? new Date(entry.timestamp).toLocaleString() : '-'],
+      ['Session', entry.session_id || '-'],
+      ['Action', entry.action || '-'],
+      ['Skill', entry.skill_name || '-'],
+      ['Outcome', entry.outcome || '-'],
+    ];
+    document.getElementById('detail-grid').innerHTML = rows.map(([label, value]) => `
+      <div class="detail-label">${escapeHtml(label)}</div>
+      <div class="detail-value">${escapeHtml(value)}</div>
+    `).join('');
+    document.getElementById('detail-json').textContent = JSON.stringify(entry.details || {}, null, 2);
+    document.getElementById('detail-backdrop').classList.add('open');
+  }
+
+  function closeDetail(event) {
+    if (event && event.target && event.target.id !== 'detail-backdrop') return;
+    document.getElementById('detail-backdrop').classList.remove('open');
+  }
+
+  function exportLogs(format) {
+    const rows = filteredLogs.length ? filteredLogs : logs;
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+    if (format === 'json') {
+      downloadText(`argentor-audit-${stamp}.json`, JSON.stringify(rows, null, 2), 'application/json');
+      return;
+    }
+    const csv = [
+      ['timestamp', 'session_id', 'action', 'skill_name', 'outcome', 'details'],
+      ...rows.map(e => [
+        e.timestamp || '',
+        e.session_id || '',
+        e.action || '',
+        e.skill_name || '',
+        e.outcome || '',
+        JSON.stringify(e.details || {}),
+      ])
+    ].map(row => row.map(csvCell).join(',')).join('\n');
+    downloadText(`argentor-audit-${stamp}.csv`, csv, 'text/csv');
+  }
+
+  function csvCell(value) {
+    return `"${String(value ?? '').replace(/"/g, '""')}"`;
+  }
+
+  function downloadText(filename, text, type) {
+    const blob = new Blob([text], { type });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   function renderViolations() {
