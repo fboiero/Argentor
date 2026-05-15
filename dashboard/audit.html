@@ -129,6 +129,30 @@
     </div>
   </div>
 
+  <!-- Endpoint health -->
+  <div class="section">
+    <div class="section-header">
+      <h2>Endpoint Health</h2>
+      <span class="badge" id="endpoint-health-source">/metrics</span>
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th>Route</th>
+            <th style="text-align:right">Requests</th>
+            <th style="text-align:right">Errors (4xx/5xx)</th>
+            <th style="text-align:right">Error rate</th>
+            <th style="text-align:right">Avg latency</th>
+          </tr>
+        </thead>
+        <tbody id="endpoint-health-body">
+          <tr><td colspan="5" class="muted">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
   <!-- Log table -->
   <div class="section">
     <div class="section-header">
@@ -213,10 +237,11 @@
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     setStatus('warn', 'Loading');
     try {
-      const [logsRes, violRes, statsRes] = await Promise.all([
+      const [logsRes, violRes, statsRes, metricsRes] = await Promise.all([
         fetch(`${API}/api/v1/audit/logs?limit=100`, { signal: controller.signal }),
         fetch(`${API}/api/v1/audit/violations?limit=50`, { signal: controller.signal }),
         fetch(`${API}/api/v1/audit/stats`, { signal: controller.signal }),
+        fetch(`${API}/metrics`, { signal: controller.signal }),
       ]);
       if (!logsRes.ok || !violRes.ok || !statsRes.ok) {
         throw new Error(`API ${logsRes.status}/${violRes.status}/${statsRes.status}`);
@@ -235,6 +260,12 @@
         document.getElementById('stat-violations').textContent = s.violations_today.toLocaleString();
         document.getElementById('stat-block-rate').textContent = s.block_rate_percent.toFixed(1) + '%';
       }
+      if (metricsRes.ok) {
+        const text = await metricsRes.text();
+        renderEndpointHealth(text);
+      } else {
+        renderEndpointHealth('');
+      }
       lastError = '';
       setStatus('ok', 'Live');
     } catch (e) {
@@ -247,6 +278,71 @@
     renderLogs();
     renderViolations();
     updateCountdown(30);
+  }
+
+  // Parses Prometheus text-format metrics and renders an endpoint health
+  // table scoped to /api/v1/audit/* routes. Uses the existing
+  // argentor_http_requests_total and argentor_http_request_duration_us
+  // counters; no new metrics required.
+  function renderEndpointHealth(promText) {
+    const body = document.getElementById('endpoint-health-body');
+    if (!promText) {
+      body.innerHTML = '<tr><td colspan="5" class="muted">Metrics unavailable</td></tr>';
+      return;
+    }
+
+    // Aggregate per route. Sum across status codes; track 4xx/5xx separately.
+    const routes = new Map();
+    const lineRe = /^argentor_http_(requests_total|request_duration_us)\{method="([^"]+)",path="([^"]+)",status="([^"]+)"\}\s+([0-9.eE+\-]+)/;
+    for (const line of promText.split('\n')) {
+      const m = line.match(lineRe);
+      if (!m) continue;
+      const [, metric, method, path, statusStr, valStr] = m;
+      if (!path.startsWith('/api/v1/audit/')) continue;
+      const status = parseInt(statusStr, 10);
+      const val = parseFloat(valStr);
+      const key = `${method} ${path}`;
+      if (!routes.has(key)) {
+        routes.set(key, { method, path, total: 0, errors: 0, durationUs: 0 });
+      }
+      const r = routes.get(key);
+      if (metric === 'requests_total') {
+        r.total += val;
+        if (status >= 400) r.errors += val;
+      } else if (metric === 'request_duration_us') {
+        r.durationUs += val;
+      }
+    }
+
+    if (routes.size === 0) {
+      body.innerHTML = '<tr><td colspan="5" class="muted">No audit traffic recorded yet</td></tr>';
+      return;
+    }
+
+    const sorted = Array.from(routes.values()).sort((a, b) =>
+      a.path.localeCompare(b.path) || a.method.localeCompare(b.method));
+
+    const fmtLatency = (us, count) => {
+      if (count <= 0) return '—';
+      const avgUs = us / count;
+      if (avgUs >= 1000) return (avgUs / 1000).toFixed(1) + ' ms';
+      return Math.round(avgUs) + ' µs';
+    };
+    const fmtRate = (errs, total) => {
+      if (total <= 0) return '—';
+      return ((errs / total) * 100).toFixed(2) + '%';
+    };
+
+    body.innerHTML = sorted.map(r => {
+      const errClass = r.errors > 0 ? 'val-red' : 'val-green';
+      return `<tr>
+        <td><code>${r.method} ${r.path}</code></td>
+        <td style="text-align:right">${r.total.toLocaleString()}</td>
+        <td style="text-align:right" class="${errClass}">${r.errors.toLocaleString()}</td>
+        <td style="text-align:right" class="${errClass}">${fmtRate(r.errors, r.total)}</td>
+        <td style="text-align:right">${fmtLatency(r.durationUs, r.total)}</td>
+      </tr>`;
+    }).join('');
   }
 
   async function loadMoreLogs() {

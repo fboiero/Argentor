@@ -222,6 +222,15 @@ async fn test_release_operability_smoke() {
     let audit_html = String::from_utf8_lossy(&audit_body);
     assert!(audit_html.contains("/api/v1/audit/logs"));
     assert!(audit_html.contains("exportLogs"));
+    // Endpoint health panel: parses /metrics for per-route audit traffic.
+    assert!(
+        audit_html.contains("Endpoint Health"),
+        "audit dashboard must include the Endpoint Health panel"
+    );
+    assert!(
+        audit_html.contains("renderEndpointHealth"),
+        "audit dashboard must wire renderEndpointHealth() to fetchAll()"
+    );
 
     let (metrics_status, metrics_body) = get(&app, "/metrics").await;
     assert_eq!(metrics_status, StatusCode::OK);
