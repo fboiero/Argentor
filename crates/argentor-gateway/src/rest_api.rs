@@ -15,7 +15,7 @@ use axum::{
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fmt::Write as _;
-use std::io::{Read, Seek, SeekFrom};
+use std::io::{BufRead, BufReader, Read, Seek, SeekFrom};
 use std::path::{Path as FsPath, PathBuf};
 use std::sync::{Arc, RwLock};
 use std::time::SystemTime;
@@ -826,7 +826,9 @@ async fn read_audit_stats(
         return Ok(entry.stats.clone());
     }
 
-    let stats = task::spawn_blocking(move || read_audit_stats_blocking(&path))
+    let modified_ns = system_time_unix_nanos(modified).unwrap_or(0);
+
+    let stats = task::spawn_blocking(move || read_audit_stats_blocking(&path, file_len, modified_ns))
         .await
         .map_err(|e| ApiError::Internal(format!("Audit stats read task failed: {e}")))?
         .map_err(|e| ApiError::Internal(format!("Failed to read audit stats: {e}")))?;
@@ -873,7 +875,27 @@ fn read_audit_entries_page_blocking(
     })
 }
 
-fn read_audit_stats_blocking(path: &FsPath) -> Result<AuditStats, String> {
+fn read_audit_stats_blocking(
+    path: &FsPath,
+    file_len: u64,
+    modified_ns: u128,
+) -> Result<AuditStats, String> {
+    let index_path = audit_stats_index_path(path);
+    match read_audit_stats_index_if_fresh(&index_path, file_len, modified_ns) {
+        Ok(Some(stats)) => return Ok(stats),
+        Ok(None) => {}
+        Err(err) => warn!(error = %err, "Ignoring stale or invalid audit stats index"),
+    }
+
+    let stats = compute_audit_stats_blocking(path)?;
+    if let Err(err) = write_audit_stats_index(&index_path, file_len, modified_ns, &stats) {
+        warn!(error = %err, "Failed to write audit stats index");
+    }
+
+    Ok(stats)
+}
+
+fn compute_audit_stats_blocking(path: &FsPath) -> Result<AuditStats, String> {
     let today = Utc::now().date_naive();
     let total_events = count_audit_lines_blocking(path)?;
     let (events_today, violations_today, blocked_today) =
@@ -891,6 +913,76 @@ fn read_audit_stats_blocking(path: &FsPath) -> Result<AuditStats, String> {
         block_rate_percent,
         total_events,
     })
+}
+
+fn audit_stats_index_path(path: &FsPath) -> PathBuf {
+    let mut index = path.as_os_str().to_owned();
+    index.push(".stats.idx");
+    PathBuf::from(index)
+}
+
+fn read_audit_stats_index_if_fresh(
+    index_path: &FsPath,
+    file_len: u64,
+    modified_ns: u128,
+) -> Result<Option<AuditStats>, String> {
+    let Ok(file) = std::fs::File::open(index_path) else {
+        return Ok(None);
+    };
+    let mut reader = BufReader::new(file);
+
+    let mut len_header = String::new();
+    reader
+        .read_line(&mut len_header)
+        .map_err(|e| format!("Failed to read audit stats index length: {e}"))?;
+    let indexed_len = len_header
+        .trim()
+        .strip_prefix("audit_len=")
+        .and_then(|value| value.parse::<u64>().ok());
+    if indexed_len != Some(file_len) {
+        return Ok(None);
+    }
+
+    let mut modified_header = String::new();
+    reader
+        .read_line(&mut modified_header)
+        .map_err(|e| format!("Failed to read audit stats index modified time: {e}"))?;
+    let indexed_modified = modified_header
+        .trim()
+        .strip_prefix("audit_modified_ns=")
+        .and_then(|value| value.parse::<u128>().ok());
+    if indexed_modified != Some(modified_ns) {
+        return Ok(None);
+    }
+
+    let mut stats_json = String::new();
+    reader
+        .read_to_string(&mut stats_json)
+        .map_err(|e| format!("Failed to read audit stats index body: {e}"))?;
+    let stats = serde_json::from_str(stats_json.trim())
+        .map_err(|e| format!("Failed to parse audit stats index body: {e}"))?;
+    Ok(Some(stats))
+}
+
+fn write_audit_stats_index(
+    index_path: &FsPath,
+    file_len: u64,
+    modified_ns: u128,
+    stats: &AuditStats,
+) -> Result<(), String> {
+    let mut body = String::new();
+    let _ = writeln!(body, "audit_len={file_len}");
+    let _ = writeln!(body, "audit_modified_ns={modified_ns}");
+    let stats_json = serde_json::to_string(stats)
+        .map_err(|e| format!("Failed to serialize audit stats index: {e}"))?;
+    body.push_str(&stats_json);
+    body.push('\n');
+
+    if let Some(parent) = index_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create audit stats index directory: {e}"))?;
+    }
+    std::fs::write(index_path, body).map_err(|e| format!("Failed to write audit stats index: {e}"))
 }
 
 fn count_audit_lines_blocking(path: &FsPath) -> Result<u64, String> {
@@ -1003,7 +1095,226 @@ fn read_audit_violations_page_blocking(
     limit: usize,
     before: Option<u64>,
 ) -> Result<AuditPage, String> {
+    match read_audit_violations_page_from_index_blocking(path, limit, before) {
+        Ok(page) => return Ok(page),
+        Err(err) => warn!(error = %err, "Falling back to reverse scan for audit violations"),
+    }
+
     read_recent_audit_entries_where_page_blocking(path, limit, before, is_violation_entry)
+}
+
+fn read_audit_violations_page_from_index_blocking(
+    path: &FsPath,
+    limit: usize,
+    before: Option<u64>,
+) -> Result<AuditPage, String> {
+    if limit == 0 {
+        return Ok(AuditPage {
+            entries: vec![],
+            next_cursor: None,
+        });
+    }
+
+    let metadata = std::fs::metadata(path).map_err(|e| format!("Failed to stat audit log: {e}"))?;
+    let file_len = metadata.len();
+    let modified_ns = metadata
+        .modified()
+        .ok()
+        .and_then(system_time_unix_nanos)
+        .unwrap_or(0);
+    if file_len == 0 {
+        return Ok(AuditPage {
+            entries: vec![],
+            next_cursor: None,
+        });
+    }
+
+    let index_path = audit_violation_index_path(path);
+    let offsets = load_or_rebuild_violation_index(path, &index_path, file_len, modified_ns)?;
+    if offsets.is_empty() {
+        return Ok(AuditPage {
+            entries: vec![],
+            next_cursor: None,
+        });
+    }
+
+    let before = before.unwrap_or(file_len).min(file_len);
+    let upper = offsets.partition_point(|offset| *offset < before);
+    if upper == 0 {
+        return Ok(AuditPage {
+            entries: vec![],
+            next_cursor: None,
+        });
+    }
+
+    let selected_offsets: Vec<u64> = offsets[..upper].iter().rev().take(limit).copied().collect();
+    let has_more = selected_offsets
+        .last()
+        .is_some_and(|oldest| offsets[..upper].iter().any(|offset| offset < oldest));
+    let mut entries = Vec::with_capacity(selected_offsets.len());
+    for offset in &selected_offsets {
+        if let Some(entry) = read_audit_entry_at_offset(path, *offset)? {
+            if is_violation_entry(&entry) {
+                entries.push(entry);
+            }
+        }
+    }
+
+    entries.sort_by_key(|entry| entry.timestamp);
+    entries.reverse();
+
+    Ok(AuditPage {
+        entries,
+        next_cursor: has_more.then(|| selected_offsets.last().copied()).flatten(),
+    })
+}
+
+fn audit_violation_index_path(path: &FsPath) -> PathBuf {
+    let mut index = path.as_os_str().to_owned();
+    index.push(".violations.idx");
+    PathBuf::from(index)
+}
+
+fn load_or_rebuild_violation_index(
+    path: &FsPath,
+    index_path: &FsPath,
+    file_len: u64,
+    modified_ns: u128,
+) -> Result<Vec<u64>, String> {
+    if let Some(offsets) = read_violation_index_if_fresh(index_path, file_len, modified_ns)? {
+        return Ok(offsets);
+    }
+
+    let offsets = rebuild_violation_index(path, index_path, file_len, modified_ns)?;
+    Ok(offsets)
+}
+
+fn read_violation_index_if_fresh(
+    index_path: &FsPath,
+    file_len: u64,
+    modified_ns: u128,
+) -> Result<Option<Vec<u64>>, String> {
+    let Ok(file) = std::fs::File::open(index_path) else {
+        return Ok(None);
+    };
+    let mut reader = BufReader::new(file);
+    let mut header = String::new();
+    reader
+        .read_line(&mut header)
+        .map_err(|e| format!("Failed to read violation index header: {e}"))?;
+    let indexed_len = header
+        .trim()
+        .strip_prefix("audit_len=")
+        .and_then(|value| value.parse::<u64>().ok());
+    if indexed_len != Some(file_len) {
+        return Ok(None);
+    }
+
+    let mut modified_header = String::new();
+    reader
+        .read_line(&mut modified_header)
+        .map_err(|e| format!("Failed to read violation index modified header: {e}"))?;
+    let indexed_modified = modified_header
+        .trim()
+        .strip_prefix("audit_modified_ns=")
+        .and_then(|value| value.parse::<u128>().ok());
+    if indexed_modified != Some(modified_ns) {
+        return Ok(None);
+    }
+
+    let mut offsets = Vec::new();
+    for line in reader.lines() {
+        let line = line.map_err(|e| format!("Failed to read violation index: {e}"))?;
+        if line.trim().is_empty() {
+            continue;
+        }
+        let offset = line
+            .trim()
+            .parse::<u64>()
+            .map_err(|e| format!("Invalid violation index offset: {e}"))?;
+        offsets.push(offset);
+    }
+    Ok(Some(offsets))
+}
+
+fn rebuild_violation_index(
+    path: &FsPath,
+    index_path: &FsPath,
+    file_len: u64,
+    modified_ns: u128,
+) -> Result<Vec<u64>, String> {
+    let file = std::fs::File::open(path).map_err(|e| format!("Failed to open audit log: {e}"))?;
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+    let mut offset = 0u64;
+    let mut offsets = Vec::new();
+
+    loop {
+        line.clear();
+        let read = reader
+            .read_line(&mut line)
+            .map_err(|e| format!("Failed to read audit log: {e}"))?;
+        if read == 0 {
+            break;
+        }
+
+        let trimmed = line.trim();
+        if !trimmed.is_empty() {
+            let entry: AuditEntry = serde_json::from_str(trimmed)
+                .map_err(|e| format!("Failed to parse audit entry: {e}"))?;
+            if is_violation_entry(&entry) {
+                offsets.push(offset);
+            }
+        }
+        offset += read as u64;
+    }
+
+    write_violation_index(index_path, file_len, modified_ns, &offsets)?;
+    Ok(offsets)
+}
+
+fn write_violation_index(
+    index_path: &FsPath,
+    file_len: u64,
+    modified_ns: u128,
+    offsets: &[u64],
+) -> Result<(), String> {
+    let mut body = String::new();
+    let _ = writeln!(body, "audit_len={file_len}");
+    let _ = writeln!(body, "audit_modified_ns={modified_ns}");
+    for offset in offsets {
+        let _ = writeln!(body, "{offset}");
+    }
+
+    if let Some(parent) = index_path.parent() {
+        std::fs::create_dir_all(parent)
+            .map_err(|e| format!("Failed to create violation index directory: {e}"))?;
+    }
+    std::fs::write(index_path, body).map_err(|e| format!("Failed to write violation index: {e}"))
+}
+
+fn read_audit_entry_at_offset(path: &FsPath, offset: u64) -> Result<Option<AuditEntry>, String> {
+    let mut file =
+        std::fs::File::open(path).map_err(|e| format!("Failed to open audit log: {e}"))?;
+    file.seek(SeekFrom::Start(offset))
+        .map_err(|e| format!("Failed to seek audit log: {e}"))?;
+    let mut reader = BufReader::new(file);
+    let mut line = String::new();
+    let read = reader
+        .read_line(&mut line)
+        .map_err(|e| format!("Failed to read audit log: {e}"))?;
+    if read == 0 || line.trim().is_empty() {
+        return Ok(None);
+    }
+    serde_json::from_str(line.trim())
+        .map(Some)
+        .map_err(|e| format!("Failed to parse audit entry: {e}"))
+}
+
+fn system_time_unix_nanos(time: SystemTime) -> Option<u128> {
+    time.duration_since(std::time::UNIX_EPOCH)
+        .ok()
+        .map(|duration| duration.as_nanos())
 }
 
 fn read_recent_audit_entries_page_blocking(
@@ -1582,6 +1893,116 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_audit_stats_persisted_index_round_trip() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let audit_path = state.audit_log_path.clone().unwrap();
+        std::fs::create_dir_all(audit_path.parent().unwrap()).unwrap();
+
+        let session_id = Uuid::new_v4();
+        let denied = AuditEntry {
+            timestamp: Utc::now(),
+            session_id,
+            action: "policy_denied".to_string(),
+            skill_name: None,
+            details: serde_json::json!({"rule": "stats_index"}),
+            outcome: AuditOutcome::Denied,
+        };
+        let success = AuditEntry {
+            timestamp: Utc::now(),
+            session_id,
+            action: "tool_call".to_string(),
+            skill_name: None,
+            details: serde_json::json!({"ok": true}),
+            outcome: AuditOutcome::Success,
+        };
+        std::fs::write(
+            &audit_path,
+            format!(
+                "{}\n{}\n",
+                serde_json::to_string(&denied).unwrap(),
+                serde_json::to_string(&success).unwrap()
+            ),
+        )
+        .unwrap();
+
+        let metadata = std::fs::metadata(&audit_path).unwrap();
+        let file_len = metadata.len();
+        let modified_ns = system_time_unix_nanos(metadata.modified().unwrap()).unwrap();
+        let stats = read_audit_stats_blocking(&audit_path, file_len, modified_ns).unwrap();
+        assert_eq!(stats.total_events, 2);
+        assert_eq!(stats.violations_today, 1);
+
+        let index_path = audit_stats_index_path(&audit_path);
+        assert!(index_path.exists(), "stats index should be written");
+
+        std::fs::remove_file(&audit_path).unwrap();
+        let cached = read_audit_stats_blocking(&audit_path, file_len, modified_ns).unwrap();
+        assert_eq!(cached.total_events, 2);
+        assert_eq!(cached.violations_today, 1);
+    }
+
+    #[tokio::test]
+    async fn test_audit_stats_rebuilds_stale_index() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let audit_path = state.audit_log_path.clone().unwrap();
+        std::fs::create_dir_all(audit_path.parent().unwrap()).unwrap();
+
+        let session_id = Uuid::new_v4();
+        let success = AuditEntry {
+            timestamp: Utc::now(),
+            session_id,
+            action: "tool_call".to_string(),
+            skill_name: None,
+            details: serde_json::json!({"ok": true}),
+            outcome: AuditOutcome::Success,
+        };
+        std::fs::write(
+            &audit_path,
+            format!("{}\n", serde_json::to_string(&success).unwrap()),
+        )
+        .unwrap();
+        let metadata = std::fs::metadata(&audit_path).unwrap();
+        let stats = read_audit_stats_blocking(
+            &audit_path,
+            metadata.len(),
+            system_time_unix_nanos(metadata.modified().unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(stats.total_events, 1);
+        assert_eq!(stats.violations_today, 0);
+
+        let denied = AuditEntry {
+            timestamp: Utc::now() + chrono::Duration::seconds(1),
+            session_id,
+            action: "policy_denied".to_string(),
+            skill_name: None,
+            details: serde_json::json!({"rule": "stats_stale_rebuild"}),
+            outcome: AuditOutcome::Denied,
+        };
+        std::fs::write(
+            &audit_path,
+            format!(
+                "{}\n{}\n",
+                serde_json::to_string(&success).unwrap(),
+                serde_json::to_string(&denied).unwrap()
+            ),
+        )
+        .unwrap();
+        let metadata = std::fs::metadata(&audit_path).unwrap();
+        let stats = read_audit_stats_blocking(
+            &audit_path,
+            metadata.len(),
+            system_time_unix_nanos(metadata.modified().unwrap()).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(stats.total_events, 2);
+        assert_eq!(stats.violations_today, 1);
+        assert_eq!(stats.block_rate_percent, 50.0);
+    }
+
+    #[tokio::test]
     async fn test_audit_prometheus_export_unconfigured() {
         let tmp = tempfile::tempdir().unwrap();
         let state = test_state(&tmp).await;
@@ -1780,6 +2201,155 @@ mod tests {
         let violations: Vec<ViolationEntry> = serde_json::from_slice(&body).unwrap();
         assert_eq!(violations.len(), 1);
         assert_eq!(violations[0].rule, "network_policy");
+    }
+
+    #[tokio::test]
+    async fn test_audit_violations_uses_index_and_paginates() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let audit_path = state.audit_log_path.clone().unwrap();
+        std::fs::create_dir_all(audit_path.parent().unwrap()).unwrap();
+
+        let session_id = Uuid::new_v4();
+        let base = Utc::now();
+        let mut lines = Vec::new();
+        for i in 0..5 {
+            let denied = i == 0 || i == 2 || i == 4;
+            let entry = AuditEntry {
+                timestamp: base + chrono::Duration::seconds(i),
+                session_id,
+                action: if denied {
+                    "policy_denied".to_string()
+                } else {
+                    "tool_call".to_string()
+                },
+                skill_name: None,
+                details: serde_json::json!({
+                    "rule": format!("rule_{i}"),
+                    "message": format!("message_{i}")
+                }),
+                outcome: if denied {
+                    AuditOutcome::Denied
+                } else {
+                    AuditOutcome::Success
+                },
+            };
+            lines.push(serde_json::to_string(&entry).unwrap());
+        }
+        std::fs::write(&audit_path, format!("{}\n", lines.join("\n"))).unwrap();
+
+        let app = api_router(state.clone());
+        let req = Request::builder()
+            .uri("/api/v1/audit/violations?limit=2")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let cursor = resp
+            .headers()
+            .get(AUDIT_NEXT_CURSOR_HEADER)
+            .expect("first violation page should include cursor")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let violations: Vec<ViolationEntry> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            violations
+                .iter()
+                .map(|entry| entry.rule.as_str())
+                .collect::<Vec<_>>(),
+            vec!["rule_4", "rule_2"]
+        );
+        assert!(audit_violation_index_path(&audit_path).exists());
+
+        let app = api_router(state);
+        let req = Request::builder()
+            .uri(format!("/api/v1/audit/violations?limit=2&cursor={cursor}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(resp.headers().get(AUDIT_NEXT_CURSOR_HEADER).is_none());
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let violations: Vec<ViolationEntry> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].rule, "rule_0");
+    }
+
+    #[tokio::test]
+    async fn test_audit_violations_rebuilds_stale_index() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let audit_path = state.audit_log_path.clone().unwrap();
+        std::fs::create_dir_all(audit_path.parent().unwrap()).unwrap();
+
+        let session_id = Uuid::new_v4();
+        let success = AuditEntry {
+            timestamp: Utc::now(),
+            session_id,
+            action: "tool_call".to_string(),
+            skill_name: None,
+            details: serde_json::json!({ "ok": true }),
+            outcome: AuditOutcome::Success,
+        };
+        std::fs::write(
+            &audit_path,
+            format!("{}\n", serde_json::to_string(&success).unwrap()),
+        )
+        .unwrap();
+
+        let app = api_router(state.clone());
+        let req = Request::builder()
+            .uri("/api/v1/audit/violations?limit=10")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let violations: Vec<ViolationEntry> = serde_json::from_slice(&body).unwrap();
+        assert!(violations.is_empty());
+
+        let denied = AuditEntry {
+            timestamp: Utc::now() + chrono::Duration::seconds(1),
+            session_id,
+            action: "policy_denied".to_string(),
+            skill_name: None,
+            details: serde_json::json!({
+                "rule": "stale_rebuild",
+                "message": "rebuilt"
+            }),
+            outcome: AuditOutcome::Denied,
+        };
+        std::fs::write(
+            &audit_path,
+            format!(
+                "{}\n{}\n",
+                serde_json::to_string(&success).unwrap(),
+                serde_json::to_string(&denied).unwrap()
+            ),
+        )
+        .unwrap();
+
+        let app = api_router(state);
+        let req = Request::builder()
+            .uri("/api/v1/audit/violations?limit=10")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let violations: Vec<ViolationEntry> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].rule, "stale_rebuild");
     }
 
     #[tokio::test]
