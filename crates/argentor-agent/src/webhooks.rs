@@ -54,6 +54,21 @@ impl Default for WebhookConfig {
 }
 
 /// Events that the webhook system can emit.
+///
+/// `AgentRunner` fires the following events automatically:
+///
+/// - `AgentStarted` — at the start of `run()`.
+/// - `AgentCompleted` — when the agentic loop returns a final response.
+/// - `AgentFailed` — when the loop hits `max_turns` without converging.
+/// - `ToolCalled` — for every tool invocation requested by the LLM.
+/// - `GuardrailBlocked` — when input or output guardrails reject a turn. The
+///   payload includes the failing rule names and human-readable messages.
+/// - `ApprovalRequired` — when a tool marked `requires_approval: true` enters
+///   the human-in-the-loop gate, before the approval skill is invoked.
+///
+/// `BudgetExhausted` is part of the public event surface but is **not** wired
+/// to a runner hook today. Callers driving their own `TokenBudget` should fire
+/// it from their own loop when `TokenBudget::is_exhausted()` flips to `true`.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WebhookEvent {
@@ -61,15 +76,17 @@ pub enum WebhookEvent {
     AgentStarted,
     /// Agent run completed successfully.
     AgentCompleted,
-    /// Agent run failed.
+    /// Agent run failed (e.g. max_turns exceeded).
     AgentFailed,
     /// A tool was called.
     ToolCalled,
-    /// A guardrail blocked input or output.
+    /// A guardrail blocked input or output. Payload carries `phase`
+    /// (`"input"` or `"output"`), `rules` (rule names), and `messages`.
     GuardrailBlocked,
-    /// A tool requires human approval.
+    /// A tool marked `requires_approval: true` is awaiting human approval.
+    /// Payload carries `tool`, `call_id`, and `arguments`.
     ApprovalRequired,
-    /// Token/cost budget exhausted.
+    /// Token or cost budget exhausted. Caller-fired; see the enum docs.
     BudgetExhausted,
 }
 

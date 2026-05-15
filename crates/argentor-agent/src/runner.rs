@@ -781,14 +781,32 @@ impl AgentRunner {
                 let gr = engine.check_input(latest_input);
                 self.log_guardrail_result(session_id, "input", &gr);
                 if !gr.passed {
-                    return Err(ArgentorError::Agent(format!(
-                        "Input blocked by guardrails: {}",
-                        gr.violations
+                    let blocking_messages: Vec<&str> = gr
+                        .violations
+                        .iter()
+                        .filter(|v| v.severity == RuleSeverity::Block)
+                        .map(|v| v.message.as_str())
+                        .collect();
+                    if let Some(wh) = &self.webhooks {
+                        let rule_ids: Vec<&str> = gr
+                            .violations
                             .iter()
                             .filter(|v| v.severity == RuleSeverity::Block)
-                            .map(|v| v.message.as_str())
-                            .collect::<Vec<_>>()
-                            .join("; ")
+                            .map(|v| v.rule_name.as_str())
+                            .collect();
+                        wh.fire(
+                            crate::webhooks::WebhookEvent::GuardrailBlocked,
+                            session_id.to_string(),
+                            serde_json::json!({
+                                "phase": "input",
+                                "rules": rule_ids,
+                                "messages": blocking_messages,
+                            }),
+                        );
+                    }
+                    return Err(ArgentorError::Agent(format!(
+                        "Input blocked by guardrails: {}",
+                        blocking_messages.join("; ")
                     )));
                 }
             }
@@ -1211,6 +1229,19 @@ impl AgentRunner {
                         tool = %call.name,
                         "Skill requires human approval — invoking human_approval"
                     );
+                    if let Some(wh) = &self.webhooks {
+                        // `execute_tool` does not carry session context — the
+                        // tool call id is the stable identifier here.
+                        wh.fire(
+                            crate::webhooks::WebhookEvent::ApprovalRequired,
+                            call.id.clone(),
+                            serde_json::json!({
+                                "tool": call.name,
+                                "call_id": call.id,
+                                "arguments": call.arguments,
+                            }),
+                        );
+                    }
                     let approval_call = argentor_core::ToolCall {
                         id: format!("hitl_{}", call.id),
                         name: "human_approval".to_string(),
@@ -1514,14 +1545,32 @@ impl AgentRunner {
         self.log_guardrail_result(session_id, "output", &gr);
 
         if !gr.passed {
-            return Err(ArgentorError::Agent(format!(
-                "Output blocked by guardrails: {}",
-                gr.violations
+            let blocking_messages: Vec<&str> = gr
+                .violations
+                .iter()
+                .filter(|v| v.severity == RuleSeverity::Block)
+                .map(|v| v.message.as_str())
+                .collect();
+            if let Some(wh) = &self.webhooks {
+                let rule_ids: Vec<&str> = gr
+                    .violations
                     .iter()
                     .filter(|v| v.severity == RuleSeverity::Block)
-                    .map(|v| v.message.as_str())
-                    .collect::<Vec<_>>()
-                    .join("; ")
+                    .map(|v| v.rule_name.as_str())
+                    .collect();
+                wh.fire(
+                    crate::webhooks::WebhookEvent::GuardrailBlocked,
+                    session_id.to_string(),
+                    serde_json::json!({
+                        "phase": "output",
+                        "rules": rule_ids,
+                        "messages": blocking_messages,
+                    }),
+                );
+            }
+            return Err(ArgentorError::Agent(format!(
+                "Output blocked by guardrails: {}",
+                blocking_messages.join("; ")
             )));
         }
 
