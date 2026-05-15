@@ -828,10 +828,11 @@ async fn read_audit_stats(
 
     let modified_ns = system_time_unix_nanos(modified).unwrap_or(0);
 
-    let stats = task::spawn_blocking(move || read_audit_stats_blocking(&path, file_len, modified_ns))
-        .await
-        .map_err(|e| ApiError::Internal(format!("Audit stats read task failed: {e}")))?
-        .map_err(|e| ApiError::Internal(format!("Failed to read audit stats: {e}")))?;
+    let stats =
+        task::spawn_blocking(move || read_audit_stats_blocking(&path, file_len, modified_ns))
+            .await
+            .map_err(|e| ApiError::Internal(format!("Audit stats read task failed: {e}")))?
+            .map_err(|e| ApiError::Internal(format!("Failed to read audit stats: {e}")))?;
 
     *cache
         .write()

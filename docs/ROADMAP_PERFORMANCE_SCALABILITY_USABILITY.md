@@ -110,8 +110,8 @@ consistently sub-100 ms after process restart on multi-million-event logs.
   storage, and SIEM webhook/export.
 - Done: lightweight `audit.jsonl.violations.idx` index for fast
   `/api/v1/audit/violations` pagination, rebuilt when the audit JSONL changes.
-- Remaining: add a persisted stats index if cold stats must be sub-100 ms on
-  million-event logs after restart.
+- Done: persisted `audit.jsonl.stats.idx` index for `/api/v1/audit/stats`,
+  rebuilt when audit JSONL length or mtime changes.
 
 **Success criteria:**
 
@@ -179,6 +179,5 @@ streaming semantics.
 ## Next Sprint
 
 1. Add request latency/error panels for audit endpoints.
-2. Add persisted stats index design for sub-100 ms cold stats.
-3. Define release checklist for v1.4.x including docs, smoke, benchmark, and
+2. Define release checklist for v1.4.x including docs, smoke, benchmark, and
    known limits.
