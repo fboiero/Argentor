@@ -157,7 +157,8 @@ async fn run_single_query(
 
     let result = query::run(index, question, top_k, use_llm).await?;
 
-    println!("\n--- Retrieved context ({} / {} chunks searched, {}ms) ---",
+    println!(
+        "\n--- Retrieved context ({} / {} chunks searched, {}ms) ---",
         result.hits.len(),
         result.total_chunks,
         result.query_time_ms,
@@ -172,9 +173,7 @@ async fn run_single_query(
             .map(|v| !v.is_empty())
             .unwrap_or(false);
         if !has_key {
-            println!(
-                "\n[Set {ANTHROPIC_API_KEY_ENV} for AI-powered answers]"
-            );
+            println!("\n[Set {ANTHROPIC_API_KEY_ENV} for AI-powered answers]");
         }
     }
 

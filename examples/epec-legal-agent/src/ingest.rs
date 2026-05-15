@@ -159,8 +159,8 @@ fn tokenize(text: &str) -> Vec<String> {
 pub fn run_v2(corpus_path: &Path, index_dir: &Path) -> anyhow::Result<IngestStats> {
     println!("Opening corpus: {}", corpus_path.display());
 
-    let file = fs::File::open(corpus_path)
-        .map_err(|e| anyhow::anyhow!("Cannot open corpus file: {e}"))?;
+    let file =
+        fs::File::open(corpus_path).map_err(|e| anyhow::anyhow!("Cannot open corpus file: {e}"))?;
     let reader = BufReader::new(file);
 
     // Serializable BM25 internals we build in parallel
@@ -240,9 +240,7 @@ pub fn run_v2(corpus_path: &Path, index_dir: &Path) -> anyhow::Result<IngestStat
         }
     }
 
-    println!(
-        "Ingested {doc_count} records → {chunk_count} chunks ({skipped} skipped)"
-    );
+    println!("Ingested {doc_count} records → {chunk_count} chunks ({skipped} skipped)");
 
     let avg_doc_length = if chunk_count > 0 {
         doc_lengths.values().sum::<f32>() / chunk_count as f32
@@ -270,7 +268,11 @@ pub fn run_v2(corpus_path: &Path, index_dir: &Path) -> anyhow::Result<IngestStat
     fs::write(&index_path, &json)?;
 
     let size_mb = fs::metadata(&index_path)?.len() as f64 / 1_048_576.0;
-    println!("Index written to {} ({:.1} MB)", index_path.display(), size_mb);
+    println!(
+        "Index written to {} ({:.1} MB)",
+        index_path.display(),
+        size_mb
+    );
 
     Ok(IngestStats {
         doc_count,
@@ -285,7 +287,7 @@ pub fn load_index(index_dir: &Path) -> anyhow::Result<IndexBundle> {
     let index_path = index_dir.join("index.json");
     let json = fs::read_to_string(&index_path)
         .map_err(|e| anyhow::anyhow!("Cannot read index from {}: {e}", index_path.display()))?;
-    let bundle: IndexBundle = serde_json::from_str(&json)
-        .map_err(|e| anyhow::anyhow!("Failed to parse index: {e}"))?;
+    let bundle: IndexBundle =
+        serde_json::from_str(&json).map_err(|e| anyhow::anyhow!("Failed to parse index: {e}"))?;
     Ok(bundle)
 }

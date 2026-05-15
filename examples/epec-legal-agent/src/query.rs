@@ -58,7 +58,11 @@ impl LegalIndex {
                 let idf = ((n - df + 0.5) / (df + 0.5) + 1.0).ln();
 
                 for (doc_id, &tf) in postings {
-                    let dl = bm25.doc_lengths.get(doc_id.as_str()).copied().unwrap_or(0.0);
+                    let dl = bm25
+                        .doc_lengths
+                        .get(doc_id.as_str())
+                        .copied()
+                        .unwrap_or(0.0);
                     let avgdl = if bm25.avg_doc_length > 0.0 {
                         bm25.avg_doc_length
                     } else {
@@ -78,9 +82,7 @@ impl LegalIndex {
 
         results
             .into_iter()
-            .filter_map(|(id, score)| {
-                self.bundle.chunks.get(id).map(|meta| (score, meta))
-            })
+            .filter_map(|(id, score)| self.bundle.chunks.get(id).map(|meta| (score, meta)))
             .collect()
     }
 }
@@ -127,10 +129,7 @@ pub async fn run(
     let query_time_ms = start.elapsed().as_millis() as u64;
 
     // Clone hits to own them
-    let hits: Vec<(f32, ChunkMeta)> = hits_refs
-        .into_iter()
-        .map(|(s, m)| (s, m.clone()))
-        .collect();
+    let hits: Vec<(f32, ChunkMeta)> = hits_refs.into_iter().map(|(s, m)| (s, m.clone())).collect();
 
     let context_text = format_citations(&hits);
     let total_chunks = index.bundle.chunk_count;
@@ -208,9 +207,9 @@ No inventes normativa ni fallos. Citá las fuentes usando los números de refere
         .system_prompt(system_prompt)
         .max_turns(1);
 
-    let answer = query_simple(question, options).await
+    let answer = query_simple(question, options)
+        .await
         .map_err(|e| anyhow::anyhow!("Claude API error: {e}"))?;
 
     Ok(answer)
 }
-
