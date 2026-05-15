@@ -18,7 +18,7 @@ pub mod repl;
 use argentor_agent::{AgentRunner, ModelConfig};
 use argentor_gateway::{AuthConfig, GatewayServer, RestApiState};
 use argentor_security::tls;
-use argentor_security::{AuditLog, Capability, PermissionSet, RateLimiter};
+use argentor_security::{AuditLog, AuditRotationConfig, Capability, PermissionSet, RateLimiter};
 use argentor_session::FileSessionStore;
 use argentor_skills::{MarkdownSkillLoader, SkillConfig, SkillLoader, SkillRegistry, ToolGroup};
 use clap::{Parser, Subcommand};
@@ -142,6 +142,8 @@ struct ArgentorConfig {
     #[serde(default)]
     security: SecurityConfig,
     #[serde(default)]
+    audit: AuditConfig,
+    #[serde(default)]
     skills: Vec<SkillConfig>,
     #[serde(default)]
     mcp_servers: Vec<McpServerConfig>,
@@ -201,6 +203,37 @@ struct SecurityConfig {
     api_keys: Vec<String>,
 }
 
+#[derive(Deserialize, Clone)]
+struct AuditConfig {
+    /// Optional explicit audit JSONL file path. Defaults to `<data_dir>/audit/audit.jsonl`.
+    #[serde(default)]
+    path: Option<PathBuf>,
+    /// Rotate when active audit file exceeds this many MiB. Default: 10.
+    #[serde(default = "default_audit_max_size_mb")]
+    max_size_mb: u64,
+    /// Number of rotated files to keep by numeric suffix. Default: 5.
+    #[serde(default = "default_audit_max_rotated_files")]
+    max_rotated_files: u32,
+    /// Delete rotated audit files older than this many days. `0` removes them on cleanup.
+    #[serde(default)]
+    retention_days: Option<u64>,
+    /// Compress rotated audit logs as `.zst` files.
+    #[serde(default)]
+    compress_rotated: bool,
+}
+
+impl Default for AuditConfig {
+    fn default() -> Self {
+        Self {
+            path: None,
+            max_size_mb: default_audit_max_size_mb(),
+            max_rotated_files: default_audit_max_rotated_files(),
+            retention_days: None,
+            compress_rotated: false,
+        }
+    }
+}
+
 impl Default for SecurityConfig {
     fn default() -> Self {
         Self {
@@ -229,6 +262,29 @@ fn default_burst() -> f64 {
 }
 fn default_max_msg_len() -> usize {
     100_000
+}
+fn default_audit_max_size_mb() -> u64 {
+    10
+}
+fn default_audit_max_rotated_files() -> u32 {
+    5
+}
+
+fn audit_log_file(config: &ArgentorConfig) -> PathBuf {
+    config
+        .audit
+        .path
+        .clone()
+        .unwrap_or_else(|| config.data_dir.join("audit").join("audit.jsonl"))
+}
+
+fn audit_rotation_config(config: &ArgentorConfig) -> AuditRotationConfig {
+    AuditRotationConfig {
+        max_size_bytes: config.audit.max_size_mb.saturating_mul(1024 * 1024),
+        max_rotated_files: config.audit.max_rotated_files,
+        retention_days: config.audit.retention_days,
+        compress_rotated: config.audit.compress_rotated,
+    }
 }
 
 /// Expand `${VAR_NAME}` patterns in a string with environment variable values.
@@ -473,8 +529,11 @@ async fn main() -> anyhow::Result<()> {
             info!("Starting Argentor gateway on {}:{}", host, port);
 
             // Initialize security
-            let audit_dir = config.data_dir.join("audit");
-            let audit = Arc::new(AuditLog::new(audit_dir.clone()));
+            let audit_log_file = audit_log_file(&config);
+            let audit = Arc::new(AuditLog::with_file_rotation(
+                audit_log_file.clone(),
+                audit_rotation_config(&config),
+            ));
             let rate_limiter = Arc::new(RateLimiter::new(
                 config.security.max_burst,
                 config.security.max_requests_per_second,
@@ -559,7 +618,7 @@ async fn main() -> anyhow::Result<()> {
                 sessions: sessions.clone(),
                 skills,
                 started_at: chrono::Utc::now(),
-                audit_log_path: Some(audit_dir.join("audit.jsonl")),
+                audit_log_path: Some(audit_log_file),
                 audit_stats_cache: Arc::new(std::sync::RwLock::new(None)),
             });
 
@@ -716,7 +775,10 @@ async fn main() -> anyhow::Result<()> {
             approval_timeout,
         } => {
             // Initialize security
-            let audit = Arc::new(AuditLog::new(config.data_dir.join("audit")));
+            let audit = Arc::new(AuditLog::with_file_rotation(
+                audit_log_file(&config),
+                audit_rotation_config(&config),
+            ));
 
             // Load skills: builtins + config + markdown
             let registry = SkillRegistry::new();

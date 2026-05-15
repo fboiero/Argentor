@@ -428,6 +428,17 @@ Import the bundled dashboard from `deploy/grafana/argentor-dashboard.json` or cr
 
 Audit logs are critical for compliance. Back them up regularly:
 
+Configure local lifecycle controls before shipping off-host:
+
+```toml
+[audit]
+path = "/var/lib/argentor/audit.jsonl"
+max_size_mb = 500
+max_rotated_files = 14
+retention_days = 30
+compress_rotated = true
+```
+
 ```bash
 # Daily backup to S3
 aws s3 sync /var/lib/argentor/audit s3://argentor-backups/audit/$(date +%Y-%m-%d)/

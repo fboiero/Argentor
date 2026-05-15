@@ -342,8 +342,10 @@ burst = 30
 
 [audit]
 path = "/var/lib/argentor/audit.jsonl"
-rotate_daily = true
 max_size_mb = 500
+max_rotated_files = 14
+retention_days = 30
+compress_rotated = true
 ```
 
 Config hot-reload is enabled by default — edit the file and Argentor reloads within 500ms (via the `notify` crate file watcher). No restart needed.

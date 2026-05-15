@@ -74,6 +74,17 @@ max_message_length = 100000
 # api_keys = ["your-secret-key-1", "your-secret-key-2"]
 api_keys = []
 
+# Audit log storage and lifecycle
+[audit]
+# Defaults to "./data/audit/audit.jsonl" when omitted.
+# path = "./data/audit/audit.jsonl"
+max_size_mb = 10
+max_rotated_files = 5
+# Optional: delete rotated audit logs older than this many days.
+# retention_days = 30
+# Optional: compress rotated audit logs as .zst files.
+compress_rotated = false
+
 # Skills configuration
 # Each [[skills]] entry loads a skill on startup.
 # Native skills use `type = "native"`, WASM skills use `type = "wasm"`.
