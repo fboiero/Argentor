@@ -599,58 +599,72 @@ pub async fn audit_prometheus_export(state: &RestApiState) -> String {
     body.push_str("# HELP argentor_audit_configured Whether an audit log path is configured.\n");
     body.push_str("# TYPE argentor_audit_configured gauge\n");
 
-    let Some(path) = audit_log_path(state) else {
+    // "Configured" means the operator wired a path, regardless of whether the
+    // file already exists on disk. The audit log file is created lazily on the
+    // first event; we want the metric family to be stable from process start.
+    let Some(path) = state.audit_log_path.clone() else {
         body.push_str("argentor_audit_configured 0\n");
         return body;
     };
 
     body.push_str("argentor_audit_configured 1\n");
 
-    if let Ok(metadata) = tokio::fs::metadata(&path).await {
-        body.push_str("# HELP argentor_audit_log_bytes Audit log file size in bytes.\n");
-        body.push_str("# TYPE argentor_audit_log_bytes gauge\n");
-        let _ = writeln!(body, "argentor_audit_log_bytes {}", metadata.len());
-    }
+    // The audit log file is created lazily on the first event. Emit the full
+    // gauge family with zero values when the file is missing so operator
+    // dashboards have stable series from process start onward.
+    let log_bytes = match tokio::fs::metadata(&path).await {
+        Ok(metadata) => metadata.len(),
+        Err(_) => 0,
+    };
+    body.push_str("# HELP argentor_audit_log_bytes Audit log file size in bytes.\n");
+    body.push_str("# TYPE argentor_audit_log_bytes gauge\n");
+    let _ = writeln!(body, "argentor_audit_log_bytes {log_bytes}");
 
-    match read_audit_stats(path, state.audit_stats_cache.clone()).await {
-        Ok(stats) => {
-            body.push_str("# HELP argentor_audit_events_today Audit events recorded today.\n");
-            body.push_str("# TYPE argentor_audit_events_today gauge\n");
-            let _ = writeln!(body, "argentor_audit_events_today {}", stats.events_today);
-
-            body.push_str(
-                "# HELP argentor_audit_violations_today Audit violations recorded today.\n",
-            );
-            body.push_str("# TYPE argentor_audit_violations_today gauge\n");
-            let _ = writeln!(
-                body,
-                "argentor_audit_violations_today {}",
-                stats.violations_today
-            );
-
-            body.push_str("# HELP argentor_audit_block_rate_percent Percentage of today's audit events that were denied.\n");
-            body.push_str("# TYPE argentor_audit_block_rate_percent gauge\n");
-            let _ = writeln!(
-                body,
-                "argentor_audit_block_rate_percent {:.6}",
-                stats.block_rate_percent
-            );
-
-            body.push_str(
-                "# HELP argentor_audit_events_total Total audit events in the current audit log.\n",
-            );
-            body.push_str("# TYPE argentor_audit_events_total gauge\n");
-            let _ = writeln!(body, "argentor_audit_events_total {}", stats.total_events);
-        }
+    let stats = match read_audit_stats(path, state.audit_stats_cache.clone()).await {
+        Ok(stats) => stats,
         Err(err) => {
-            warn!(error = %err, "Failed to export audit metrics");
+            // File missing or unreadable. Report the failure as a counter but
+            // still emit zeroed gauges so the family stays continuous.
+            warn!(error = %err, "Failed to read audit stats for Prometheus export");
             body.push_str(
                 "# HELP argentor_audit_export_errors_total Audit metrics export errors.\n",
             );
             body.push_str("# TYPE argentor_audit_export_errors_total counter\n");
             body.push_str("argentor_audit_export_errors_total 1\n");
+            AuditStats {
+                events_today: 0,
+                violations_today: 0,
+                block_rate_percent: 0.0,
+                total_events: 0,
+            }
         }
-    }
+    };
+
+    body.push_str("# HELP argentor_audit_events_today Audit events recorded today.\n");
+    body.push_str("# TYPE argentor_audit_events_today gauge\n");
+    let _ = writeln!(body, "argentor_audit_events_today {}", stats.events_today);
+
+    body.push_str("# HELP argentor_audit_violations_today Audit violations recorded today.\n");
+    body.push_str("# TYPE argentor_audit_violations_today gauge\n");
+    let _ = writeln!(
+        body,
+        "argentor_audit_violations_today {}",
+        stats.violations_today
+    );
+
+    body.push_str("# HELP argentor_audit_block_rate_percent Percentage of today's audit events that were denied.\n");
+    body.push_str("# TYPE argentor_audit_block_rate_percent gauge\n");
+    let _ = writeln!(
+        body,
+        "argentor_audit_block_rate_percent {:.6}",
+        stats.block_rate_percent
+    );
+
+    body.push_str(
+        "# HELP argentor_audit_events_total Total audit events in the current audit log.\n",
+    );
+    body.push_str("# TYPE argentor_audit_events_total gauge\n");
+    let _ = writeln!(body, "argentor_audit_events_total {}", stats.total_events);
 
     body
 }

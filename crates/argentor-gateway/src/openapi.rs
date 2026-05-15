@@ -378,6 +378,18 @@ impl OpenApiGenerator {
                         "in": "header",
                         "name": "X-API-Key"
                     }
+                },
+                "schemas": {
+                    "ErrorResponse": {
+                        "type": "object",
+                        "required": ["error"],
+                        "properties": {
+                            "error": {
+                                "type": "string",
+                                "description": "Human-readable error message"
+                            }
+                        }
+                    }
                 }
             }
         })
@@ -403,6 +415,11 @@ impl OpenApiGenerator {
             HttpMethod::Get,
             "/metrics",
             "Prometheus metrics",
+        ));
+        gen.add_endpoint(ApiEndpoint::new(
+            HttpMethod::Get,
+            "/openapi.json",
+            "OpenAPI specification (self-reference)",
         ));
         gen.add_endpoint(ApiEndpoint::new(
             HttpMethod::Get,
@@ -450,7 +467,11 @@ impl OpenApiGenerator {
         gen.add_endpoint(
             ApiEndpoint::new(HttpMethod::Get, "/api/v1/audit/logs", "List audit log entries")
                 .with_description("Returns recent audit JSONL entries. Use limit to cap the response size and cursor to continue from the x-next-cursor response header.")
+                .with_parameter(ApiParameter::query("limit", "integer", "Maximum entries to return, capped at 1000"))
+                .with_parameter(ApiParameter::query("cursor", "integer", "Byte offset from the x-next-cursor response header"))
                 .with_tag("Audit")
+                .with_response(ApiResponse::json(400, "Invalid cursor or query parameter").with_example(r#"{"error":"cursor must be an unsigned byte offset"}"#))
+                .with_response(ApiResponse::json(500, "Audit log read failure").with_example(r#"{"error":"Failed to read audit log"}"#))
                 .with_response(ApiResponse::json(200, "Audit log entries")),
         );
         gen.add_endpoint(
@@ -462,7 +483,11 @@ impl OpenApiGenerator {
             .with_description(
                 "Returns recent denied policy, guardrail, or violation entries from the audit log. Use cursor to continue from the x-next-cursor response header.",
             )
+            .with_parameter(ApiParameter::query("limit", "integer", "Maximum entries to return, capped at 500"))
+            .with_parameter(ApiParameter::query("cursor", "integer", "Byte offset from the x-next-cursor response header"))
             .with_tag("Audit")
+            .with_response(ApiResponse::json(400, "Invalid cursor or query parameter").with_example(r#"{"error":"cursor must be an unsigned byte offset"}"#))
+            .with_response(ApiResponse::json(500, "Audit log read failure").with_example(r#"{"error":"Failed to read audit log"}"#))
             .with_response(ApiResponse::json(200, "Audit violations")),
         );
         gen.add_endpoint(
@@ -471,6 +496,10 @@ impl OpenApiGenerator {
                     "Returns aggregate audit counts, success rate, and last event timestamp.",
                 )
                 .with_tag("Audit")
+                .with_response(
+                    ApiResponse::json(500, "Audit stats read failure")
+                        .with_example(r#"{"error":"Failed to read audit stats"}"#),
+                )
                 .with_response(ApiResponse::json(200, "Audit statistics")),
         );
 
