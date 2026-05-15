@@ -20,17 +20,23 @@
 
 use argentor_agent::StreamEvent;
 use axum::{
-    extract::{Json, State},
-    response::sse::{Event, KeepAlive, Sse},
-    routing::post,
+    extract::{Json, Path, State},
+    http::StatusCode,
+    response::{
+        sse::{Event, KeepAlive, Sse},
+        IntoResponse,
+    },
+    routing::{get, post},
     Router,
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::convert::Infallible;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
+use tokio::sync::{broadcast, RwLock};
 use tokio_stream::{wrappers::UnboundedReceiverStream, Stream, StreamExt};
 use tracing::{info, warn};
 
@@ -39,6 +45,8 @@ use crate::rest_api::ApiError;
 use crate::router::MessageRouter;
 
 use argentor_session::SessionStore;
+
+const MAX_SESSION_BROADCAST_CHANNELS: usize = 4096;
 
 // ---------------------------------------------------------------------------
 // SSE event types
@@ -219,6 +227,11 @@ pub struct StreamingState {
     pub connections: Arc<ConnectionManager>,
     /// Session persistence backend.
     pub sessions: Arc<dyn SessionStore>,
+    /// Per-session broadcast channels for `GET /api/v1/stream/{session_id}`.
+    ///
+    /// When an agent run is active it publishes SSE JSON strings here;
+    /// subscribers receive them in real time.
+    pub session_broadcast: Arc<RwLock<HashMap<uuid::Uuid, broadcast::Sender<String>>>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -331,15 +344,162 @@ pub async fn sse_chat_handler(
 }
 
 // ---------------------------------------------------------------------------
+// GET /api/v1/stream/{session_id} — subscribe to a running agent
+// ---------------------------------------------------------------------------
+
+/// SSE subscriber handler for `GET /api/v1/stream/{session_id}`.
+///
+/// Clients subscribe to this endpoint *before* (or immediately after)
+/// triggering an agent run via `POST /api/v1/chat/stream`. Events are
+/// published by the running agent and forwarded here in real time.
+///
+/// # Event format
+///
+/// ```text
+/// event: token
+/// data: {"text": "Hello", "index": 0}
+///
+/// event: tool_call
+/// data: {"skill": "web_search", "args": {...}}
+///
+/// event: done
+/// data: {"total_tokens": 150, "duration_ms": 2340}
+/// ```
+pub async fn sse_session_stream_handler(
+    State(state): State<Arc<StreamingState>>,
+    Path(session_id_str): Path<String>,
+) -> impl IntoResponse {
+    let session_id: uuid::Uuid = match session_id_str.parse() {
+        Ok(id) => id,
+        Err(_) => {
+            return (
+                StatusCode::BAD_REQUEST,
+                "Invalid session_id — must be a UUID",
+            )
+                .into_response();
+        }
+    };
+
+    info!(session_id = %session_id, "SSE session stream subscription");
+
+    let rx = match subscribe_session_broadcast(&state, session_id).await {
+        Ok(rx) => rx,
+        Err(status) => return status.into_response(),
+    };
+
+    let token_idx = Arc::new(AtomicU64::new(0));
+
+    let sse_stream = tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(move |result| {
+        let token_idx = token_idx.clone();
+        match result {
+            Ok(raw) => {
+                // Determine the SSE event name from the "event" field in the payload.
+                let event_name = serde_json::from_str::<serde_json::Value>(&raw)
+                    .ok()
+                    .and_then(|v| {
+                        v.get("event")
+                            .and_then(|e| e.as_str())
+                            .map(|s| s.to_string())
+                    })
+                    .unwrap_or_else(|| "message".to_string());
+
+                let idx = token_idx.fetch_add(1, Ordering::Relaxed);
+                let event = Event::default()
+                    .id(idx.to_string())
+                    .event(event_name)
+                    .data(raw);
+                Some(Ok::<Event, Infallible>(event))
+            }
+            // Receiver lagged — skip missed events rather than terminating.
+            Err(tokio_stream::wrappers::errors::BroadcastStreamRecvError::Lagged(_)) => None,
+        }
+    });
+
+    Sse::new(sse_stream)
+        .keep_alive(KeepAlive::new().interval(Duration::from_secs(15)).text(""))
+        .into_response()
+}
+
+async fn subscribe_session_broadcast(
+    state: &StreamingState,
+    session_id: uuid::Uuid,
+) -> Result<broadcast::Receiver<String>, StatusCode> {
+    let mut map = state.session_broadcast.write().await;
+
+    if !map.contains_key(&session_id) && map.len() >= MAX_SESSION_BROADCAST_CHANNELS {
+        prune_idle_broadcast_channels(&mut map);
+        if map.len() >= MAX_SESSION_BROADCAST_CHANNELS {
+            warn!(
+                active_channels = map.len(),
+                "SSE session broadcast channel limit reached"
+            );
+            return Err(StatusCode::SERVICE_UNAVAILABLE);
+        }
+    }
+
+    let sender = map.entry(session_id).or_insert_with(|| {
+        let (tx, _) = broadcast::channel(256);
+        tx
+    });
+
+    Ok(sender.subscribe())
+}
+
+fn prune_idle_broadcast_channels(map: &mut HashMap<uuid::Uuid, broadcast::Sender<String>>) {
+    map.retain(|_, tx| tx.receiver_count() > 0);
+}
+
+/// Publish an event to the per-session broadcast channel.
+///
+/// Called by gateway layers when an agent produces a token, tool call, or
+/// completion event. Returns the number of active subscribers.
+pub async fn publish_session_event(
+    state: &StreamingState,
+    session_id: uuid::Uuid,
+    event: &str,
+    data: serde_json::Value,
+) -> usize {
+    let payload = serde_json::json!({ "event": event, "data": data }).to_string();
+    let tx = {
+        let map = state.session_broadcast.read().await;
+        map.get(&session_id).cloned()
+    };
+
+    let Some(tx) = tx else {
+        return 0;
+    };
+
+    match tx.send(payload) {
+        Ok(count) => count,
+        Err(_) => {
+            let mut map = state.session_broadcast.write().await;
+            if map
+                .get(&session_id)
+                .is_some_and(|sender| sender.receiver_count() == 0)
+            {
+                map.remove(&session_id);
+            }
+            0
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
 /// Build the SSE streaming sub-router.
 ///
-/// Mounts `POST /api/v1/chat/stream` backed by the given state.
+/// Mounts:
+/// - `POST /api/v1/chat/stream` — start an agent run and stream its output
+/// - `GET  /api/v1/stream/{session_id}` — subscribe to a running agent's event stream
 pub fn streaming_router(state: Arc<StreamingState>) -> Router {
     Router::new()
         .route("/api/v1/chat/stream", post(sse_chat_handler))
+        .route(
+            "/api/v1/stream/{session_id}",
+            get(sse_session_stream_handler),
+        )
         .with_state(state)
 }
 
@@ -737,5 +897,24 @@ mod tests {
             let v2 = serde_json::to_value(&deserialized).unwrap();
             assert_eq!(v1, v2, "Round-trip failed for event: {serialized}");
         }
+    }
+
+    #[test]
+    fn test_prune_idle_broadcast_channels() {
+        let active_id = uuid::Uuid::new_v4();
+        let idle_id = uuid::Uuid::new_v4();
+        let (active_tx, active_rx) = broadcast::channel(1);
+        let (idle_tx, _idle_rx) = broadcast::channel(1);
+        drop(_idle_rx);
+
+        let mut map = HashMap::new();
+        map.insert(active_id, active_tx);
+        map.insert(idle_id, idle_tx);
+
+        prune_idle_broadcast_channels(&mut map);
+
+        assert!(map.contains_key(&active_id));
+        assert!(!map.contains_key(&idle_id));
+        drop(active_rx);
     }
 }

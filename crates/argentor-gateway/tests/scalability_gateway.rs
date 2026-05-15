@@ -73,6 +73,8 @@ async fn build_router() -> (axum::Router, tempfile::TempDir) {
         sessions: sessions.clone(),
         skills,
         started_at: Utc::now(),
+        audit_log_path: None,
+        audit_stats_cache: Arc::new(std::sync::RwLock::new(None)),
     });
 
     let app = GatewayServer::build_full(

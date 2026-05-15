@@ -7,19 +7,28 @@ use crate::connection::ConnectionManager;
 use crate::router::{InboundMessage, MessageRouter};
 use axum::{
     extract::{Json, Path, State},
-    http::StatusCode,
+    http::{HeaderValue, StatusCode},
     response::IntoResponse,
     routing::{delete, get, post},
     Router,
 };
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+use std::fmt::Write as _;
+use std::io::{Read, Seek, SeekFrom};
+use std::path::{Path as FsPath, PathBuf};
+use std::sync::{Arc, RwLock};
+use std::time::SystemTime;
+use tokio::task;
 use tracing::{info, warn};
 use uuid::Uuid;
 
+use argentor_security::audit::{AuditEntry, AuditOutcome};
+use argentor_security::{query_audit_log, AuditFilter};
 use argentor_session::SessionStore;
 use argentor_skills::SkillRegistry;
+
+const AUDIT_NEXT_CURSOR_HEADER: &str = "x-next-cursor";
 
 // ---------------------------------------------------------------------------
 // Shared state
@@ -42,6 +51,10 @@ pub struct RestApiState {
     pub skills: Arc<SkillRegistry>,
     /// Timestamp when the server was started (for uptime calculation).
     pub started_at: DateTime<Utc>,
+    /// Optional path to the append-only audit JSONL file.
+    pub audit_log_path: Option<PathBuf>,
+    /// Cached audit stats keyed by audit file metadata.
+    pub audit_stats_cache: Arc<RwLock<Option<AuditStatsCacheEntry>>>,
 }
 
 // ---------------------------------------------------------------------------
@@ -248,6 +261,10 @@ pub fn api_router(state: Arc<RestApiState>) -> Router {
         .route("/api/v1/connections", get(list_connections))
         // Metrics
         .route("/api/v1/metrics", get(get_metrics))
+        // Audit
+        .route("/api/v1/audit/logs", get(audit_logs))
+        .route("/api/v1/audit/violations", get(audit_violations))
+        .route("/api/v1/audit/stats", get(audit_stats))
         .with_state(state)
 }
 
@@ -508,6 +525,557 @@ async fn get_metrics(
 }
 
 // ---------------------------------------------------------------------------
+// Audit API — response types
+// ---------------------------------------------------------------------------
+
+/// A single audit log entry as returned by the REST API.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditLogEntry {
+    /// ISO 8601 timestamp of the action.
+    pub timestamp: String,
+    /// Session the action belongs to.
+    pub session_id: String,
+    /// Human-readable action label (e.g. "tool_call", "login").
+    pub action: String,
+    /// Skill involved, if any.
+    pub skill_name: Option<String>,
+    /// Structured details (free-form JSON).
+    pub details: serde_json::Value,
+    /// Outcome: "success", "denied", or "error".
+    pub outcome: String,
+}
+
+/// A guardrail/policy violation entry.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ViolationEntry {
+    /// ISO 8601 timestamp.
+    pub timestamp: String,
+    /// Session that triggered the violation.
+    pub session_id: String,
+    /// Name of the rule that fired (e.g. "pii_detection", "injection_guard").
+    pub rule: String,
+    /// Severity level: "warn" or "block".
+    pub severity: String,
+    /// Human-readable description.
+    pub message: String,
+}
+
+/// Summary statistics for the audit dashboard.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditStats {
+    /// Total audit events recorded today.
+    pub events_today: u64,
+    /// Number of guardrail violations today.
+    pub violations_today: u64,
+    /// Percentage of requests blocked today (0–100).
+    pub block_rate_percent: f64,
+    /// Total audit events since server start.
+    pub total_events: u64,
+}
+
+/// Cached audit stats for an unchanged audit log file.
+#[derive(Debug, Clone)]
+pub struct AuditStatsCacheEntry {
+    /// File size in bytes when these stats were computed.
+    pub file_len: u64,
+    /// File modification timestamp when these stats were computed.
+    pub modified: SystemTime,
+    /// Computed stats.
+    pub stats: AuditStats,
+}
+
+#[derive(Debug)]
+struct AuditPage {
+    entries: Vec<AuditEntry>,
+    next_cursor: Option<u64>,
+}
+
+/// Export audit health and aggregate counters in Prometheus text format.
+///
+/// This intentionally keeps labels out of the audit metrics to avoid cardinality
+/// growth from sessions, users, rules, or tenants.
+pub async fn audit_prometheus_export(state: &RestApiState) -> String {
+    let mut body = String::new();
+    body.push_str("# HELP argentor_audit_configured Whether an audit log path is configured.\n");
+    body.push_str("# TYPE argentor_audit_configured gauge\n");
+
+    let Some(path) = audit_log_path(state) else {
+        body.push_str("argentor_audit_configured 0\n");
+        return body;
+    };
+
+    body.push_str("argentor_audit_configured 1\n");
+
+    if let Ok(metadata) = tokio::fs::metadata(&path).await {
+        body.push_str("# HELP argentor_audit_log_bytes Audit log file size in bytes.\n");
+        body.push_str("# TYPE argentor_audit_log_bytes gauge\n");
+        let _ = writeln!(body, "argentor_audit_log_bytes {}", metadata.len());
+    }
+
+    match read_audit_stats(path, state.audit_stats_cache.clone()).await {
+        Ok(stats) => {
+            body.push_str("# HELP argentor_audit_events_today Audit events recorded today.\n");
+            body.push_str("# TYPE argentor_audit_events_today gauge\n");
+            let _ = writeln!(body, "argentor_audit_events_today {}", stats.events_today);
+
+            body.push_str(
+                "# HELP argentor_audit_violations_today Audit violations recorded today.\n",
+            );
+            body.push_str("# TYPE argentor_audit_violations_today gauge\n");
+            let _ = writeln!(
+                body,
+                "argentor_audit_violations_today {}",
+                stats.violations_today
+            );
+
+            body.push_str("# HELP argentor_audit_block_rate_percent Percentage of today's audit events that were denied.\n");
+            body.push_str("# TYPE argentor_audit_block_rate_percent gauge\n");
+            let _ = writeln!(
+                body,
+                "argentor_audit_block_rate_percent {:.6}",
+                stats.block_rate_percent
+            );
+
+            body.push_str(
+                "# HELP argentor_audit_events_total Total audit events in the current audit log.\n",
+            );
+            body.push_str("# TYPE argentor_audit_events_total gauge\n");
+            let _ = writeln!(body, "argentor_audit_events_total {}", stats.total_events);
+        }
+        Err(err) => {
+            warn!(error = %err, "Failed to export audit metrics");
+            body.push_str(
+                "# HELP argentor_audit_export_errors_total Audit metrics export errors.\n",
+            );
+            body.push_str("# TYPE argentor_audit_export_errors_total counter\n");
+            body.push_str("argentor_audit_export_errors_total 1\n");
+        }
+    }
+
+    body
+}
+
+// ---------------------------------------------------------------------------
+// Audit API — handlers
+// ---------------------------------------------------------------------------
+
+/// `GET /api/v1/audit/logs?limit=N&cursor=BYTE_OFFSET`
+///
+/// Returns recent audit log entries. When more older entries are available, the
+/// response includes an `x-next-cursor` header for the next page.
+async fn audit_logs(
+    State(state): State<Arc<RestApiState>>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<axum::response::Response, ApiError> {
+    let limit: usize = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(100)
+        .min(1000);
+    let cursor = parse_audit_cursor(&params)?;
+
+    let Some(path) = audit_log_path(&state) else {
+        return Ok(build_audit_page_response(Vec::<AuditLogEntry>::new(), None));
+    };
+
+    let page = read_audit_entries_page(path, limit, cursor).await?;
+    let entries = page.entries.into_iter().map(AuditLogEntry::from).collect();
+
+    Ok(build_audit_page_response(entries, page.next_cursor))
+}
+
+/// `GET /api/v1/audit/violations?limit=N&cursor=BYTE_OFFSET`
+///
+/// Returns recent guardrail violations. When more older entries are available,
+/// the response includes an `x-next-cursor` header for the next page.
+async fn audit_violations(
+    State(state): State<Arc<RestApiState>>,
+    axum::extract::Query(params): axum::extract::Query<std::collections::HashMap<String, String>>,
+) -> Result<axum::response::Response, ApiError> {
+    let limit: usize = params
+        .get("limit")
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(50)
+        .min(500);
+    let cursor = parse_audit_cursor(&params)?;
+
+    let Some(path) = audit_log_path(&state) else {
+        return Ok(build_audit_page_response(
+            Vec::<ViolationEntry>::new(),
+            None,
+        ));
+    };
+
+    let page = read_audit_violations_page(path, limit, cursor).await?;
+    let violations = page
+        .entries
+        .into_iter()
+        .filter_map(ViolationEntry::from_audit_entry)
+        .collect();
+
+    Ok(build_audit_page_response(violations, page.next_cursor))
+}
+
+/// `GET /api/v1/audit/stats`
+///
+/// Returns aggregated audit statistics for the dashboard summary bar.
+async fn audit_stats(State(state): State<Arc<RestApiState>>) -> Result<Json<AuditStats>, ApiError> {
+    let Some(path) = audit_log_path(&state) else {
+        return Ok(Json(AuditStats {
+            events_today: 0,
+            violations_today: 0,
+            block_rate_percent: 0.0,
+            total_events: 0,
+        }));
+    };
+
+    let stats = read_audit_stats(path, state.audit_stats_cache.clone()).await?;
+    Ok(Json(stats))
+}
+
+fn audit_log_path(state: &RestApiState) -> Option<PathBuf> {
+    let path = state.audit_log_path.as_ref()?;
+    if path.exists() {
+        Some(path.clone())
+    } else {
+        None
+    }
+}
+
+fn parse_audit_cursor(
+    params: &std::collections::HashMap<String, String>,
+) -> Result<Option<u64>, ApiError> {
+    params
+        .get("cursor")
+        .map(|cursor| {
+            cursor
+                .parse::<u64>()
+                .map_err(|_| ApiError::BadRequest("cursor must be an unsigned byte offset".into()))
+        })
+        .transpose()
+}
+
+fn build_audit_page_response<T: Serialize>(
+    entries: Vec<T>,
+    next_cursor: Option<u64>,
+) -> axum::response::Response {
+    let mut response = Json(entries).into_response();
+    if let Some(cursor) = next_cursor {
+        if let Ok(value) = HeaderValue::from_str(&cursor.to_string()) {
+            response
+                .headers_mut()
+                .insert(AUDIT_NEXT_CURSOR_HEADER, value);
+        }
+    }
+    response
+}
+
+async fn read_audit_entries_page(
+    path: PathBuf,
+    limit: usize,
+    before: Option<u64>,
+) -> Result<AuditPage, ApiError> {
+    task::spawn_blocking(move || read_audit_entries_page_blocking(&path, limit, before))
+        .await
+        .map_err(|e| ApiError::Internal(format!("Audit log read task failed: {e}")))?
+}
+
+async fn read_audit_violations_page(
+    path: PathBuf,
+    limit: usize,
+    before: Option<u64>,
+) -> Result<AuditPage, ApiError> {
+    task::spawn_blocking(move || read_audit_violations_page_blocking(&path, limit, before))
+        .await
+        .map_err(|e| ApiError::Internal(format!("Audit violation read task failed: {e}")))?
+        .map_err(|e| ApiError::Internal(format!("Failed to read audit log: {e}")))
+}
+
+async fn read_audit_stats(
+    path: PathBuf,
+    cache: Arc<RwLock<Option<AuditStatsCacheEntry>>>,
+) -> Result<AuditStats, ApiError> {
+    let metadata = tokio::fs::metadata(&path)
+        .await
+        .map_err(|e| ApiError::Internal(format!("Failed to stat audit log: {e}")))?;
+    let file_len = metadata.len();
+    let modified = metadata
+        .modified()
+        .map_err(|e| ApiError::Internal(format!("Failed to stat audit log mtime: {e}")))?;
+
+    if let Some(entry) = cache
+        .read()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
+        .as_ref()
+        .filter(|entry| entry.file_len == file_len && entry.modified == modified)
+    {
+        return Ok(entry.stats.clone());
+    }
+
+    let stats = task::spawn_blocking(move || read_audit_stats_blocking(&path))
+        .await
+        .map_err(|e| ApiError::Internal(format!("Audit stats read task failed: {e}")))?
+        .map_err(|e| ApiError::Internal(format!("Failed to read audit stats: {e}")))?;
+
+    *cache
+        .write()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = Some(AuditStatsCacheEntry {
+        file_len,
+        modified,
+        stats: stats.clone(),
+    });
+
+    Ok(stats)
+}
+
+fn read_audit_entries_page_blocking(
+    path: &FsPath,
+    limit: usize,
+    before: Option<u64>,
+) -> Result<AuditPage, ApiError> {
+    if limit > 0 {
+        return read_recent_audit_entries_page_blocking(path, limit, before)
+            .map_err(|e| ApiError::Internal(format!("Failed to read audit log: {e}")));
+    }
+
+    let filter = AuditFilter {
+        limit: 0,
+        ..AuditFilter::all()
+    };
+    let mut entries = query_audit_log(path, &filter)
+        .map_err(|e| ApiError::Internal(format!("Failed to read audit log: {e}")))?
+        .entries;
+
+    entries.sort_by_key(|entry| entry.timestamp);
+    entries.reverse();
+
+    if limit > 0 && entries.len() > limit {
+        entries.truncate(limit);
+    }
+
+    Ok(AuditPage {
+        entries,
+        next_cursor: None,
+    })
+}
+
+fn read_audit_stats_blocking(path: &FsPath) -> Result<AuditStats, String> {
+    let filter = AuditFilter {
+        limit: 0,
+        ..AuditFilter::all()
+    };
+    let entries = query_audit_log(path, &filter)
+        .map_err(|e| format!("Failed to query audit log: {e}"))?
+        .entries;
+
+    let today = Utc::now().date_naive();
+    let mut events_today = 0u64;
+    let mut violations_today = 0u64;
+    let mut blocked_today = 0u64;
+
+    for entry in &entries {
+        if entry.timestamp.date_naive() != today {
+            continue;
+        }
+        events_today += 1;
+        if is_violation_entry(entry) {
+            violations_today += 1;
+        }
+        if matches!(entry.outcome, AuditOutcome::Denied) {
+            blocked_today += 1;
+        }
+    }
+
+    let block_rate_percent = if events_today > 0 {
+        (blocked_today as f64 / events_today as f64) * 100.0
+    } else {
+        0.0
+    };
+
+    Ok(AuditStats {
+        events_today,
+        violations_today,
+        block_rate_percent,
+        total_events: entries.len() as u64,
+    })
+}
+
+fn read_audit_violations_page_blocking(
+    path: &FsPath,
+    limit: usize,
+    before: Option<u64>,
+) -> Result<AuditPage, String> {
+    read_recent_audit_entries_where_page_blocking(path, limit, before, is_violation_entry)
+}
+
+fn read_recent_audit_entries_page_blocking(
+    path: &FsPath,
+    limit: usize,
+    before: Option<u64>,
+) -> Result<AuditPage, String> {
+    read_recent_audit_entries_where_page_blocking(path, limit, before, |_| true)
+}
+
+fn read_recent_audit_entries_where_page_blocking(
+    path: &FsPath,
+    limit: usize,
+    before: Option<u64>,
+    mut matches_entry: impl FnMut(&AuditEntry) -> bool,
+) -> Result<AuditPage, String> {
+    const BLOCK_SIZE: u64 = 8192;
+
+    let mut file =
+        std::fs::File::open(path).map_err(|e| format!("Failed to open audit log: {e}"))?;
+    let file_len = file
+        .metadata()
+        .map_err(|e| format!("Failed to stat audit log: {e}"))?
+        .len();
+    let mut pos = before.unwrap_or(file_len).min(file_len);
+    if limit == 0 || pos == 0 {
+        return Ok(AuditPage {
+            entries: vec![],
+            next_cursor: None,
+        });
+    }
+
+    let mut carry = Vec::new();
+    let mut selected: Vec<(u64, AuditEntry)> = Vec::new();
+    loop {
+        let read_len = BLOCK_SIZE.min(pos) as usize;
+        pos -= read_len as u64;
+
+        file.seek(SeekFrom::Start(pos))
+            .map_err(|e| format!("Failed to seek audit log: {e}"))?;
+        let mut chunk = vec![0u8; read_len];
+        file.read_exact(&mut chunk)
+            .map_err(|e| format!("Failed to read audit log: {e}"))?;
+
+        chunk.extend_from_slice(&carry);
+        let parse_start = if pos > 0 {
+            if let Some(newline_idx) = chunk.iter().position(|byte| *byte == b'\n') {
+                carry = chunk[..newline_idx].to_vec();
+                newline_idx + 1
+            } else {
+                carry = chunk;
+                continue;
+            }
+        } else {
+            0
+        };
+
+        let content = String::from_utf8_lossy(&chunk[parse_start..]);
+        let mut offset = pos + parse_start as u64;
+        let parsed: Vec<(u64, AuditEntry)> = content
+            .split_inclusive('\n')
+            .enumerate()
+            .filter_map(|(idx, segment)| {
+                let segment_offset = offset;
+                offset += segment.len() as u64;
+
+                if idx == 0 && parse_start > 0 && segment.is_empty() {
+                    return None;
+                }
+
+                let line = segment.trim();
+                if line.is_empty() {
+                    return None;
+                }
+
+                serde_json::from_str(line)
+                    .ok()
+                    .map(|entry| (segment_offset, entry))
+            })
+            .collect();
+
+        let remaining = limit.saturating_sub(selected.len());
+        selected.extend(
+            parsed
+                .into_iter()
+                .rev()
+                .filter(|(_, entry)| matches_entry(entry))
+                .take(remaining),
+        );
+
+        if selected.len() >= limit || pos == 0 {
+            let next_cursor = selected
+                .last()
+                .and_then(|(offset, _)| (*offset > 0).then_some(*offset));
+            let mut entries: Vec<AuditEntry> =
+                selected.into_iter().map(|(_, entry)| entry).collect();
+            entries.sort_by_key(|entry| entry.timestamp);
+            entries.reverse();
+            return Ok(AuditPage {
+                entries,
+                next_cursor,
+            });
+        }
+    }
+}
+
+impl From<AuditEntry> for AuditLogEntry {
+    fn from(entry: AuditEntry) -> Self {
+        let outcome = match entry.outcome {
+            AuditOutcome::Success => "success",
+            AuditOutcome::Denied => "denied",
+            AuditOutcome::Error => "error",
+        };
+
+        Self {
+            timestamp: entry.timestamp.to_rfc3339(),
+            session_id: entry.session_id.to_string(),
+            action: entry.action,
+            skill_name: entry.skill_name,
+            details: entry.details,
+            outcome: outcome.to_string(),
+        }
+    }
+}
+
+impl ViolationEntry {
+    fn from_audit_entry(entry: AuditEntry) -> Option<Self> {
+        if !is_violation_entry(&entry) {
+            return None;
+        }
+
+        let severity = if matches!(entry.outcome, AuditOutcome::Denied) {
+            "block"
+        } else {
+            "warn"
+        };
+        let rule = entry
+            .details
+            .get("rule")
+            .or_else(|| entry.details.get("rule_name"))
+            .and_then(|value| value.as_str())
+            .unwrap_or(&entry.action)
+            .to_string();
+        let message = entry
+            .details
+            .get("message")
+            .or_else(|| entry.details.get("reason"))
+            .and_then(|value| value.as_str())
+            .unwrap_or(&entry.action)
+            .to_string();
+
+        Some(Self {
+            timestamp: entry.timestamp.to_rfc3339(),
+            session_id: entry.session_id.to_string(),
+            rule,
+            severity: severity.to_string(),
+            message,
+        })
+    }
+}
+
+fn is_violation_entry(entry: &AuditEntry) -> bool {
+    let action = entry.action.to_ascii_lowercase();
+    matches!(entry.outcome, AuditOutcome::Denied)
+        || action.contains("guardrail")
+        || action.contains("violation")
+        || action.contains("policy")
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -560,6 +1128,8 @@ mod tests {
             sessions,
             skills,
             started_at: Utc::now(),
+            audit_log_path: Some(tmp.path().join("audit").join("audit.jsonl")),
+            audit_stats_cache: Arc::new(RwLock::new(None)),
         })
     }
 
@@ -758,6 +1328,360 @@ mod tests {
         assert_eq!(metrics.active_sessions, 0);
         assert!(metrics.uptime_seconds >= 0);
         assert_eq!(metrics.skills_registered, 0);
+    }
+
+    #[tokio::test]
+    async fn test_audit_endpoints_read_jsonl() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let audit_path = state.audit_log_path.clone().unwrap();
+        std::fs::create_dir_all(audit_path.parent().unwrap()).unwrap();
+
+        let session_id = Uuid::new_v4();
+        let success = AuditEntry {
+            timestamp: Utc::now(),
+            session_id,
+            action: "tool_call".to_string(),
+            skill_name: Some("lookup".to_string()),
+            details: serde_json::json!({"ok": true}),
+            outcome: AuditOutcome::Success,
+        };
+        let denied = AuditEntry {
+            timestamp: Utc::now(),
+            session_id,
+            action: "guardrail_blocked".to_string(),
+            skill_name: None,
+            details: serde_json::json!({
+                "rule": "pii_detection",
+                "message": "PII blocked"
+            }),
+            outcome: AuditOutcome::Denied,
+        };
+        let jsonl = format!(
+            "{}\n{}\n",
+            serde_json::to_string(&success).unwrap(),
+            serde_json::to_string(&denied).unwrap()
+        );
+        std::fs::write(&audit_path, &jsonl).unwrap();
+
+        let app = api_router(state.clone());
+        let req = Request::builder()
+            .uri("/api/v1/audit/logs?limit=10")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let logs: Vec<AuditLogEntry> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(logs.len(), 2);
+        assert!(logs.iter().any(|entry| entry.outcome == "denied"));
+
+        let app = api_router(state.clone());
+        let req = Request::builder()
+            .uri("/api/v1/audit/violations?limit=10")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let violations: Vec<ViolationEntry> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].rule, "pii_detection");
+        assert_eq!(violations[0].severity, "block");
+
+        let app = api_router(state.clone());
+        let req = Request::builder()
+            .uri("/api/v1/audit/stats")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let stats: AuditStats = serde_json::from_slice(&body).unwrap();
+        assert_eq!(stats.total_events, 2);
+        assert_eq!(stats.events_today, 2);
+        assert_eq!(stats.violations_today, 1);
+        assert_eq!(stats.block_rate_percent, 50.0);
+        assert!(state.audit_stats_cache.read().unwrap().as_ref().is_some());
+
+        let extra = AuditEntry {
+            timestamp: Utc::now(),
+            session_id,
+            action: "tool_call".to_string(),
+            skill_name: Some("lookup".to_string()),
+            details: serde_json::json!({"extra": true}),
+            outcome: AuditOutcome::Success,
+        };
+        std::fs::write(
+            &audit_path,
+            format!("{jsonl}{}\n", serde_json::to_string(&extra).unwrap()),
+        )
+        .unwrap();
+
+        let app = api_router(state);
+        let req = Request::builder()
+            .uri("/api/v1/audit/stats")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let stats: AuditStats = serde_json::from_slice(&body).unwrap();
+        assert_eq!(stats.total_events, 3);
+        assert_eq!(stats.events_today, 3);
+        assert_eq!(stats.violations_today, 1);
+    }
+
+    #[tokio::test]
+    async fn test_audit_prometheus_export() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let audit_path = state.audit_log_path.clone().unwrap();
+        std::fs::create_dir_all(audit_path.parent().unwrap()).unwrap();
+
+        let session_id = Uuid::new_v4();
+        let success = AuditEntry {
+            timestamp: Utc::now(),
+            session_id,
+            action: "tool_call".to_string(),
+            skill_name: Some("lookup".to_string()),
+            details: serde_json::json!({"ok": true}),
+            outcome: AuditOutcome::Success,
+        };
+        let denied = AuditEntry {
+            timestamp: Utc::now(),
+            session_id,
+            action: "guardrail_blocked".to_string(),
+            skill_name: None,
+            details: serde_json::json!({"rule": "pii_detection"}),
+            outcome: AuditOutcome::Denied,
+        };
+        std::fs::write(
+            &audit_path,
+            format!(
+                "{}\n{}\n",
+                serde_json::to_string(&success).unwrap(),
+                serde_json::to_string(&denied).unwrap()
+            ),
+        )
+        .unwrap();
+
+        let metrics = audit_prometheus_export(&state).await;
+        assert!(metrics.contains("argentor_audit_configured 1"));
+        assert!(metrics.contains("argentor_audit_log_bytes "));
+        assert!(metrics.contains("argentor_audit_events_today 2"));
+        assert!(metrics.contains("argentor_audit_violations_today 1"));
+        assert!(metrics.contains("argentor_audit_block_rate_percent 50.000000"));
+        assert!(metrics.contains("argentor_audit_events_total 2"));
+    }
+
+    #[tokio::test]
+    async fn test_audit_prometheus_export_unconfigured() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let mut state = Arc::try_unwrap(state).ok().unwrap();
+        state.audit_log_path = None;
+
+        let metrics = audit_prometheus_export(&state).await;
+        assert!(metrics.contains("argentor_audit_configured 0"));
+        assert!(!metrics.contains("argentor_audit_events_total"));
+    }
+
+    #[tokio::test]
+    async fn test_audit_logs_cursor_paginates() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let audit_path = state.audit_log_path.clone().unwrap();
+        std::fs::create_dir_all(audit_path.parent().unwrap()).unwrap();
+
+        let session_id = Uuid::new_v4();
+        let base = Utc::now();
+        let mut lines = Vec::new();
+        for i in 0..3 {
+            let entry = AuditEntry {
+                timestamp: base + chrono::Duration::seconds(i),
+                session_id,
+                action: format!("event_{i}"),
+                skill_name: None,
+                details: serde_json::json!({ "i": i }),
+                outcome: AuditOutcome::Success,
+            };
+            lines.push(serde_json::to_string(&entry).unwrap());
+        }
+        std::fs::write(&audit_path, format!("{}\n", lines.join("\n"))).unwrap();
+
+        let app = api_router(state.clone());
+        let req = Request::builder()
+            .uri("/api/v1/audit/logs?limit=2")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let cursor = resp
+            .headers()
+            .get(AUDIT_NEXT_CURSOR_HEADER)
+            .expect("first page should include cursor")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let logs: Vec<AuditLogEntry> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(
+            logs.iter()
+                .map(|entry| entry.action.as_str())
+                .collect::<Vec<_>>(),
+            vec!["event_2", "event_1"]
+        );
+
+        let app = api_router(state);
+        let req = Request::builder()
+            .uri(format!("/api/v1/audit/logs?limit=2&cursor={cursor}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        assert!(resp.headers().get(AUDIT_NEXT_CURSOR_HEADER).is_none());
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let logs: Vec<AuditLogEntry> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(logs.len(), 1);
+        assert_eq!(logs[0].action, "event_0");
+    }
+
+    #[tokio::test]
+    async fn test_audit_logs_cursor_paginates_across_blocks() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let audit_path = state.audit_log_path.clone().unwrap();
+        std::fs::create_dir_all(audit_path.parent().unwrap()).unwrap();
+
+        let session_id = Uuid::new_v4();
+        let base = Utc::now();
+        let payload = "x".repeat(512);
+        let mut lines = Vec::new();
+        for i in 0..200 {
+            let entry = AuditEntry {
+                timestamp: base + chrono::Duration::seconds(i),
+                session_id,
+                action: format!("event_{i}"),
+                skill_name: None,
+                details: serde_json::json!({ "i": i, "payload": payload }),
+                outcome: AuditOutcome::Success,
+            };
+            lines.push(serde_json::to_string(&entry).unwrap());
+        }
+        std::fs::write(&audit_path, format!("{}\n", lines.join("\n"))).unwrap();
+
+        let app = api_router(state.clone());
+        let req = Request::builder()
+            .uri("/api/v1/audit/logs?limit=50")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let cursor = resp
+            .headers()
+            .get(AUDIT_NEXT_CURSOR_HEADER)
+            .expect("first page should include cursor across multiple blocks")
+            .to_str()
+            .unwrap()
+            .to_string();
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let logs: Vec<AuditLogEntry> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(logs.len(), 50);
+        assert_eq!(logs[0].action, "event_199");
+        assert_eq!(logs[49].action, "event_150");
+
+        let app = api_router(state);
+        let req = Request::builder()
+            .uri(format!("/api/v1/audit/logs?limit=50&cursor={cursor}"))
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let logs: Vec<AuditLogEntry> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(logs.len(), 50);
+        assert_eq!(logs[0].action, "event_149");
+        assert_eq!(logs[49].action, "event_100");
+    }
+
+    #[tokio::test]
+    async fn test_audit_logs_reject_invalid_cursor() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let app = api_router(state);
+
+        let req = Request::builder()
+            .uri("/api/v1/audit/logs?cursor=not-a-number")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn test_audit_violations_scans_back_until_limit() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let audit_path = state.audit_log_path.clone().unwrap();
+        std::fs::create_dir_all(audit_path.parent().unwrap()).unwrap();
+
+        let session_id = Uuid::new_v4();
+        let denied = AuditEntry {
+            timestamp: Utc::now(),
+            session_id,
+            action: "policy_denied".to_string(),
+            skill_name: None,
+            details: serde_json::json!({
+                "rule": "network_policy",
+                "message": "Outbound host blocked"
+            }),
+            outcome: AuditOutcome::Denied,
+        };
+
+        let mut lines = vec![serde_json::to_string(&denied).unwrap()];
+        for i in 0..1500 {
+            let success = AuditEntry {
+                timestamp: Utc::now(),
+                session_id,
+                action: "tool_call".to_string(),
+                skill_name: Some("lookup".to_string()),
+                details: serde_json::json!({ "i": i }),
+                outcome: AuditOutcome::Success,
+            };
+            lines.push(serde_json::to_string(&success).unwrap());
+        }
+        std::fs::write(&audit_path, format!("{}\n", lines.join("\n"))).unwrap();
+
+        let app = api_router(state);
+        let req = Request::builder()
+            .uri("/api/v1/audit/violations?limit=1")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let violations: Vec<ViolationEntry> = serde_json::from_slice(&body).unwrap();
+        assert_eq!(violations.len(), 1);
+        assert_eq!(violations[0].rule, "network_policy");
     }
 
     #[tokio::test]

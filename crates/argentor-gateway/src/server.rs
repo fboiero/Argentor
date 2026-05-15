@@ -16,7 +16,7 @@ use crate::playground::playground_router;
 use crate::pricing_page::pricing_router;
 use crate::proxy_management::{proxy_management_router, ProxyManagementState};
 use crate::rate_limit_per_key::PerKeyRateLimiter;
-use crate::rest_api::{api_router, RestApiState};
+use crate::rest_api::{api_router, audit_prometheus_export, RestApiState};
 use crate::router::{InboundMessage, MessageRouter};
 use crate::streaming::{streaming_router, StreamingState};
 use crate::webhook::{webhook_handler, WebhookConfig, WebhookState};
@@ -260,6 +260,7 @@ impl GatewayServer {
             router: router.clone(),
             connections: connections.clone(),
             sessions: sessions_for_streaming,
+            session_broadcast: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         });
 
         let state = Arc::new(AppState {
@@ -392,6 +393,7 @@ impl GatewayServer {
             router: router.clone(),
             connections: connections.clone(),
             sessions: sessions_for_streaming,
+            session_broadcast: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
         });
 
         let state = Arc::new(AppState {
@@ -855,6 +857,15 @@ async fn prometheus_metrics_handler(State(state): State<Arc<AppState>>) -> impl 
         has_metrics = true;
     }
 
+    // Audit metrics from the REST API state, if mounted.
+    if let Some(rest_api) = &state.rest_api {
+        if has_metrics {
+            body.push('\n');
+        }
+        body.push_str(&audit_prometheus_export(rest_api).await);
+        has_metrics = true;
+    }
+
     if has_metrics {
         (
             StatusCode::OK,
@@ -880,7 +891,9 @@ async fn prometheus_metrics_handler(State(state): State<Arc<AppState>>) -> impl 
     }
 }
 
+#[tracing::instrument(skip(ws, state), fields(method = "GET", path = "/ws", status_code = tracing::field::Empty))]
 async fn ws_handler(ws: WebSocketUpgrade, State(state): State<Arc<AppState>>) -> impl IntoResponse {
+    tracing::Span::current().record("status_code", 101u16);
     ws.on_upgrade(move |socket| handle_socket(socket, state))
 }
 

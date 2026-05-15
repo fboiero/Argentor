@@ -109,6 +109,8 @@ async fn start_full_server() -> (
         sessions: sessions.clone(),
         skills: skills.clone(),
         started_at: chrono::Utc::now(),
+        audit_log_path: None,
+        audit_stats_cache: Arc::new(std::sync::RwLock::new(None)),
     });
 
     // Build control plane state for readiness checks
@@ -170,6 +172,8 @@ async fn start_enterprise_configured_server() -> (String, tempfile::TempDir, Arc
         sessions: sessions.clone(),
         skills: skills.clone(),
         started_at: chrono::Utc::now(),
+        audit_log_path: None,
+        audit_stats_cache: Arc::new(std::sync::RwLock::new(None)),
     });
 
     let per_key_config = argentor_gateway::rate_limit_per_key::RateLimitConfig {

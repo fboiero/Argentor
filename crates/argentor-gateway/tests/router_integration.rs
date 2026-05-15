@@ -99,6 +99,8 @@ async fn build_full_gateway() -> (axum::Router, tempfile::TempDir) {
         sessions: sessions.clone(),
         skills,
         started_at: Utc::now(),
+        audit_log_path: None,
+        audit_stats_cache: Arc::new(std::sync::RwLock::new(None)),
     });
 
     // --- Proxy management ---
@@ -214,6 +216,26 @@ async fn test_dashboard_route_mounted() {
     assert!(
         html.contains("<html") || html.contains("<!DOCTYPE") || html.contains("<!doctype"),
         "Dashboard response should contain HTML"
+    );
+    assert!(
+        html.contains("/dashboard/audit"),
+        "Dashboard should link to the audit view"
+    );
+}
+
+#[tokio::test]
+async fn test_audit_dashboard_route_mounted() {
+    let (app, _tmp) = build_full_gateway().await;
+    let (status, body) = get(&app, "/dashboard/audit").await;
+    assert_eq!(
+        status,
+        StatusCode::OK,
+        "GET /dashboard/audit should return 200"
+    );
+    let html = String::from_utf8_lossy(&body);
+    assert!(
+        html.contains("/api/v1/audit/logs") && html.contains("/api/v1/audit/stats"),
+        "Audit dashboard response should reference audit API endpoints"
     );
 }
 

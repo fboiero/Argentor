@@ -16,7 +16,7 @@ pub mod headless;
 pub mod repl;
 
 use argentor_agent::{AgentRunner, ModelConfig};
-use argentor_gateway::{AuthConfig, GatewayServer};
+use argentor_gateway::{AuthConfig, GatewayServer, RestApiState};
 use argentor_security::tls;
 use argentor_security::{AuditLog, Capability, PermissionSet, RateLimiter};
 use argentor_session::FileSessionStore;
@@ -473,7 +473,8 @@ async fn main() -> anyhow::Result<()> {
             info!("Starting Argentor gateway on {}:{}", host, port);
 
             // Initialize security
-            let audit = Arc::new(AuditLog::new(config.data_dir.join("audit")));
+            let audit_dir = config.data_dir.join("audit");
+            let audit = Arc::new(AuditLog::new(audit_dir.clone()));
             let rate_limiter = Arc::new(RateLimiter::new(
                 config.security.max_burst,
                 config.security.max_requests_per_second,
@@ -546,13 +547,31 @@ async fn main() -> anyhow::Result<()> {
                 audit,
             ));
 
-            let app = GatewayServer::build_with_middleware(
+            let rest_connections = argentor_gateway::connection::ConnectionManager::new();
+            let rest_router = Arc::new(argentor_gateway::router::MessageRouter::new(
+                agent.clone(),
+                sessions.clone(),
+                rest_connections.clone(),
+            ));
+            let rest_api = Arc::new(RestApiState {
+                router: rest_router,
+                connections: rest_connections,
+                sessions: sessions.clone(),
+                skills,
+                started_at: chrono::Utc::now(),
+                audit_log_path: Some(audit_dir.join("audit.jsonl")),
+                audit_stats_cache: Arc::new(std::sync::RwLock::new(None)),
+            });
+
+            let app = GatewayServer::build_full(
                 agent,
                 sessions,
                 Some(rate_limiter),
                 auth_config,
                 None,
                 None,
+                None,
+                Some(rest_api),
             );
 
             let addr = format!("{host}:{port}");

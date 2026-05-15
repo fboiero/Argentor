@@ -409,6 +409,11 @@ impl OpenApiGenerator {
             "/dashboard",
             "Web dashboard",
         ));
+        gen.add_endpoint(ApiEndpoint::new(
+            HttpMethod::Get,
+            "/dashboard/audit",
+            "Audit dashboard",
+        ));
         gen.add_endpoint(
             ApiEndpoint::new(
                 HttpMethod::Get,
@@ -439,6 +444,34 @@ impl OpenApiGenerator {
         // Skills
         gen.add_endpoint(
             ApiEndpoint::new(HttpMethod::Get, "/api/v1/skills", "List skills").with_tag("Skills"),
+        );
+
+        // Audit
+        gen.add_endpoint(
+            ApiEndpoint::new(HttpMethod::Get, "/api/v1/audit/logs", "List audit log entries")
+                .with_description("Returns recent audit JSONL entries. Use limit to cap the response size and cursor to continue from the x-next-cursor response header.")
+                .with_tag("Audit")
+                .with_response(ApiResponse::json(200, "Audit log entries")),
+        );
+        gen.add_endpoint(
+            ApiEndpoint::new(
+                HttpMethod::Get,
+                "/api/v1/audit/violations",
+                "List audit violations",
+            )
+            .with_description(
+                "Returns recent denied policy, guardrail, or violation entries from the audit log. Use cursor to continue from the x-next-cursor response header.",
+            )
+            .with_tag("Audit")
+            .with_response(ApiResponse::json(200, "Audit violations")),
+        );
+        gen.add_endpoint(
+            ApiEndpoint::new(HttpMethod::Get, "/api/v1/audit/stats", "Audit statistics")
+                .with_description(
+                    "Returns aggregate audit counts, success rate, and last event timestamp.",
+                )
+                .with_tag("Audit")
+                .with_response(ApiResponse::json(200, "Audit statistics")),
         );
 
         // Control plane

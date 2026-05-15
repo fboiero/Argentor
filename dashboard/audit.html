@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Argentor — Audit Dashboard</title>
+  <style>
+    :root {
+      --bg: #0d1117; --bg2: #161b22; --bg3: #21262d;
+      --border: #30363d; --text: #c9d1d9; --muted: #8b949e;
+      --green: #3fb950; --yellow: #d29922; --red: #f85149;
+      --blue: #58a6ff; --purple: #bc8cff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: var(--bg); color: var(--text); font-family: ui-monospace, 'Cascadia Code', monospace; font-size: 13px; }
+    header { background: var(--bg2); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; gap: 12px; }
+    header h1 { font-size: 16px; font-weight: 600; color: var(--blue); }
+    header span { color: var(--muted); font-size: 12px; }
+    .header-spacer { margin-left: auto; }
+    .status-badge, .refresh-badge, .refresh-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; font-size: 11px; color: var(--muted); }
+    .status-badge.ok { color: var(--green); border-color: rgba(63,185,80,.45); }
+    .status-badge.warn { color: var(--yellow); border-color: rgba(210,153,34,.45); }
+    .status-badge.err { color: var(--red); border-color: rgba(248,81,73,.45); }
+    .refresh-btn { cursor: pointer; font-family: inherit; }
+    .refresh-btn:hover { color: var(--text); border-color: var(--blue); }
+    main { padding: 20px 24px; max-width: 1400px; margin: 0 auto; }
+
+    /* Stats bar */
+    .stats-bar { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+    .stat-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; }
+    .stat-card .label { color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
+    .stat-card .value { font-size: 28px; font-weight: 700; }
+    .stat-card .sub { color: var(--muted); font-size: 11px; margin-top: 4px; }
+    .val-green { color: var(--green); }
+    .val-yellow { color: var(--yellow); }
+    .val-red { color: var(--red); }
+
+    /* Sections */
+    .section { background: var(--bg2); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 20px; }
+    .section-header { padding: 12px 16px; border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 8px; }
+    .section-header h2 { font-size: 13px; font-weight: 600; }
+    .badge { background: var(--bg3); border: 1px solid var(--border); border-radius: 12px; padding: 2px 8px; font-size: 11px; color: var(--muted); }
+
+    /* Filter bar */
+    .filter-bar { padding: 10px 16px; display: flex; gap: 8px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+    .filter-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 4px 12px; color: var(--muted); cursor: pointer; font-size: 12px; }
+    .filter-btn.active { border-color: var(--blue); color: var(--blue); }
+    .filter-input { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 4px 10px; color: var(--text); font-size: 12px; flex: 1; min-width: 160px; font-family: inherit; }
+    .filter-input:focus { outline: none; border-color: var(--blue); }
+    .section-footer { padding: 10px 16px; border-top: 1px solid var(--border); display: flex; justify-content: center; }
+    .load-more-btn { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 6px 14px; color: var(--muted); cursor: pointer; font-size: 12px; font-family: inherit; }
+    .load-more-btn:hover:not(:disabled) { color: var(--text); border-color: var(--blue); }
+    .load-more-btn:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* Table */
+    table { width: 100%; border-collapse: collapse; }
+    th { padding: 8px 12px; text-align: left; color: var(--muted); font-size: 11px; text-transform: uppercase; letter-spacing: .05em; border-bottom: 1px solid var(--border); font-weight: 500; cursor: pointer; user-select: none; }
+    th:hover { color: var(--text); }
+    th .sort-icon { opacity: .5; margin-left: 4px; }
+    td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    tr:hover td { background: var(--bg3); }
+    .ts { color: var(--muted); font-size: 11px; white-space: nowrap; }
+    .action-tag { background: var(--bg3); border: 1px solid var(--border); border-radius: 4px; padding: 1px 6px; font-size: 11px; }
+    .outcome-success { color: var(--green); }
+    .outcome-denied { color: var(--red); }
+    .outcome-error { color: var(--yellow); }
+    .empty-row td { text-align: center; color: var(--muted); padding: 32px; font-size: 12px; }
+    .error-row td { text-align: center; color: var(--red); padding: 32px; font-size: 12px; }
+
+    /* Violations panel */
+    .rule-group { padding: 12px 16px; border-bottom: 1px solid var(--border); }
+    .rule-group:last-child { border-bottom: none; }
+    .rule-name { font-weight: 600; margin-bottom: 6px; }
+    .rule-count { color: var(--muted); font-size: 11px; margin-left: 8px; }
+    .severity-warn { color: var(--yellow); }
+    .severity-block { color: var(--red); }
+
+    /* Loading */
+    .loading { color: var(--muted); padding: 24px; text-align: center; }
+    .dot-anim::after { content: '...'; animation: dots 1.2s infinite; }
+    @keyframes dots { 0%,20%{content:'.'}40%,60%{content:'..'}80%,100%{content:'...'} }
+  </style>
+</head>
+<body>
+<header>
+  <h1>Argentor</h1>
+  <span>Audit Dashboard</span>
+  <div class="header-spacer"></div>
+  <div class="status-badge warn" id="api-status">Connecting</div>
+  <div class="refresh-badge" id="refresh-badge">Auto-refresh: 30s</div>
+  <button class="refresh-btn" type="button" onclick="fetchAll()">Refresh</button>
+</header>
+
+<main>
+  <!-- Stats bar -->
+  <div class="stats-bar" id="stats-bar">
+    <div class="stat-card">
+      <div class="label">Events Today</div>
+      <div class="value val-green" id="stat-events">—</div>
+      <div class="sub">audit entries recorded</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Violations Today</div>
+      <div class="value val-yellow" id="stat-violations">—</div>
+      <div class="sub">guardrail rule triggers</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Block Rate</div>
+      <div class="value val-red" id="stat-block-rate">—</div>
+      <div class="sub">of requests blocked today</div>
+    </div>
+  </div>
+
+  <!-- Log table -->
+  <div class="section">
+    <div class="section-header">
+      <h2>Audit Log</h2>
+      <span class="badge" id="log-count">0</span>
+    </div>
+    <div class="filter-bar">
+      <button class="filter-btn active" data-type="all" onclick="setTypeFilter(this)">All</button>
+      <button class="filter-btn" data-type="action" onclick="setTypeFilter(this)">Action</button>
+      <button class="filter-btn" data-type="violation" onclick="setTypeFilter(this)">Violation</button>
+      <button class="filter-btn" data-type="auth" onclick="setTypeFilter(this)">Auth</button>
+      <input class="filter-input" id="log-search" placeholder="Search session, action, skill…" oninput="renderLogs()" />
+    </div>
+    <div style="overflow-x:auto">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortLogs('timestamp')">Timestamp <span class="sort-icon">↕</span></th>
+            <th onclick="sortLogs('session_id')">Session <span class="sort-icon">↕</span></th>
+            <th onclick="sortLogs('action')">Action <span class="sort-icon">↕</span></th>
+            <th>Skill</th>
+            <th onclick="sortLogs('outcome')">Outcome <span class="sort-icon">↕</span></th>
+            <th>Details</th>
+          </tr>
+        </thead>
+        <tbody id="log-body">
+          <tr class="empty-row"><td colspan="6"><span class="dot-anim">Loading</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="section-footer">
+      <button class="load-more-btn" id="load-more-logs" type="button" onclick="loadMoreLogs()" disabled>Load more</button>
+    </div>
+  </div>
+
+  <!-- Violations panel -->
+  <div class="section">
+    <div class="section-header">
+      <h2>Violations by Rule</h2>
+      <span class="badge" id="violation-count">0</span>
+    </div>
+    <div id="violation-panel">
+      <div class="loading"><span class="dot-anim">Loading</span></div>
+    </div>
+    <div class="section-footer">
+      <button class="load-more-btn" id="load-more-violations" type="button" onclick="loadMoreViolations()" disabled>Load more</button>
+    </div>
+  </div>
+</main>
+
+<script>
+  const API = '';
+  const REQUEST_TIMEOUT_MS = 8000;
+  let logs = [], violations = [], typeFilter = 'all', sortKey = 'timestamp', sortDir = -1;
+  let logNextCursor = null, violationNextCursor = null;
+  let lastError = '';
+
+  async function fetchAll() {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+    setStatus('warn', 'Loading');
+    try {
+      const [logsRes, violRes, statsRes] = await Promise.all([
+        fetch(`${API}/api/v1/audit/logs?limit=100`, { signal: controller.signal }),
+        fetch(`${API}/api/v1/audit/violations?limit=50`, { signal: controller.signal }),
+        fetch(`${API}/api/v1/audit/stats`, { signal: controller.signal }),
+      ]);
+      if (!logsRes.ok || !violRes.ok || !statsRes.ok) {
+        throw new Error(`API ${logsRes.status}/${violRes.status}/${statsRes.status}`);
+      }
+      if (logsRes.ok) {
+        logs = await logsRes.json();
+        logNextCursor = logsRes.headers.get('x-next-cursor');
+      }
+      if (violRes.ok) {
+        violations = await violRes.json();
+        violationNextCursor = violRes.headers.get('x-next-cursor');
+      }
+      if (statsRes.ok) {
+        const s = await statsRes.json();
+        document.getElementById('stat-events').textContent = s.events_today.toLocaleString();
+        document.getElementById('stat-violations').textContent = s.violations_today.toLocaleString();
+        document.getElementById('stat-block-rate').textContent = s.block_rate_percent.toFixed(1) + '%';
+      }
+      lastError = '';
+      setStatus('ok', 'Live');
+    } catch (e) {
+      lastError = e && e.name === 'AbortError' ? 'Request timed out' : (e.message || 'Fetch failed');
+      setStatus('err', lastError);
+      console.warn('Fetch error:', e);
+    } finally {
+      clearTimeout(timeout);
+    }
+    renderLogs();
+    renderViolations();
+    updateCountdown(30);
+  }
+
+  async function loadMoreLogs() {
+    if (!logNextCursor) return;
+    const button = document.getElementById('load-more-logs');
+    button.disabled = true;
+    button.textContent = 'Loading...';
+    try {
+      const res = await fetch(`${API}/api/v1/audit/logs?limit=100&cursor=${encodeURIComponent(logNextCursor)}`);
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      logs = logs.concat(await res.json());
+      logNextCursor = res.headers.get('x-next-cursor');
+      lastError = '';
+      setStatus('ok', 'Live');
+    } catch (e) {
+      lastError = e.message || 'Fetch failed';
+      setStatus('err', lastError);
+    }
+    renderLogs();
+  }
+
+  async function loadMoreViolations() {
+    if (!violationNextCursor) return;
+    const button = document.getElementById('load-more-violations');
+    button.disabled = true;
+    button.textContent = 'Loading...';
+    try {
+      const res = await fetch(`${API}/api/v1/audit/violations?limit=50&cursor=${encodeURIComponent(violationNextCursor)}`);
+      if (!res.ok) throw new Error(`API ${res.status}`);
+      violations = violations.concat(await res.json());
+      violationNextCursor = res.headers.get('x-next-cursor');
+      lastError = '';
+      setStatus('ok', 'Live');
+    } catch (e) {
+      lastError = e.message || 'Fetch failed';
+      setStatus('err', lastError);
+    }
+    renderViolations();
+  }
+
+  function setStatus(kind, text) {
+    const el = document.getElementById('api-status');
+    el.className = `status-badge ${kind}`;
+    el.textContent = text;
+  }
+
+  function escapeHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+  }
+
+  function compactJson(value, maxLen = 260) {
+    const text = JSON.stringify(value || {});
+    return text.length > maxLen ? `${text.slice(0, maxLen - 3)}...` : text;
+  }
+
+  function setTypeFilter(btn) {
+    document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+    btn.classList.add('active');
+    typeFilter = btn.dataset.type;
+    renderLogs();
+  }
+
+  function sortLogs(key) {
+    if (sortKey === key) sortDir *= -1; else { sortKey = key; sortDir = -1; }
+    renderLogs();
+  }
+
+  function renderLogs() {
+    const q = (document.getElementById('log-search').value || '').toLowerCase();
+    let data = [...logs];
+
+    if (typeFilter !== 'all') {
+      data = data.filter(e => (e.action || '').toLowerCase().includes(typeFilter));
+    }
+    if (q) {
+      data = data.filter(e =>
+        (e.session_id || '').toLowerCase().includes(q) ||
+        (e.action || '').toLowerCase().includes(q) ||
+        (e.skill_name || '').toLowerCase().includes(q)
+      );
+    }
+
+    data.sort((a, b) => {
+      const va = a[sortKey] || '', vb = b[sortKey] || '';
+      return sortDir * (va < vb ? -1 : va > vb ? 1 : 0);
+    });
+
+    document.getElementById('log-count').textContent = data.length;
+    updateLoadMoreButton('load-more-logs', logNextCursor);
+    const tbody = document.getElementById('log-body');
+    if (lastError && logs.length === 0) {
+      tbody.innerHTML = `<tr class="error-row"><td colspan="6">${escapeHtml(lastError)}</td></tr>`;
+      return;
+    }
+    if (data.length === 0) {
+      tbody.innerHTML = '<tr class="empty-row"><td colspan="6">No audit entries found</td></tr>';
+      return;
+    }
+    tbody.innerHTML = data.map(e => `
+      <tr>
+        <td class="ts">${e.timestamp ? escapeHtml(new Date(e.timestamp).toLocaleString()) : '-'}</td>
+        <td class="ts">${escapeHtml((e.session_id || '').slice(0, 8))}...</td>
+        <td><span class="action-tag">${escapeHtml(e.action || '-')}</span></td>
+        <td>${e.skill_name ? escapeHtml(e.skill_name) : '<span style="color:var(--muted)">-</span>'}</td>
+        <td class="outcome-${escapeHtml(e.outcome || 'success')}">${escapeHtml(e.outcome || '-')}</td>
+        <td style="color:var(--muted);font-size:11px;max-width:260px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escapeHtml(compactJson(e.details))}</td>
+      </tr>
+    `).join('');
+  }
+
+  function renderViolations() {
+    const panel = document.getElementById('violation-panel');
+    document.getElementById('violation-count').textContent = violations.length;
+    updateLoadMoreButton('load-more-violations', violationNextCursor);
+
+    if (violations.length === 0) {
+      panel.innerHTML = '<div class="loading">No violations recorded</div>';
+      return;
+    }
+
+    const byRule = {};
+    violations.forEach(v => {
+      if (!byRule[v.rule]) byRule[v.rule] = [];
+      byRule[v.rule].push(v);
+    });
+
+    panel.innerHTML = Object.entries(byRule).map(([rule, items]) => `
+      <div class="rule-group">
+        <div class="rule-name">
+          <span class="severity-${escapeHtml(items[0].severity)}">${items[0].severity === 'block' ? 'BLOCK' : 'WARN'}</span>
+          ${escapeHtml(rule)}
+          <span class="rule-count">${items.length} occurrence${items.length !== 1 ? 's' : ''}</span>
+        </div>
+        ${items.slice(0, 3).map(v => `
+          <div style="color:var(--muted);font-size:11px;margin-top:4px">
+            <span class="ts">${escapeHtml(new Date(v.timestamp).toLocaleTimeString())}</span>
+            - ${escapeHtml(v.message)}
+          </div>
+        `).join('')}
+        ${items.length > 3 ? `<div style="color:var(--muted);font-size:11px;margin-top:4px">and ${items.length - 3} more</div>` : ''}
+      </div>
+    `).join('');
+  }
+
+  function updateLoadMoreButton(id, cursor) {
+    const button = document.getElementById(id);
+    if (!button) return;
+    button.disabled = !cursor;
+    button.textContent = cursor ? 'Load more' : 'No more entries';
+  }
+
+  let countdown = 30;
+  let countdownInterval;
+  function updateCountdown(secs) {
+    countdown = secs;
+    clearInterval(countdownInterval);
+    countdownInterval = setInterval(() => {
+      countdown -= 1;
+      document.getElementById('refresh-badge').textContent = `Auto-refresh: ${countdown}s`;
+      if (countdown <= 0) { clearInterval(countdownInterval); fetchAll(); }
+    }, 1000);
+  }
+
+  fetchAll();
+</script>
+</body>
+</html>

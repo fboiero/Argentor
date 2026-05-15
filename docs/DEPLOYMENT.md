@@ -405,6 +405,12 @@ scrape_configs:
 | `argentor_llm_calls_total` | Counter | LLM API calls by provider |
 | `argentor_tool_executions_total` | Counter | Tool invocations by skill |
 | `argentor_errors_total` | Counter | Errors by subsystem |
+| `argentor_audit_configured` | Gauge | Whether audit metrics are backed by an audit log |
+| `argentor_audit_log_bytes` | Gauge | Current audit log size |
+| `argentor_audit_events_total` | Gauge | Total events in the current audit log |
+| `argentor_audit_events_today` | Gauge | Audit events recorded today |
+| `argentor_audit_violations_today` | Gauge | Audit violations recorded today |
+| `argentor_audit_block_rate_percent` | Gauge | Percentage of today's audit events denied by policy |
 
 ### Grafana dashboard
 
