@@ -259,7 +259,9 @@ impl BatchProcessor {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         // Sort by priority (descending)
-        inner.pending.sort_by(|a, b| b.priority.cmp(&a.priority));
+        inner
+            .pending
+            .sort_by_key(|entry| std::cmp::Reverse(entry.priority));
 
         let batch_size = self.config.max_batch_size.min(inner.pending.len());
         let batch: Vec<BatchRequest> = inner.pending.drain(..batch_size).collect();

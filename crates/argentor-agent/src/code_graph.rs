@@ -513,7 +513,7 @@ impl CodeGraph {
             .into_iter()
             .map(|(lang, files)| (lang, files.len()))
             .collect();
-        languages.sort_by(|a, b| b.1.cmp(&a.1));
+        languages.sort_by_key(|entry| std::cmp::Reverse(entry.1));
 
         let mut top_level_modules: Vec<String> = modules.into_iter().collect();
         top_level_modules.sort();

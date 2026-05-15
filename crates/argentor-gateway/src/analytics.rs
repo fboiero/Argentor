@@ -636,7 +636,7 @@ impl AnalyticsEngine {
             *channel_counts.entry(i.channel.clone()).or_insert(0) += 1;
         }
         let mut sorted_channels: Vec<(String, u64)> = channel_counts.into_iter().collect();
-        sorted_channels.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted_channels.sort_by_key(|entry| std::cmp::Reverse(entry.1));
         let top_topics: Vec<String> = sorted_channels
             .into_iter()
             .take(5)

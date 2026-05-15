@@ -307,7 +307,7 @@ fn op_summarize(text: &str, max_sentences: usize, title: Option<&str>) -> serde_
 fn op_extract_keywords(text: &str, max_keywords: usize) -> serde_json::Value {
     let freq = word_frequencies(text);
     let mut pairs: Vec<(String, usize)> = freq.into_iter().collect();
-    pairs.sort_by(|a, b| b.1.cmp(&a.1));
+    pairs.sort_by_key(|entry| std::cmp::Reverse(entry.1));
     pairs.truncate(max_keywords);
 
     let keywords: Vec<serde_json::Value> = pairs
@@ -329,7 +329,7 @@ fn op_extract_keywords(text: &str, max_keywords: usize) -> serde_json::Value {
 fn op_word_frequency(text: &str) -> serde_json::Value {
     let freq = word_frequencies(text);
     let mut pairs: Vec<(String, usize)> = freq.into_iter().collect();
-    pairs.sort_by(|a, b| b.1.cmp(&a.1));
+    pairs.sort_by_key(|entry| std::cmp::Reverse(entry.1));
 
     let entries: serde_json::Map<String, serde_json::Value> = pairs
         .into_iter()

@@ -343,7 +343,7 @@ impl ReviewEngine {
             md.push_str("### Findings\n\n");
 
             let mut by_severity: Vec<&ReviewFinding> = report.findings.iter().collect();
-            by_severity.sort_by(|a, b| b.severity.cmp(&a.severity));
+            by_severity.sort_by_key(|entry| std::cmp::Reverse(entry.severity));
 
             for finding in &by_severity {
                 let location = match finding.line {
@@ -1397,7 +1397,7 @@ impl ReviewEngine {
             *dim_counts.entry(f.dimension).or_default() += 1;
         }
         let mut dim_list: Vec<(ReviewDimension, usize)> = dim_counts.into_iter().collect();
-        dim_list.sort_by(|a, b| b.1.cmp(&a.1));
+        dim_list.sort_by_key(|entry| std::cmp::Reverse(entry.1));
 
         if !dim_list.is_empty() {
             let top_dims: Vec<String> = dim_list

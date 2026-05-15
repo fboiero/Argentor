@@ -431,7 +431,7 @@ impl ProxyOrchestrator {
 
         // Sort by priority descending (we work on a snapshot so this is cheap).
         let mut sorted: Vec<&RoutingRule> = rules.iter().collect();
-        sorted.sort_by(|a, b| b.priority.cmp(&a.priority));
+        sorted.sort_by_key(|entry| std::cmp::Reverse(entry.priority));
 
         for rule in &sorted {
             let tool_matches = match &rule.tool_pattern {
