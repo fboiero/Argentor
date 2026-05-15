@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+
 //! Multi-agent orchestration with the Orchestrator-Workers pattern.
 //!
 //! Spins up an Orchestrator that decomposes a task and dispatches it to

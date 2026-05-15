@@ -301,15 +301,15 @@ async fn test_dev_team_full_workflow() {
     // Typical order: Architect -> Implementer -> Tester -> Reviewer
     let roles: Vec<DevRole> = steps.iter().map(|s| s.role).collect();
     assert!(
-        roles.iter().any(|r| *r == DevRole::Implementer),
+        roles.contains(&DevRole::Implementer),
         "ImplementFeature should include an Implementer step"
     );
     assert!(
-        roles.iter().any(|r| *r == DevRole::Tester),
+        roles.contains(&DevRole::Tester),
         "ImplementFeature should include a Tester step"
     );
     assert!(
-        roles.iter().any(|r| *r == DevRole::Reviewer),
+        roles.contains(&DevRole::Reviewer),
         "ImplementFeature should include a Reviewer step"
     );
 

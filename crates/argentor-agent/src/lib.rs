@@ -13,6 +13,23 @@
 //! - [`StreamEvent`] — Events emitted during streamed agent responses.
 //! - [`FailoverBackend`] — Multi-backend wrapper with automatic retry and failover.
 
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        unused_mut,
+        unused_variables,
+        clippy::cloned_ref_to_slice_refs,
+        clippy::expect_used,
+        clippy::manual_range_contains,
+        clippy::needless_borrows_for_generic_args,
+        clippy::redundant_closure_for_method_calls,
+        clippy::uninlined_format_args,
+        clippy::unwrap_used,
+        clippy::useless_vec
+    )
+)]
+
 /// Adaptive memory integration for automatic context recall across sessions.
 pub mod adaptive_memory;
 /// LLM backend implementations.

@@ -523,6 +523,7 @@ impl Default for ConversationTree {
 // ===========================================================================
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use argentor_core::Role;
@@ -1036,12 +1037,12 @@ mod tests {
     fn deep_chain_history_order() {
         let mut tree = ConversationTree::new();
         for i in 0..20 {
-            tree.add_message(user_msg(&tree, &format!("msg-{}", i)));
+            tree.add_message(user_msg(&tree, &format!("msg-{i}")));
         }
         let history = tree.active_history();
         assert_eq!(history.len(), 20);
         for (i, msg) in history.iter().enumerate() {
-            assert_eq!(msg.content, format!("msg-{}", i));
+            assert_eq!(msg.content, format!("msg-{i}"));
         }
     }
 

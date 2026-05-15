@@ -399,7 +399,7 @@ pub async fn sse_session_stream_handler(
                     .and_then(|v| {
                         v.get("event")
                             .and_then(|e| e.as_str())
-                            .map(|s| s.to_string())
+                            .map(std::string::ToString::to_string)
                     })
                     .unwrap_or_else(|| "message".to_string());
 

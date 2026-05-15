@@ -38,7 +38,7 @@ impl Skill for BenchSkill {
 }
 
 fn bench_registry_lookup(c: &mut Criterion) {
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     for i in 0..100 {
         registry.register(Arc::new(BenchSkill::new(&format!("skill_{i}"))));
     }
@@ -64,7 +64,7 @@ fn bench_registry_lookup(c: &mut Criterion) {
 fn bench_registry_register(c: &mut Criterion) {
     c.bench_function("register 100 skills", |b| {
         b.iter(|| {
-            let mut registry = SkillRegistry::new();
+            let registry = SkillRegistry::new();
             for i in 0..100 {
                 registry.register(Arc::new(BenchSkill::new(&format!("skill_{i}"))));
             }
@@ -180,7 +180,7 @@ fn bench_registry_lookup_10(c: &mut Criterion) {
         "artifact_store",
     ];
 
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     for name in &skill_names {
         registry.register(Arc::new(BenchSkill::new(name)));
     }
@@ -224,7 +224,7 @@ fn bench_tool_group_filtering(c: &mut Criterion) {
         "artifact_store",
     ];
 
-    let mut registry = SkillRegistry::new();
+    let registry = SkillRegistry::new();
     for name in &skill_names {
         registry.register(Arc::new(BenchSkill::new(name)));
     }
@@ -278,7 +278,7 @@ fn bench_tool_group_filtering(c: &mut Criterion) {
     // Custom group registration + filtering
     c.bench_function("register_group + filter_by_group", |b| {
         b.iter(|| {
-            let mut reg = registry.filter_by_group("full").expect("full group");
+            let reg = registry.filter_by_group("full").expect("full group");
             reg.register_group(ToolGroup::new(
                 "custom_bench",
                 "Custom benchmark group",

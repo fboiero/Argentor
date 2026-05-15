@@ -1204,7 +1204,7 @@ impl AgentRunner {
         // If the target skill is tagged `requires_approval: true`, invoke the
         // `human_approval` skill before executing.  If approval is denied (or
         // the approval skill itself is absent), the call is blocked.
-        if !self.proxy.is_some() {
+        if self.proxy.is_none() {
             if let Some(skill) = self.skills.get(&call.name) {
                 if skill.descriptor().requires_approval {
                     warn!(

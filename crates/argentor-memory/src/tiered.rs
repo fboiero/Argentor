@@ -118,9 +118,9 @@ impl EntityPatterns {
     fn new() -> Self {
         Self {
             // Words starting with uppercase followed by at least 2 lowercase letters
-            capitalized: Regex::new(r"\b([A-Z][a-z]{2,})\b").unwrap(),
-            at_mention: Regex::new(r"@([A-Za-z][A-Za-z0-9_]{1,})").unwrap(),
-            quoted: Regex::new(r#""([^"]{2,32})""#).unwrap(),
+            capitalized: compile_entity_regex(r"\b([A-Z][a-z]{2,})\b"),
+            at_mention: compile_entity_regex(r"@([A-Za-z][A-Za-z0-9_]{1,})"),
+            quoted: compile_entity_regex(r#""([^"]{2,32})""#),
         }
     }
 
@@ -140,6 +140,13 @@ impl EntityPatterns {
 
         entities.dedup();
         entities
+    }
+}
+
+fn compile_entity_regex(pattern: &str) -> Regex {
+    match Regex::new(pattern) {
+        Ok(regex) => regex,
+        Err(err) => panic!("invalid built-in entity regex `{pattern}`: {err}"),
     }
 }
 
@@ -286,7 +293,7 @@ impl TieredMemory {
                 .iter()
                 .map(|m| m.entry.content.len())
                 .sum::<usize>()
-            + entity_facts.iter().map(|f| f.len()).sum::<usize>();
+            + entity_facts.iter().map(String::len).sum::<usize>();
         let total_tokens_estimate = char_total / 4;
 
         Ok(MemoryContext {

@@ -1,4 +1,9 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
+#![allow(
+    clippy::expect_used,
+    clippy::manual_range_contains,
+    clippy::unwrap_used,
+    missing_docs
+)]
 //! Long-running session and back-pressure scalability tests.
 //!
 //! These tests exercise the compaction engine, max-turn budgeting,

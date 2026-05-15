@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+
 //! Simplest possible Argentor agent: mock backend, one prompt, one response.
 //!
 //! No API key required.

@@ -263,6 +263,7 @@ impl Skill for ErrorTool {
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
     use argentor_core::ToolCall;

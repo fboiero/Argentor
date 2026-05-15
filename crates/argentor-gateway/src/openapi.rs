@@ -707,8 +707,8 @@ mod tests {
         for ep in auth_endpoints {
             assert!(
                 ep.responses.iter().any(|r| r.status_code == 401),
-                "endpoint {} {} requires auth but does not document a 401 response",
-                format!("{:?}", ep.method),
+                "endpoint {:?} {} requires auth but does not document a 401 response",
+                ep.method,
                 ep.path
             );
         }
@@ -735,8 +735,8 @@ mod tests {
         for ep in mutating {
             assert!(
                 ep.responses.iter().any(|r| r.status_code == 500),
-                "mutating endpoint {} {} does not document a 500 response",
-                format!("{:?}", ep.method),
+                "mutating endpoint {:?} {} does not document a 500 response",
+                ep.method,
                 ep.path
             );
         }

@@ -1,4 +1,10 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::expect_used,
+    clippy::needless_borrows_for_generic_args,
+    clippy::uninlined_format_args,
+    clippy::unwrap_used,
+    dead_code
+)]
 //! End-to-end regression tests for the full AgentRunner lifecycle.
 //!
 //! These tests exercise the COMPLETE agent loop with a mock LLM, real skills,

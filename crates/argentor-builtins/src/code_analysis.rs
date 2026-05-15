@@ -32,37 +32,44 @@ use tracing::info;
 
 fn re_rust_use() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^\s*use\s+(.+);").expect("valid regex"))
+    RE.get_or_init(|| compile_static_regex(r"^\s*use\s+(.+);"))
 }
 
 fn re_python_import() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^\s*import\s+(.+)").expect("valid regex"))
+    RE.get_or_init(|| compile_static_regex(r"^\s*import\s+(.+)"))
 }
 
 fn re_python_from_import() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^\s*from\s+(\S+)\s+import\s+(.+)").expect("valid regex"))
+    RE.get_or_init(|| compile_static_regex(r"^\s*from\s+(\S+)\s+import\s+(.+)"))
 }
 
 fn re_js_import() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r"^\s*import\s+(.+)").expect("valid regex"))
+    RE.get_or_init(|| compile_static_regex(r"^\s*import\s+(.+)"))
 }
 
 fn re_js_require() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r#"require\s*\(\s*['"]([^'"]+)['"]\s*\)"#).expect("valid regex"))
+    RE.get_or_init(|| compile_static_regex(r#"require\s*\(\s*['"]([^'"]+)['"]\s*\)"#))
 }
 
 fn re_go_single_import() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r#"^\s*import\s+"([^"]+)""#).expect("valid regex"))
+    RE.get_or_init(|| compile_static_regex(r#"^\s*import\s+"([^"]+)""#))
 }
 
 fn re_go_block_import() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
-    RE.get_or_init(|| Regex::new(r#"^\s*"([^"]+)""#).expect("valid regex"))
+    RE.get_or_init(|| compile_static_regex(r#"^\s*"([^"]+)""#))
+}
+
+fn compile_static_regex(pattern: &str) -> Regex {
+    match Regex::new(pattern) {
+        Ok(regex) => regex,
+        Err(err) => panic!("invalid built-in code analysis regex `{pattern}`: {err}"),
+    }
 }
 
 /// Directories that are always excluded from traversal.

@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
+#![allow(clippy::expect_used, clippy::unwrap_used, missing_docs, unused_mut)]
 //! Concurrent execution scalability tests.
 //!
 //! These integration tests verify that Argentor's core primitives behave

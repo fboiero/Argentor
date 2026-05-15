@@ -129,8 +129,7 @@ impl Default for DateTimeSkill {
 fn parse_timezone(tz: &str) -> Result<FixedOffset, String> {
     let tz = tz.trim();
     if tz.eq_ignore_ascii_case("Z") || tz.eq_ignore_ascii_case("UTC") {
-        // 0 seconds east is always a valid UTC offset — east_opt(0) cannot return None.
-        return Ok(FixedOffset::east_opt(0).expect("UTC offset 0 is always valid"));
+        return FixedOffset::east_opt(0).ok_or_else(|| "UTC offset 0 is invalid".to_string());
     }
 
     // Parse +HH:MM or -HH:MM

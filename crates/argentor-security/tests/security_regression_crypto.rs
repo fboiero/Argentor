@@ -122,8 +122,7 @@ fn test_pbkdf2_iterations_sufficient() {
     // under 1ms, the iteration count was likely lowered.
     assert!(
         elapsed.as_micros() > 1_000,
-        "CRITICAL: KDF too fast ({:?}) — iteration count may have been lowered (CWE-916)",
-        elapsed
+        "CRITICAL: KDF too fast ({elapsed:?}) — iteration count may have been lowered (CWE-916)"
     );
 
     // SECURITY-TODO: OWASP 2025 recommends 600K iterations for PBKDF2-SHA256.

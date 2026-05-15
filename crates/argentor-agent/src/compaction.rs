@@ -1043,7 +1043,7 @@ mod tests {
         let non_summary: Vec<&CompactedMessage> = result
             .preserved_messages
             .iter()
-            .filter(|m| !m.is_summary && !m.is_summary)
+            .filter(|m| !m.is_summary)
             .collect();
         assert!(
             non_summary.len() >= 4,

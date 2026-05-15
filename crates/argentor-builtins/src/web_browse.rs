@@ -99,15 +99,13 @@ fn parse_robots_disallowed(text: &str, path: &str) -> bool {
 /// Strip HTML tags and decode common entities.
 fn strip_html_to_text(html: &str) -> String {
     // Remove <script> and <style> blocks entirely
-    let re_script =
-        Regex::new(r"(?is)<script[^>]*>.*?</script>").unwrap_or_else(|_| Regex::new("$^").unwrap());
-    let re_style =
-        Regex::new(r"(?is)<style[^>]*>.*?</style>").unwrap_or_else(|_| Regex::new("$^").unwrap());
+    let re_script = compile_html_regex(r"(?is)<script[^>]*>.*?</script>");
+    let re_style = compile_html_regex(r"(?is)<style[^>]*>.*?</style>");
     let stripped = re_script.replace_all(html, " ");
     let stripped = re_style.replace_all(&stripped, " ");
 
     // Remove all remaining tags
-    let re_tags = Regex::new(r"<[^>]+>").unwrap_or_else(|_| Regex::new("$^").unwrap());
+    let re_tags = compile_html_regex(r"<[^>]+>");
     let text = re_tags.replace_all(&stripped, " ");
 
     let text = text
@@ -119,7 +117,7 @@ fn strip_html_to_text(html: &str) -> String {
         .replace("&#39;", "'")
         .replace("&nbsp;", " ");
 
-    let re_ws = Regex::new(r"\s+").unwrap_or_else(|_| Regex::new(" ").unwrap());
+    let re_ws = compile_html_regex(r"\s+");
     re_ws.replace_all(&text, " ").trim().to_string()
 }
 
@@ -168,8 +166,15 @@ fn html_to_markdown(html: &str) -> String {
     // Remove remaining tags
     let text = strip_html_to_text(&md);
 
-    let re_ws = Regex::new(r" {2,}").unwrap_or_else(|_| Regex::new(" +").unwrap());
+    let re_ws = compile_html_regex(r" {2,}");
     re_ws.replace_all(&text, " ").trim().to_string()
+}
+
+fn compile_html_regex(pattern: &str) -> Regex {
+    match Regex::new(pattern) {
+        Ok(regex) => regex,
+        Err(err) => panic!("invalid built-in HTML regex `{pattern}`: {err}"),
+    }
 }
 
 // ---------------------------------------------------------------------------

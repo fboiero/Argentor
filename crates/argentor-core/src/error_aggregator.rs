@@ -356,7 +356,7 @@ impl ErrorAggregator {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         let mut groups: Vec<ErrorGroup> = inner.groups.values().cloned().collect();
-        groups.sort_by(|a, b| b.count.cmp(&a.count));
+        groups.sort_by_key(|group| std::cmp::Reverse(group.count));
         groups.truncate(n);
         groups
     }
@@ -422,7 +422,7 @@ impl ErrorAggregator {
             .unwrap_or_else(std::sync::PoisonError::into_inner);
 
         let mut groups: Vec<ErrorGroup> = inner.groups.values().cloned().collect();
-        groups.sort_by(|a, b| b.count.cmp(&a.count));
+        groups.sort_by_key(|group| std::cmp::Reverse(group.count));
         groups.truncate(top_n);
 
         let by_severity = inner

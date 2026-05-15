@@ -111,7 +111,10 @@ impl TenantCounters {
 
     /// Reset daily counters if we have crossed into a new calendar day (UTC).
     fn maybe_reset(&self, now: NaiveDate) {
-        let mut last = self.last_reset.lock().unwrap_or_else(|e| e.into_inner());
+        let mut last = self
+            .last_reset
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
         if now > *last {
             self.tokens_used_today.store(0, Ordering::Relaxed);
             self.requests_today.store(0, Ordering::Relaxed);

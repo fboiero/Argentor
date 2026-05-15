@@ -307,6 +307,7 @@ mod tests {
 
     #[test]
     fn nist_field_list_non_empty() {
-        assert!(!NIST_800_92_REQUIRED_FIELDS.is_empty());
+        let fields = std::hint::black_box(NIST_800_92_REQUIRED_FIELDS);
+        assert!(!fields.is_empty());
     }
 }

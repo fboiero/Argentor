@@ -1,3 +1,5 @@
+#![allow(clippy::expect_used)]
+
 //! Agent with built-in skills (calculator, hash_tool, uuid_generator).
 //!
 //! Shows how to register skills, build a SkillRegistry, wire it into an

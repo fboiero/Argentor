@@ -1313,8 +1313,7 @@ mod tests {
         gen.generate_tool(spec2).unwrap();
 
         // Composite tool
-        let mut pipe_spec =
-            simple_spec("pipe", "pipeline: prefix(input=input); suffix(data=_prev)");
+        let pipe_spec = simple_spec("pipe", "pipeline: prefix(input=input); suffix(data=_prev)");
         gen.generate_tool(pipe_spec).unwrap();
 
         let result = gen

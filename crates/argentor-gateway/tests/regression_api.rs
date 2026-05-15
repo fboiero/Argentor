@@ -378,7 +378,7 @@ async fn test_api_v1_agent_chat_full_roundtrip() {
     // Either 200 (if the request managed to bubble through) or 5xx (LLM fail)
     // — both prove the endpoint is wired up.
     let status = resp.status();
-    assert!(status.as_u16() >= 200, "unexpected status: {}", status);
+    assert!(status.as_u16() >= 200, "unexpected status: {status}");
     // Content-type should be JSON regardless
     let ct = resp.headers().get("content-type").cloned();
     assert!(

@@ -13,9 +13,7 @@
 //! The example deliberately skips the live connection so it compiles and runs
 //! without any external dependencies.
 
-use argentor_mcp::{McpClient, McpServerConfig, McpServerManager, McpSkill};
-use argentor_skills::SkillRegistry;
-use std::sync::Arc;
+use argentor_mcp::McpServerConfig;
 
 #[tokio::main]
 async fn main() {

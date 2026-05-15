@@ -1,4 +1,4 @@
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::expect_used, clippy::unwrap_used, dead_code)]
 //! Regression tests for error recovery paths across the agent runner.
 //!
 //! Covers:

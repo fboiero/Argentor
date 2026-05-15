@@ -1,4 +1,9 @@
-#![allow(clippy::unwrap_used, clippy::expect_used, missing_docs)]
+#![allow(
+    clippy::expect_used,
+    clippy::needless_borrows_for_generic_args,
+    clippy::unwrap_used,
+    missing_docs
+)]
 //! Memory-pressure scalability tests.
 //!
 //! These tests exercise paths that historically leak memory or grow unbounded

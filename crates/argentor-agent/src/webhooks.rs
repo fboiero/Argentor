@@ -201,8 +201,10 @@ async fn send_webhook(
 
 /// Compute HMAC-SHA256 and return a lowercase hex string.
 fn hmac_sha256_hex(secret: &str, data: &[u8]) -> String {
-    let mut mac =
-        HmacSha256::new_from_slice(secret.as_bytes()).expect("HMAC accepts any key length");
+    let mut mac = match HmacSha256::new_from_slice(secret.as_bytes()) {
+        Ok(mac) => mac,
+        Err(_) => unreachable!("HMAC accepts any key length"),
+    };
     mac.update(data);
     let result = mac.finalize();
     hex::encode(result.into_bytes())

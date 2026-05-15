@@ -22,7 +22,6 @@ use serde::{Deserialize, Serialize};
 use tracing::info;
 
 use crate::config::DEFAULT_INDEX_DIR;
-use crate::ingest::ChunkMeta;
 use crate::query::LegalIndex;
 
 // ---------------------------------------------------------------------------

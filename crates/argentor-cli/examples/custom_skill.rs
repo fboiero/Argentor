@@ -6,6 +6,8 @@
 //!
 //! No API key required.
 //!
+
+#![allow(clippy::expect_used)]
 //! ```bash
 //! cargo run --example custom_skill
 //! ```
