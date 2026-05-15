@@ -202,7 +202,7 @@ impl MarketplaceCatalog {
     /// Return the most popular entries sorted by download count (descending).
     pub fn list_popular(&self, limit: usize) -> Vec<&MarketplaceEntry> {
         let mut items: Vec<&MarketplaceEntry> = self.entries.iter().collect();
-        items.sort_by(|a, b| b.downloads.cmp(&a.downloads));
+        items.sort_by_key(|entry| std::cmp::Reverse(entry.downloads));
         items.into_iter().take(limit).collect()
     }
 
@@ -327,7 +327,9 @@ impl MarketplaceCatalog {
 
     fn sort_entries(results: &mut [&MarketplaceEntry], sort_by: SortBy) {
         match sort_by {
-            SortBy::Downloads => results.sort_by(|a, b| b.downloads.cmp(&a.downloads)),
+            SortBy::Downloads => {
+                results.sort_by_key(|entry| std::cmp::Reverse(entry.downloads));
+            }
             SortBy::Rating => results.sort_by(|a, b| {
                 b.rating
                     .partial_cmp(&a.rating)
@@ -1734,7 +1736,7 @@ impl MarketplaceCatalog {
                         .any(|t| t.to_lowercase().contains(&q))
             })
             .collect();
-        results.sort_by(|a, b| b.downloads.cmp(&a.downloads));
+        results.sort_by_key(|entry| std::cmp::Reverse(entry.downloads));
         results.iter().map(|e| CatalogEntry::from(*e)).collect()
     }
 
