@@ -14,7 +14,7 @@ use argentor_skills::SkillDescriptor;
 use tokio::sync::mpsc;
 
 /// Response from the LLM — either text content or a tool call request.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum LlmResponse {
     /// Pure text response.
     Text(String),

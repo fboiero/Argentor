@@ -154,6 +154,8 @@ type OptionalProxy = Option<(Arc<argentor_mcp::McpProxy>, String)>;
 /// ```
 pub struct AgentRunner {
     llm: LlmClient,
+    /// Model identifier for tracing/observability (e.g. "claude-sonnet-4-20250514").
+    model_id: String,
     skills: Arc<SkillRegistry>,
     permissions: PermissionSet,
     audit: Arc<AuditLog>,
@@ -187,6 +189,8 @@ pub struct AgentRunner {
     learning: Option<crate::learning::LearningEngine>,
     /// System prompt scaffold mode (Full vs Minimal). See [`ScaffoldMode`].
     scaffold_mode: ScaffoldMode,
+    /// Optional webhook manager for event notifications.
+    webhooks: Option<crate::webhooks::WebhookManager>,
 }
 
 impl AgentRunner {
@@ -198,8 +202,10 @@ impl AgentRunner {
         audit: Arc<AuditLog>,
     ) -> Self {
         let max_turns = config.max_turns;
+        let model_id = config.model_id.clone();
         Self {
             llm: LlmClient::new(config),
+            model_id,
             skills,
             permissions,
             audit,
@@ -219,6 +225,7 @@ impl AgentRunner {
             checkpoint_manager: None,
             learning: None,
             scaffold_mode: ScaffoldMode::Full,
+            webhooks: None,
         }
     }
 
@@ -235,8 +242,11 @@ impl AgentRunner {
         audit: Arc<AuditLog>,
         max_turns: u32,
     ) -> Self {
+        let llm = LlmClient::from_backend(backend);
+        let model_id = llm.provider_name().to_string();
         Self {
-            llm: LlmClient::from_backend(backend),
+            llm,
+            model_id,
             skills,
             permissions,
             audit,
@@ -256,6 +266,7 @@ impl AgentRunner {
             checkpoint_manager: None,
             learning: None,
             scaffold_mode: ScaffoldMode::Full,
+            webhooks: None,
         }
     }
 
@@ -533,13 +544,70 @@ impl AgentRunner {
             .with_default_learning()
     }
 
+    /// Attach a webhook manager for event notifications.
+    ///
+    /// # Example
+    ///
+    /// ```rust,no_run
+    /// use argentor_agent::webhooks::{WebhookConfig, WebhookEvent, WebhookManager};
+    /// # use argentor_agent::{AgentRunner, ModelConfig, LlmProvider};
+    /// # use argentor_security::{AuditLog, PermissionSet};
+    /// # use argentor_skills::SkillRegistry;
+    /// # use std::sync::Arc;
+    /// # use std::path::PathBuf;
+    /// # let skills = Arc::new(SkillRegistry::new());
+    /// # let permissions = PermissionSet::new();
+    /// # let audit = Arc::new(AuditLog::new(PathBuf::from("/tmp/audit")));
+    /// # let config = ModelConfig {
+    /// #     provider: LlmProvider::Claude,
+    /// #     model_id: "claude-sonnet-4-20250514".into(),
+    /// #     api_key: "key".into(),
+    /// #     api_base_url: None,
+    /// #     temperature: 0.7,
+    /// #     max_tokens: 4096,
+    /// #     max_turns: 10,
+    /// #     max_context_tokens: 200_000,
+    /// #     fallback_models: vec![],
+    /// #     retry_policy: None,
+    /// # };
+    /// let agent = AgentRunner::new(config, skills, permissions, audit)
+    ///     .with_webhooks(vec![WebhookConfig {
+    ///         url: "https://example.com/hook".into(),
+    ///         events: vec![WebhookEvent::AgentStarted, WebhookEvent::AgentCompleted],
+    ///         secret: Some("my-secret".into()),
+    ///         timeout_ms: 5000,
+    ///     }]);
+    /// ```
+    pub fn with_webhooks(mut self, configs: Vec<crate::webhooks::WebhookConfig>) -> Self {
+        self.webhooks = Some(crate::webhooks::WebhookManager::new(configs));
+        self
+    }
+
+    /// Get a reference to the webhook manager (if configured).
+    pub fn webhook_manager(&self) -> Option<&crate::webhooks::WebhookManager> {
+        self.webhooks.as_ref()
+    }
+
     /// Run the agentic loop for a session. Returns the final assistant response.
     #[tracing::instrument(
         skip(self, session, user_input),
-        fields(session_id = %session.id, max_turns = self.max_turns)
+        fields(
+            session_id = %session.id,
+            model = %self.model_id,
+            turn_count = tracing::field::Empty,
+        )
     )]
     pub async fn run(&self, session: &mut Session, user_input: &str) -> ArgentorResult<String> {
         let session_id = session.id;
+
+        // --- Webhook: AgentStarted ---
+        if let Some(wh) = &self.webhooks {
+            wh.fire(
+                crate::webhooks::WebhookEvent::AgentStarted,
+                session_id.to_string(),
+                serde_json::json!({"model": self.model_id}),
+            );
+        }
 
         self.debug_recorder
             .record(StepType::Input, user_input, None);
@@ -851,6 +919,15 @@ impl AgentRunner {
                     }
 
                     info!(session_id = %session_id, turns = turn + 1, "Agentic loop completed");
+                    tracing::Span::current().record("turn_count", turn + 1);
+                    // --- Webhook: AgentCompleted ---
+                    if let Some(wh) = &self.webhooks {
+                        wh.fire(
+                            crate::webhooks::WebhookEvent::AgentCompleted,
+                            session_id.to_string(),
+                            serde_json::json!({"turns": turn + 1}),
+                        );
+                    }
                     return Ok(text);
                 }
 
@@ -887,6 +964,15 @@ impl AgentRunner {
                             call_id = %call.id,
                             "Executing tool call"
                         );
+
+                        // --- Webhook: ToolCalled ---
+                        if let Some(wh) = &self.webhooks {
+                            wh.fire(
+                                crate::webhooks::WebhookEvent::ToolCalled,
+                                session_id.to_string(),
+                                serde_json::json!({"tool": call.name, "call_id": call.id}),
+                            );
+                        }
 
                         // --- Pre-Tool Hook Evaluation ---
                         let mut effective_call = call.clone();
@@ -1045,6 +1131,15 @@ impl AgentRunner {
             "Agentic loop reached max turns"
         );
 
+        // --- Webhook: AgentFailed ---
+        if let Some(wh) = &self.webhooks {
+            wh.fire(
+                crate::webhooks::WebhookEvent::AgentFailed,
+                session_id.to_string(),
+                serde_json::json!({"reason": "max_turns_exceeded", "max_turns": self.max_turns}),
+            );
+        }
+
         Err(ArgentorError::Agent(format!(
             "Agentic loop exceeded maximum of {} turns",
             self.max_turns
@@ -1055,12 +1150,17 @@ impl AgentRunner {
     /// MCP proxy if configured, otherwise falls back to the skill registry.
     #[tracing::instrument(
         skip(self, call),
-        fields(tool_name = %call.name, call_id = %call.id)
+        fields(
+            skill_name = %call.name,
+            call_id = %call.id,
+            duration_ms = tracing::field::Empty,
+        )
     )]
     async fn execute_tool(
         &self,
         call: argentor_core::ToolCall,
     ) -> ArgentorResult<argentor_core::ToolResult> {
+        let _tool_start = std::time::Instant::now();
         // --- Permission mode check ---
         if let Some(evaluator) = &self.permission_evaluator {
             match evaluator.check(&call.name, &call.arguments) {
@@ -1183,11 +1283,13 @@ impl AgentRunner {
             }
         }
 
-        if let Some((proxy, agent_id)) = &self.proxy {
+        let result = if let Some((proxy, agent_id)) = &self.proxy {
             proxy.execute(call, agent_id).await
         } else {
             self.skills.execute(call, &self.permissions).await
-        }
+        };
+        tracing::Span::current().record("duration_ms", _tool_start.elapsed().as_millis() as u64);
+        result
     }
 
     /// Run the agentic loop with streaming.
@@ -1198,7 +1300,12 @@ impl AgentRunner {
     /// (non-streaming) before the next turn.
     #[tracing::instrument(
         skip(self, session, user_input, event_tx),
-        fields(session_id = %session.id, max_turns = self.max_turns, streaming = true)
+        fields(
+            session_id = %session.id,
+            model = %self.model_id,
+            turn_count = tracing::field::Empty,
+            streaming = true,
+        )
     )]
     pub async fn run_streaming(
         &self,
@@ -1271,6 +1378,7 @@ impl AgentRunner {
                         turns = turn + 1,
                         "Streaming agentic loop completed"
                     );
+                    tracing::Span::current().record("turn_count", turn + 1);
                     return Ok(text);
                 }
 

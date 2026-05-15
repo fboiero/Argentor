@@ -77,6 +77,8 @@ pub mod query;
 pub mod react;
 /// In-memory LRU response cache for LLM calls with TTL expiration.
 pub mod response_cache;
+/// Transparent caching layer that wraps any `LlmBackend` with SHA-256 keyed LRU caching.
+pub mod response_cache_layer;
 /// Multi-dimensional code review engine (security, performance, style, correctness).
 pub mod review_engine;
 /// Process reward scoring — scores each reasoning step, not just the final output.
@@ -103,6 +105,8 @@ pub mod vision_backends;
 pub mod voice;
 /// Voice backends (Whisper, Deepgram, OpenAI TTS, ElevenLabs).
 pub mod voice_backends;
+/// Webhook notification system for agent events.
+pub mod webhooks;
 
 pub use adaptive_memory::{
     AdaptiveMemory, AdaptiveMemoryConfig, MemoryEntry, MemoryKind, RecallResult,
@@ -193,6 +197,7 @@ pub use query::{
 };
 pub use react::{ReActAction, ReActConfig, ReActEngine, ReActOutcome, ReActStep, ReActTrace};
 pub use response_cache::{CacheKey, CacheMessage, CacheStats, ResponseCache};
+pub use response_cache_layer::{CacheConfig, CacheLayer, CacheLayerStats};
 pub use review_engine::{
     DimensionScore, FindingSeverity, ReviewConfig, ReviewDimension, ReviewEngine, ReviewFinding,
     ReviewReport, ReviewVerdict,
@@ -228,3 +233,4 @@ pub use voice::{
 pub use voice_backends::{
     DeepgramSttBackend, ElevenLabsTtsBackend, OpenAiTtsBackend, OpenAiWhisperBackend,
 };
+pub use webhooks::{WebhookConfig, WebhookEvent, WebhookManager, WebhookPayload};

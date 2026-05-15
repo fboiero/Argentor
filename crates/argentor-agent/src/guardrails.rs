@@ -46,6 +46,7 @@ use regex::Regex;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::Instant;
+use tracing::instrument;
 
 // ---------------------------------------------------------------------------
 // Core types
@@ -387,6 +388,15 @@ impl GuardrailEngine {
         }
     }
 
+    #[instrument(
+        skip(self, text),
+        fields(
+            input_length = text.len(),
+            is_output = is_output,
+            violations_count = tracing::field::Empty,
+            processing_time_ms = tracing::field::Empty,
+        )
+    )]
     fn run_pipeline(&self, text: &str, is_output: bool) -> GuardrailResult {
         let start = Instant::now();
         #[allow(clippy::expect_used)] // lock poisoning
@@ -436,11 +446,17 @@ impl GuardrailEngine {
         };
 
         let elapsed = start.elapsed();
+        let elapsed_ms = elapsed.as_millis() as u64;
+
+        tracing::Span::current()
+            .record("violations_count", violations.len())
+            .record("processing_time_ms", elapsed_ms);
+
         GuardrailResult {
             passed,
             violations,
             sanitized_text,
-            processing_time_ms: elapsed.as_millis() as u64,
+            processing_time_ms: elapsed_ms,
         }
     }
 }

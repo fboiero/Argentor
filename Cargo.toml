@@ -103,7 +103,7 @@ argentor-orchestrator = { path = "crates/argentor-orchestrator", version = "1.4.
 argentor-compliance = { path = "crates/argentor-compliance", version = "1.4.0" }
 argentor-a2a = { path = "crates/argentor-a2a", version = "1.4.0" }
 futures-util = "0.3"
-tokio-stream = "0.1"
+tokio-stream = { version = "0.1", features = ["sync"] }
 
 [workspace.lints.clippy]
 unwrap_used = "warn"
