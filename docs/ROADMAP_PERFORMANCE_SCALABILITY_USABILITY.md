@@ -29,12 +29,13 @@
 
 **Goal:** make the current single-node gateway diagnosable under real traffic.
 
-- Add Prometheus metrics for audit health and aggregate audit counters.
-- Add request latency/error dashboards for `/api/v1/audit/*`.
-- Add explicit API error schemas and document them in OpenAPI.
-- Add load tests for audit JSONL files with 100k, 1M, and 10M events.
-- Add smoke tests that verify `/dashboard`, `/dashboard/audit`, `/metrics`, and
+- Done: Prometheus metrics for audit health and aggregate audit counters.
+- Done: OpenAPI audit parameters and shared error response schema.
+- Done: load benchmark harness for audit JSONL files at 100k and 1M events.
+- Done: smoke tests that verify `/dashboard`, `/dashboard/audit`, `/metrics`, and
   `/openapi.json` together.
+- Remaining: request latency/error dashboard panels for `/api/v1/audit/*`.
+- Remaining: 10M-event benchmark run before claiming very large local JSONL support.
 
 **Success criteria:**
 
@@ -69,31 +70,46 @@ Near-term target: keep logs under 10 ms p95 and violations under 100 ms p95
 at 100k events. Phase 2 should add a violation index before treating 1M-event
 violation queries as production-ready.
 
-Follow-up 1M-event baseline after streaming stats optimization:
+Follow-up baselines after the streaming stats optimization (release build,
+synthetic JSONL fixture, single-violation-every-1000):
 
-| Endpoint | 1M-event p95 |
-|----------|--------------|
-| Logs first page | <= 2 ms |
-| Logs second page | <= 2 ms |
-| Violations first page | <= 70 ms |
-| Stats cold scan | <= 1.1 s |
-| Stats warm cache hit | <= 1 ms |
+| Endpoint | 1M-event p95 | 10M-event p95 |
+|----------|--------------|---------------|
+| Logs first page | <= 2 ms | 0.20 ms |
+| Logs second page | <= 2 ms | 0.13 ms |
+| Violations first page | <= 70 ms | 44.84 ms |
+| Stats cold scan | <= 1.1 s | 812.96 ms |
+| Stats warm cache hit | <= 1 ms | 0.05 ms |
 
-Stats cold now avoids materializing every audit entry and counts total events via
-byte scanning, then parses only today's tail in reverse. A persisted stats index
-is still required if cold `/api/v1/audit/stats` must be consistently sub-100 ms
-on million-event logs after process restart.
+Stats cold avoids materializing every audit entry. It counts total events via
+byte-block newline scanning (no JSON parsing) and parses only today's tail in
+reverse. The 10M result confirms the cold-path cost is dominated by byte I/O
+plus the size of today's window — not the total file size.
+
+Reproduce with:
+
+```
+cargo run -p argentor-benchmarks --release -- audit-scale \
+  --events 10000000 --page-limit 100 --violation-every 1000 --samples 3
+```
+
+A persisted stats index is still required if cold `/api/v1/audit/stats` must be
+consistently sub-100 ms after process restart on multi-million-event logs.
 
 ## Phase 2: Scalable Audit Plane
 
 **Goal:** move audit from local JSONL convenience into a production subsystem.
 
-- Add cursor pagination to `/api/v1/audit/logs`.
-- Add cursor pagination to `/api/v1/audit/violations`.
-- Introduce audit retention, rotation, and compression policy.
-- Add pluggable audit sinks: JSONL, SQLite/Postgres, S3-compatible object
+- Done: cursor pagination to `/api/v1/audit/logs`.
+- Done: cursor pagination to `/api/v1/audit/violations`.
+- Done: local JSONL audit rotation and retention policy through `[audit]`
+  config (`path`, `max_size_mb`, `max_rotated_files`, `retention_days`).
+- Remaining: compression policy for archived audit logs.
+- Remaining: add pluggable audit sinks: JSONL, SQLite/Postgres, S3-compatible object
   storage, and SIEM webhook/export.
-- Add a lightweight violation index for fast policy/security views.
+- Remaining: add a lightweight violation index for fast policy/security views.
+- Remaining: add a persisted stats index if cold stats must be sub-100 ms on
+  million-event logs after restart.
 
 **Success criteria:**
 
@@ -122,12 +138,13 @@ streaming semantics.
 
 **Goal:** make day-two operations practical from the dashboard.
 
-- Add audit filters by severity, outcome, action, skill, date range, and text.
-- Add detail drawers with compact JSON rendering and copyable correlation IDs.
-- Add export actions for CSV/JSON.
-- Add health panels for cache hit rate, audit lag, active streams, and stream
+- Done: audit filters by action/type, outcome, date range, and text.
+- Done: detail drawer with compact JSON rendering.
+- Done: export actions for CSV/JSON.
+- Remaining: copyable correlation IDs once correlation IDs are present in audit entries.
+- Remaining: health panels for cache hit rate, audit lag, active streams, and stream
   channel pressure.
-- Add safe operator actions: scoped cache clear, session revoke, pause/resume
+- Remaining: safe operator actions: scoped cache clear, session revoke, pause/resume
   agent, and policy dry-run.
 
 **Success criteria:**
@@ -159,8 +176,9 @@ streaming semantics.
 
 ## Next Sprint
 
-1. Finish audit metrics in `/metrics`.
-2. Add cursor pagination design and tests for `/api/v1/audit/logs`.
-3. Add a JSONL benchmark fixture generator for audit scale tests.
-4. Improve `/dashboard/audit` filters and disabled/empty/error states.
-5. Add an operations checklist linking dashboard, OpenAPI, and Prometheus.
+1. Add compression policy for archived audit logs.
+2. Add request latency/error panels for audit endpoints.
+3. Add persisted stats index design for sub-100 ms cold stats.
+4. Add violation index design for sparse or old violations.
+5. Define release checklist for v1.4.x including docs, smoke, benchmark, and
+   known limits.
