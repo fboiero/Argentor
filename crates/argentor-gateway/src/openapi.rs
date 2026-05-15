@@ -140,6 +140,34 @@ impl ApiResponse {
         self.example = Some(example.into());
         self
     }
+
+    /// Conventional Argentor error response: `{"error": "message"}`.
+    ///
+    /// Use for documenting non-200 responses. The `description` should explain
+    /// the failure mode; the example is fixed to the wire shape.
+    pub fn error(status_code: u16, description: impl Into<String>) -> Self {
+        Self {
+            status_code,
+            description: description.into(),
+            content_type: Some("application/json".to_string()),
+            example: Some(r#"{"error":"<message>"}"#.to_string()),
+        }
+    }
+
+    /// Standard 401 Unauthorized response.
+    pub fn unauthorized() -> Self {
+        Self::error(401, "Authentication required").with_example(r#"{"error":"Authentication required"}"#)
+    }
+
+    /// Standard 500 Internal Server Error response.
+    pub fn internal_error() -> Self {
+        Self::error(500, "Internal server error")
+    }
+
+    /// Standard 400 Bad Request response.
+    pub fn bad_request(description: impl Into<String>) -> Self {
+        Self::error(400, description)
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -445,22 +473,28 @@ impl OpenApiGenerator {
                 ApiResponse::json(200, "Enterprise readiness report").with_example(
                     r#"{"version":"1.3.0","posture":"ready","score":78,"runtime":{"skills_registered":42,"active_connections":0,"active_sessions":0,"uptime_seconds":60},"checks":[],"next_actions":[]}"#,
                 ),
-            ),
+            )
+            .with_response(ApiResponse::internal_error()),
         );
 
         // Sessions
         gen.add_endpoint(
             ApiEndpoint::new(HttpMethod::Get, "/api/v1/sessions", "List sessions")
-                .with_tag("Sessions"),
+                .with_tag("Sessions")
+                .with_response(ApiResponse::internal_error()),
         );
         gen.add_endpoint(
             ApiEndpoint::new(HttpMethod::Post, "/api/v1/sessions", "Create session")
-                .with_tag("Sessions"),
+                .with_tag("Sessions")
+                .with_response(ApiResponse::bad_request("Invalid session payload"))
+                .with_response(ApiResponse::internal_error()),
         );
 
         // Skills
         gen.add_endpoint(
-            ApiEndpoint::new(HttpMethod::Get, "/api/v1/skills", "List skills").with_tag("Skills"),
+            ApiEndpoint::new(HttpMethod::Get, "/api/v1/skills", "List skills")
+                .with_tag("Skills")
+                .with_response(ApiResponse::internal_error()),
         );
 
         // Audit
@@ -511,7 +545,9 @@ impl OpenApiGenerator {
                 "List deployments",
             )
             .with_tag("Control Plane")
-            .requires_auth(),
+            .requires_auth()
+            .with_response(ApiResponse::unauthorized())
+            .with_response(ApiResponse::internal_error()),
         );
         gen.add_endpoint(
             ApiEndpoint::new(
@@ -520,7 +556,10 @@ impl OpenApiGenerator {
                 "Create deployment",
             )
             .with_tag("Control Plane")
-            .requires_auth(),
+            .requires_auth()
+            .with_response(ApiResponse::bad_request("Invalid deployment payload"))
+            .with_response(ApiResponse::unauthorized())
+            .with_response(ApiResponse::internal_error()),
         );
 
         gen
@@ -653,6 +692,70 @@ mod tests {
     fn test_argentor_openapi_spec() {
         let spec = argentor_openapi_spec();
         assert_eq!(spec["openapi"], "3.0.3");
+    }
+
+    // 11b. Every authenticated endpoint documents 401 explicitly.
+    #[test]
+    fn test_argentor_default_auth_endpoints_document_401() {
+        let gen = OpenApiGenerator::argentor_default();
+        let auth_endpoints: Vec<_> = gen
+            .endpoints
+            .iter()
+            .filter(|e| e.auth_required)
+            .collect();
+        assert!(
+            !auth_endpoints.is_empty(),
+            "expected at least one auth-required endpoint"
+        );
+        for ep in auth_endpoints {
+            assert!(
+                ep.responses.iter().any(|r| r.status_code == 401),
+                "endpoint {} {} requires auth but does not document a 401 response",
+                format!("{:?}", ep.method),
+                ep.path
+            );
+        }
+    }
+
+    // 11c. Mutating API endpoints document a 500 fallback.
+    #[test]
+    fn test_argentor_default_mutating_endpoints_document_500() {
+        let gen = OpenApiGenerator::argentor_default();
+        let mutating: Vec<_> = gen
+            .endpoints
+            .iter()
+            .filter(|e| {
+                matches!(
+                    e.method,
+                    HttpMethod::Post | HttpMethod::Put | HttpMethod::Delete | HttpMethod::Patch
+                ) && e.path.starts_with("/api/v1/")
+            })
+            .collect();
+        assert!(!mutating.is_empty(), "expected at least one mutating /api/v1 endpoint");
+        for ep in mutating {
+            assert!(
+                ep.responses.iter().any(|r| r.status_code == 500),
+                "mutating endpoint {} {} does not document a 500 response",
+                format!("{:?}", ep.method),
+                ep.path
+            );
+        }
+    }
+
+    // 11d. ApiResponse error helpers emit the conventional shape.
+    #[test]
+    fn test_api_response_error_helpers() {
+        let r = ApiResponse::unauthorized();
+        assert_eq!(r.status_code, 401);
+        assert_eq!(r.content_type.as_deref(), Some("application/json"));
+        assert!(r.example.as_deref().unwrap().contains("error"));
+
+        let r = ApiResponse::internal_error();
+        assert_eq!(r.status_code, 500);
+
+        let r = ApiResponse::bad_request("nope");
+        assert_eq!(r.status_code, 400);
+        assert_eq!(r.description, "nope");
     }
 
     // 12. Response with example
