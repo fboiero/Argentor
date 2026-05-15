@@ -71,19 +71,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: wasm32-wasip1
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-            skills/echo-skill/target
-          key: ${{ runner.os }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: ${{ runner.os }}-cargo-test-
-      - name: Build echo-skill WASM
-        run: cargo build --target wasm32-wasip1 --release --manifest-path skills/echo-skill/Cargo.toml
       - name: Count tests (current branch)
         id: count
         run: |
