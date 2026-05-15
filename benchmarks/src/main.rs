@@ -24,9 +24,14 @@ use argentor_benchmarks::runners::{
     ArgentorRunner, ExternalRunner, MockRunner, Runner, RunnerKind,
 };
 use argentor_benchmarks::task::{Task, TaskKind, TaskResult};
+use argentor_gateway::RestApiState;
 use clap::{Parser, Subcommand, ValueEnum};
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::io::Write;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, RwLock};
+use std::time::Instant;
+use tower::ServiceExt;
 
 #[derive(Parser)]
 #[command(about = "Argentor benchmark harness")]
@@ -162,6 +167,24 @@ enum Command {
         runners: Vec<RunnerArg>,
         #[arg(long, default_value_t = 1)]
         samples: usize,
+    },
+    /// Benchmark audit JSONL dashboard endpoints at scale.
+    AuditScale {
+        /// Number of audit events to generate.
+        #[arg(long, default_value_t = 100_000)]
+        events: usize,
+        /// Page size requested from audit log and violation endpoints.
+        #[arg(long, default_value_t = 100)]
+        page_limit: usize,
+        /// Generate one denied violation every N events.
+        #[arg(long, default_value_t = 100)]
+        violation_every: usize,
+        /// Number of timing samples per endpoint.
+        #[arg(long, default_value_t = 5)]
+        samples: usize,
+        /// Directory where result JSON is written.
+        #[arg(long, default_value = "benchmarks/results")]
+        output_dir: PathBuf,
     },
     /// Generate the static benchmark dashboard from `benchmarks/results/*.json`.
     /// Writes `benchmarks/dashboard/index.html`.
@@ -445,6 +468,15 @@ async fn main() -> anyhow::Result<()> {
         }
         Command::Integrations { runners, samples } => {
             run_integrations(&cli.tasks_dir, &runners, samples).await?;
+        }
+        Command::AuditScale {
+            events,
+            page_limit,
+            violation_every,
+            samples,
+            output_dir,
+        } => {
+            run_audit_scale(events, page_limit, violation_every, samples, &output_dir).await?;
         }
         Command::Dashboard {
             results_dir,
@@ -1818,4 +1850,273 @@ async fn run_integrations(
     println!("\nResults written to {}", out.display());
 
     Ok(())
+}
+
+async fn run_audit_scale(
+    events: usize,
+    page_limit: usize,
+    violation_every: usize,
+    samples: usize,
+    output_dir: &Path,
+) -> anyhow::Result<()> {
+    if events == 0 {
+        anyhow::bail!("--events must be greater than zero");
+    }
+    if page_limit == 0 {
+        anyhow::bail!("--page-limit must be greater than zero");
+    }
+    if violation_every == 0 {
+        anyhow::bail!("--violation-every must be greater than zero");
+    }
+    if samples == 0 {
+        anyhow::bail!("--samples must be greater than zero");
+    }
+
+    let run_id = chrono::Utc::now().format("%Y%m%d_%H%M%S");
+    let root = std::env::temp_dir().join(format!("argentor-audit-scale-{run_id}"));
+    let audit_dir = root.join("audit");
+    let audit_path = audit_dir.join("audit.jsonl");
+    std::fs::create_dir_all(&audit_dir)?;
+
+    println!(
+        "Generating {events} audit events at {} (1 violation every {violation_every})",
+        audit_path.display()
+    );
+    let generation_started = Instant::now();
+    generate_audit_jsonl(&audit_path, events, violation_every)?;
+    let generation_ms = generation_started.elapsed().as_secs_f64() * 1000.0;
+    let file_bytes = std::fs::metadata(&audit_path)?.len();
+
+    let app = build_audit_benchmark_app(&root, audit_path.clone()).await?;
+    let mut log_first_ms = Vec::new();
+    let mut log_second_ms = Vec::new();
+    let mut violations_ms = Vec::new();
+    let stats_cold = timed_get(&app, "/api/v1/audit/stats").await?;
+    let mut stats_warm_ms = Vec::new();
+    let mut first_cursor = None;
+
+    for _ in 0..samples {
+        let first = timed_get(&app, &format!("/api/v1/audit/logs?limit={page_limit}")).await?;
+        log_first_ms.push(first.elapsed_ms);
+        first_cursor = first.next_cursor.clone().or(first_cursor);
+
+        if let Some(cursor) = &first.next_cursor {
+            let second = timed_get(
+                &app,
+                &format!("/api/v1/audit/logs?limit={page_limit}&cursor={cursor}"),
+            )
+            .await?;
+            log_second_ms.push(second.elapsed_ms);
+        }
+
+        let violations = timed_get(
+            &app,
+            &format!("/api/v1/audit/violations?limit={page_limit}"),
+        )
+        .await?;
+        violations_ms.push(violations.elapsed_ms);
+
+        let stats_warm = timed_get(&app, "/api/v1/audit/stats").await?;
+        stats_warm_ms.push(stats_warm.elapsed_ms);
+    }
+
+    let summary = serde_json::json!({
+        "timestamp": chrono::Utc::now().to_rfc3339(),
+        "events": events,
+        "page_limit": page_limit,
+        "violation_every": violation_every,
+        "samples": samples,
+        "file_bytes": file_bytes,
+        "generation_ms": generation_ms,
+        "has_next_cursor": first_cursor.is_some(),
+        "latency_ms": {
+            "logs_first_page": summarize_samples(&log_first_ms),
+            "logs_second_page": summarize_samples(&log_second_ms),
+            "violations_first_page": summarize_samples(&violations_ms),
+            "stats_cold": summarize_samples(&[stats_cold.elapsed_ms]),
+            "stats_warm": summarize_samples(&stats_warm_ms),
+        },
+        "raw_samples_ms": {
+            "logs_first_page": log_first_ms,
+            "logs_second_page": log_second_ms,
+            "violations_first_page": violations_ms,
+            "stats_cold": [stats_cold.elapsed_ms],
+            "stats_warm": stats_warm_ms,
+        }
+    });
+
+    std::fs::create_dir_all(output_dir)?;
+    let out = output_dir.join(format!("audit_scale_{run_id}.json"));
+    std::fs::write(&out, serde_json::to_string_pretty(&summary)?)?;
+
+    println!("\n## Audit scale results\n");
+    println!("| Endpoint | Mean ms | Median ms | P95 ms | Min ms | Max ms |");
+    println!("|----------|---------|-----------|--------|--------|--------|");
+    print_latency_row("logs first page", &summary["latency_ms"]["logs_first_page"]);
+    print_latency_row(
+        "logs second page",
+        &summary["latency_ms"]["logs_second_page"],
+    );
+    print_latency_row(
+        "violations first page",
+        &summary["latency_ms"]["violations_first_page"],
+    );
+    print_latency_row("stats cold", &summary["latency_ms"]["stats_cold"]);
+    print_latency_row("stats warm", &summary["latency_ms"]["stats_warm"]);
+    println!("\nResults written to {}", out.display());
+
+    Ok(())
+}
+
+fn generate_audit_jsonl(path: &Path, events: usize, violation_every: usize) -> anyhow::Result<()> {
+    use argentor_security::audit::{AuditEntry, AuditOutcome};
+    use uuid::Uuid;
+
+    let file = std::fs::File::create(path)?;
+    let mut writer = std::io::BufWriter::new(file);
+    let session_id = Uuid::new_v4();
+    let start = chrono::Utc::now() - chrono::Duration::seconds(events as i64);
+
+    for i in 0..events {
+        let denied = i % violation_every == 0;
+        let entry = AuditEntry {
+            timestamp: start + chrono::Duration::seconds(i as i64),
+            session_id,
+            action: if denied {
+                "guardrail_blocked".to_string()
+            } else {
+                "tool_call".to_string()
+            },
+            skill_name: (!denied).then(|| "benchmark_tool".to_string()),
+            details: if denied {
+                serde_json::json!({
+                    "rule": "benchmark_policy",
+                    "message": "Synthetic denied event",
+                    "i": i
+                })
+            } else {
+                serde_json::json!({ "i": i, "ok": true })
+            },
+            outcome: if denied {
+                AuditOutcome::Denied
+            } else {
+                AuditOutcome::Success
+            },
+        };
+        serde_json::to_writer(&mut writer, &entry)?;
+        writer.write_all(b"\n")?;
+    }
+    writer.flush()?;
+    Ok(())
+}
+
+async fn build_audit_benchmark_app(
+    root: &Path,
+    audit_path: PathBuf,
+) -> anyhow::Result<axum::Router> {
+    use argentor_agent::{AgentRunner, LlmProvider, ModelConfig};
+    use argentor_security::{AuditLog, PermissionSet};
+    use argentor_session::{FileSessionStore, SessionStore};
+    use argentor_skills::SkillRegistry;
+
+    let audit = Arc::new(AuditLog::new(root.join("runtime-audit")));
+    let sessions: Arc<dyn SessionStore> =
+        Arc::new(FileSessionStore::new(root.join("sessions")).await?);
+    let skills = Arc::new(SkillRegistry::new());
+    let permissions = PermissionSet::new();
+    let config = ModelConfig {
+        provider: LlmProvider::Claude,
+        model_id: "bench-audit".to_string(),
+        api_key: "bench".to_string(),
+        api_base_url: Some("http://127.0.0.1:1".to_string()),
+        temperature: 0.0,
+        max_tokens: 100,
+        max_turns: 1,
+        max_context_tokens: 200_000,
+        fallback_models: vec![],
+        retry_policy: None,
+    };
+    let agent = Arc::new(AgentRunner::new(config, skills.clone(), permissions, audit));
+    let connections = argentor_gateway::connection::ConnectionManager::new();
+    let router = Arc::new(argentor_gateway::router::MessageRouter::new(
+        agent,
+        sessions.clone(),
+        connections.clone(),
+    ));
+    let state = Arc::new(RestApiState {
+        router,
+        connections,
+        sessions,
+        skills,
+        started_at: chrono::Utc::now(),
+        audit_log_path: Some(audit_path),
+        audit_stats_cache: Arc::new(RwLock::new(None)),
+    });
+
+    Ok(argentor_gateway::api_router(state))
+}
+
+struct TimedResponse {
+    elapsed_ms: f64,
+    next_cursor: Option<String>,
+}
+
+async fn timed_get(app: &axum::Router, uri: &str) -> anyhow::Result<TimedResponse> {
+    let request = axum::http::Request::builder()
+        .method("GET")
+        .uri(uri)
+        .body(axum::body::Body::empty())?;
+    let started = Instant::now();
+    let response = app.clone().oneshot(request).await?;
+    let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
+    if !response.status().is_success() {
+        anyhow::bail!("GET {uri} returned {}", response.status());
+    }
+    let next_cursor = response
+        .headers()
+        .get("x-next-cursor")
+        .and_then(|value| value.to_str().ok())
+        .map(ToOwned::to_owned);
+    let _body = axum::body::to_bytes(response.into_body(), usize::MAX).await?;
+
+    Ok(TimedResponse {
+        elapsed_ms,
+        next_cursor,
+    })
+}
+
+fn summarize_samples(samples: &[f64]) -> serde_json::Value {
+    if samples.is_empty() {
+        return serde_json::json!({
+            "mean": 0.0,
+            "median": 0.0,
+            "stddev": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "p95": 0.0,
+            "p99": 0.0,
+        });
+    }
+    let stats = Stats::from_samples(samples);
+    serde_json::json!({
+        "mean": stats.mean,
+        "median": stats.median,
+        "stddev": stats.stddev,
+        "min": stats.min,
+        "max": stats.max,
+        "p95": stats.p95,
+        "p99": stats.p99,
+    })
+}
+
+fn print_latency_row(label: &str, stats: &serde_json::Value) {
+    println!(
+        "| {} | {:.2} | {:.2} | {:.2} | {:.2} | {:.2} |",
+        label,
+        stats["mean"].as_f64().unwrap_or_default(),
+        stats["median"].as_f64().unwrap_or_default(),
+        stats["p95"].as_f64().unwrap_or_default(),
+        stats["min"].as_f64().unwrap_or_default(),
+        stats["max"].as_f64().unwrap_or_default(),
+    );
 }

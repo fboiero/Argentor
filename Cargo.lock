@@ -200,10 +200,12 @@ dependencies = [
  "argentor-agent",
  "argentor-builtins",
  "argentor-core",
+ "argentor-gateway",
  "argentor-security",
  "argentor-session",
  "argentor-skills",
  "async-trait",
+ "axum",
  "chrono",
  "clap",
  "futures",
@@ -213,6 +215,8 @@ dependencies = [
  "statrs",
  "tabled",
  "tokio",
+ "tower 0.5.3",
+ "uuid",
 ]
 
 [[package]]

@@ -17,6 +17,7 @@ argentor-session = { path = "../crates/argentor-session" }
 argentor-skills = { path = "../crates/argentor-skills" }
 argentor-agent = { path = "../crates/argentor-agent" }
 argentor-builtins = { path = "../crates/argentor-builtins" }
+argentor-gateway = { path = "../crates/argentor-gateway" }
 
 # Runtime
 tokio = { version = "1", features = ["full"] }
@@ -29,6 +30,7 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 serde_yaml = "0.9"
 chrono = { version = "0.4", features = ["serde"] }
+uuid = { version = "1", features = ["v4", "serde"] }
 
 # CLI
 clap = { version = "4", features = ["derive"] }
@@ -38,3 +40,5 @@ statrs = "0.17"
 
 # Reporting
 tabled = "0.20"
+tower = { version = "0.5", features = ["util"] }
+axum = { version = "0.8" }

@@ -860,31 +860,10 @@ fn read_audit_entries_page_blocking(
 }
 
 fn read_audit_stats_blocking(path: &FsPath) -> Result<AuditStats, String> {
-    let filter = AuditFilter {
-        limit: 0,
-        ..AuditFilter::all()
-    };
-    let entries = query_audit_log(path, &filter)
-        .map_err(|e| format!("Failed to query audit log: {e}"))?
-        .entries;
-
     let today = Utc::now().date_naive();
-    let mut events_today = 0u64;
-    let mut violations_today = 0u64;
-    let mut blocked_today = 0u64;
-
-    for entry in &entries {
-        if entry.timestamp.date_naive() != today {
-            continue;
-        }
-        events_today += 1;
-        if is_violation_entry(entry) {
-            violations_today += 1;
-        }
-        if matches!(entry.outcome, AuditOutcome::Denied) {
-            blocked_today += 1;
-        }
-    }
+    let total_events = count_audit_lines_blocking(path)?;
+    let (events_today, violations_today, blocked_today) =
+        read_today_audit_stats_reverse_blocking(path, today)?;
 
     let block_rate_percent = if events_today > 0 {
         (blocked_today as f64 / events_today as f64) * 100.0
@@ -896,8 +875,113 @@ fn read_audit_stats_blocking(path: &FsPath) -> Result<AuditStats, String> {
         events_today,
         violations_today,
         block_rate_percent,
-        total_events: entries.len() as u64,
+        total_events,
     })
+}
+
+fn count_audit_lines_blocking(path: &FsPath) -> Result<u64, String> {
+    const BLOCK_SIZE: usize = 64 * 1024;
+
+    let mut file =
+        std::fs::File::open(path).map_err(|e| format!("Failed to open audit log: {e}"))?;
+    let mut buf = vec![0u8; BLOCK_SIZE];
+    let mut lines = 0u64;
+    let mut saw_non_empty_tail = false;
+
+    loop {
+        let read = file
+            .read(&mut buf)
+            .map_err(|e| format!("Failed to read audit log: {e}"))?;
+        if read == 0 {
+            break;
+        }
+        for byte in &buf[..read] {
+            if *byte == b'\n' {
+                lines += 1;
+                saw_non_empty_tail = false;
+            } else if !byte.is_ascii_whitespace() {
+                saw_non_empty_tail = true;
+            }
+        }
+    }
+
+    if saw_non_empty_tail {
+        lines += 1;
+    }
+
+    Ok(lines)
+}
+
+fn read_today_audit_stats_reverse_blocking(
+    path: &FsPath,
+    today: chrono::NaiveDate,
+) -> Result<(u64, u64, u64), String> {
+    const BLOCK_SIZE: u64 = 8192;
+
+    let mut events_today = 0u64;
+    let mut violations_today = 0u64;
+    let mut blocked_today = 0u64;
+
+    let mut file =
+        std::fs::File::open(path).map_err(|e| format!("Failed to open audit log: {e}"))?;
+    let mut pos = file
+        .metadata()
+        .map_err(|e| format!("Failed to stat audit log: {e}"))?
+        .len();
+    if pos == 0 {
+        return Ok((0, 0, 0));
+    }
+
+    let mut carry = Vec::new();
+    loop {
+        let read_len = BLOCK_SIZE.min(pos) as usize;
+        pos -= read_len as u64;
+
+        file.seek(SeekFrom::Start(pos))
+            .map_err(|e| format!("Failed to seek audit log: {e}"))?;
+        let mut chunk = vec![0u8; read_len];
+        file.read_exact(&mut chunk)
+            .map_err(|e| format!("Failed to read audit log: {e}"))?;
+
+        chunk.extend_from_slice(&carry);
+        let parse_start = if pos > 0 {
+            if let Some(newline_idx) = chunk.iter().position(|byte| *byte == b'\n') {
+                carry = chunk[..newline_idx].to_vec();
+                newline_idx + 1
+            } else {
+                carry = chunk;
+                continue;
+            }
+        } else {
+            0
+        };
+
+        let content = String::from_utf8_lossy(&chunk[parse_start..]);
+        let lines: Vec<&str> = content
+            .split_inclusive('\n')
+            .map(str::trim)
+            .filter(|line| !line.is_empty())
+            .collect();
+
+        for line in lines.into_iter().rev() {
+            let entry: AuditEntry = serde_json::from_str(line)
+                .map_err(|e| format!("Failed to parse audit entry: {e}"))?;
+            if entry.timestamp.date_naive() != today {
+                return Ok((events_today, violations_today, blocked_today));
+            }
+            events_today += 1;
+            if is_violation_entry(&entry) {
+                violations_today += 1;
+            }
+            if matches!(entry.outcome, AuditOutcome::Denied) {
+                blocked_today += 1;
+            }
+        }
+
+        if pos == 0 {
+            return Ok((events_today, violations_today, blocked_today));
+        }
+    }
 }
 
 fn read_audit_violations_page_blocking(

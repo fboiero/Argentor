@@ -20,10 +20,21 @@ cargo run -p argentor-benchmarks --release -- run --task t2_simple_qa --runner a
 
 # Run all tasks on all runners
 cargo run -p argentor-benchmarks --release -- run-all --runners argentor,mock
+
+# Measure audit JSONL endpoint scalability
+cargo run -p argentor-benchmarks --release -- audit-scale \
+  --events 100000 \
+  --page-limit 100 \
+  --violation-every 100 \
+  --samples 5
 ```
 
 Results are written to `benchmarks/results/run_<timestamp>.json` and printed as a
 Markdown table.
+
+`audit-scale` writes `benchmarks/results/audit_scale_<timestamp>.json` with
+latency samples for logs first page, logs second page, violations first page,
+stats cold scan, and stats warm cache hits.
 
 ## Architecture
 
