@@ -1,7 +1,7 @@
 # Argentor v1.4.x Release Checklist
 
-Release readiness checklist for the audit-plane hardening work on top of
-Argentor `1.4.0`.
+Release readiness checklist for the audit-plane hardening work published as
+Argentor `1.4.1`.
 
 ## Release Scope
 
@@ -42,7 +42,7 @@ cargo run -p argentor-benchmarks --release -- audit-scale \
 
 ## Release Gates
 
-- [x] Workspace version remains `1.4.0` for the current hardening release line.
+- [x] Workspace version is `1.4.1` for the current hardening release line.
 - [x] Audit dashboard is linked from the main dashboard.
 - [x] `/health`, `/dashboard`, `/dashboard/audit`, `/metrics`, and
   `/openapi.json` are covered by release smoke tests.
@@ -66,7 +66,7 @@ cargo run -p argentor-benchmarks --release -- audit-scale \
 
 ## Tagging Notes
 
-- Suggested tag: `v1.4.1` if publishing this as a patch release from `1.4.0`.
-- Changelog source: `CHANGELOG.md` `[Unreleased]` section.
+- Tag: `v1.4.1`.
+- Changelog source: `CHANGELOG.md` `[1.4.1]` section.
 - Primary release evidence: this checklist, `docs/ROADMAP_PERFORMANCE_SCALABILITY_USABILITY.md`,
   and benchmark JSON under `benchmarks/results/` when intentionally included.

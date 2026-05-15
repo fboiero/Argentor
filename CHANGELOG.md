@@ -8,6 +8,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+---
+
+## [1.4.1] - 2026-05-15
+
 ### Audit plane
 - `GET /api/v1/audit/logs` and `GET /api/v1/audit/violations` with `limit` and `cursor` query parameters; responses include an `x-next-cursor` header
 - `GET /api/v1/audit/stats` with aggregate counters for the dashboard summary bar
@@ -691,7 +695,11 @@ Argentor v1.0.0 is the first production-ready release. All 58 development phases
 
 ---
 
-[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.1.0...HEAD
+[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/fboiero/Argentor/compare/v1.4.0...v1.4.1
+[1.4.0]: https://github.com/fboiero/Argentor/compare/v1.3.0...v1.4.0
+[1.3.0]: https://github.com/fboiero/Argentor/compare/v1.2.0...v1.3.0
+[1.2.0]: https://github.com/fboiero/Argentor/compare/v1.1.0...v1.2.0
 [1.1.0]: https://github.com/fboiero/Argentor/compare/v1.0.0...v1.1.0
 [1.0.0]: https://github.com/fboiero/Argentor/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/fboiero/Argentor/releases/tag/v0.1.0
