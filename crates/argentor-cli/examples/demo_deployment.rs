@@ -43,11 +43,7 @@ fn delay(ms: u64) {
 /// Print a progress bar of the given width (filled/total).
 fn progress_bar(filled: usize, total: usize) -> String {
     let bar_width = 10;
-    let fill = if total > 0 {
-        (filled * bar_width) / total
-    } else {
-        0
-    };
+    let fill = (filled * bar_width).checked_div(total).unwrap_or(0);
     let empty = bar_width - fill;
     format!("{}{}", "\u{2588}".repeat(fill), "\u{2591}".repeat(empty),)
 }
