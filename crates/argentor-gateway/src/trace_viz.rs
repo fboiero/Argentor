@@ -114,11 +114,17 @@ pub enum StepStatus {
     /// Step completed successfully.
     Success,
     /// Step resulted in an error.
-    Error { message: String },
+    Error {
+        /// Human-readable error message.
+        message: String,
+    },
     /// Step was served from cache.
     Cached,
     /// Step was skipped.
-    Skipped { reason: String },
+    Skipped {
+        /// Human-readable skip reason.
+        reason: String,
+    },
 }
 
 /// A single timeline entry for event-based views.
@@ -567,7 +573,7 @@ fn flatten_steps(steps: &[VisualStep]) -> Vec<&VisualStep> {
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
-    use argentor_agent::debug_recorder::{DebugRecorder, StepType, TokenUsage};
+    use argentor_agent::debug_recorder::{DebugRecorder, StepType};
 
     // -- helpers --
 
