@@ -489,7 +489,7 @@ impl AnalyticsEngine {
         };
 
         let total_duration: u64 = interactions.iter().map(|i| i.duration_ms).sum();
-        let avg_response_time_ms = if total > 0 { total_duration / total } else { 0 };
+        let avg_response_time_ms = total_duration.checked_div(total).unwrap_or(0);
 
         let total_tokens: u64 = interactions.iter().map(|i| i.tokens_used).sum();
         let cost_per_1k = self.pricing.cost_per_1k(None);
@@ -622,7 +622,7 @@ impl AnalyticsEngine {
         };
 
         let total_duration: u64 = interactions.iter().map(|i| i.duration_ms).sum();
-        let avg_duration_ms = if total > 0 { total_duration / total } else { 0 };
+        let avg_duration_ms = total_duration.checked_div(total).unwrap_or(0);
 
         let avg_quality = if quality.is_empty() {
             0.0

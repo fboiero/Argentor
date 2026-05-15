@@ -14,9 +14,10 @@ const TAVILY_API_URL: &str = "https://api.tavily.com/search";
 const BRAVE_API_URL: &str = "https://api.search.brave.com/res/v1/web/search";
 
 /// Supported search providers.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SearchProvider {
     /// Free, no API key required (default). HTML scraping.
+    #[default]
     DuckDuckGo,
     /// Requires `TAVILY_API_KEY`. High-quality AI-optimized results.
     Tavily,
@@ -24,12 +25,6 @@ pub enum SearchProvider {
     Brave,
     /// Self-hosted SearXNG instance. No API key needed.
     Searxng,
-}
-
-impl Default for SearchProvider {
-    fn default() -> Self {
-        Self::DuckDuckGo
-    }
 }
 
 /// A single search result with title, URL, and snippet.

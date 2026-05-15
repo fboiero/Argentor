@@ -469,7 +469,7 @@ impl WebhookDispatcher {
                     attempt: attempt + 1,
                     attempted_at: Utc::now(),
                     duration_ms,
-                    error: Some(e.to_string()),
+                    error: Some(e.clone()),
                 },
             };
 

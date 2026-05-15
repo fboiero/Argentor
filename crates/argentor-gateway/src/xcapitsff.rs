@@ -589,7 +589,7 @@ pub struct UsageRecord {
 }
 
 /// Time period for usage queries.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Default, Deserialize)]
 pub enum UsagePeriod {
     /// Last N hours.
     #[serde(rename = "hours")]
@@ -599,13 +599,8 @@ pub enum UsagePeriod {
     Days(u64),
     /// All recorded usage.
     #[serde(rename = "all")]
+    #[default]
     All,
-}
-
-impl Default for UsagePeriod {
-    fn default() -> Self {
-        Self::All
-    }
 }
 
 /// Aggregated usage breakdown by agent role and model.

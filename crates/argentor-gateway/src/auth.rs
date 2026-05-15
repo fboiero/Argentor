@@ -188,9 +188,10 @@ impl IntoResponse for AuthError {
 // ─── Configuration types ─────────────────────────────────────────────────────
 
 /// Authentication mode for the gateway.
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub enum AuthMode {
     /// No authentication required.
+    #[default]
     None,
     /// API key in `X-Api-Key` header.
     ApiKey,
@@ -200,12 +201,6 @@ pub enum AuthMode {
     OAuth2,
     /// Accepts either API key or JWT.
     Combined,
-}
-
-impl Default for AuthMode {
-    fn default() -> Self {
-        Self::None
-    }
 }
 
 /// Top-level authentication configuration.
