@@ -87,7 +87,19 @@ config:
   logLevel: info
   bind: "0.0.0.0:3000"
 
+# API keys and other secrets — rendered into a Kubernetes Secret and injected
+# into the pod via envFrom. Leave a value empty to omit it from the Secret.
+secrets:
+  anthropicApiKey: ""
+  openaiApiKey: ""
+  groqApiKey: ""
+
+# Extra env vars rendered as a literal list (each item must follow the
+# core/v1 EnvVar schema, e.g. {name: FOO, value: bar} or
+# {name: FOO, valueFrom: ...}).
 env: []
+
+# Extra envFrom sources (in addition to the auto-generated Secret).
 envFrom: []
 
 nodeSelector: {}

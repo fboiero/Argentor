@@ -38,16 +38,24 @@ spec:
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
             - serve
-          env:
-            - name: RUST_LOG
-              value: {{ .Values.config.logLevel }}
-            - name: ARGENTOR_BIND
-              value: {{ .Values.config.bind }}
-            {{- with .Values.env }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "argentor.fullname" . }}-gateway
+            {{- $hasSecret := false -}}
+            {{- range $key, $value := .Values.secrets -}}
+              {{- if $value -}}
+                {{- $hasSecret = true -}}
+              {{- end -}}
+            {{- end }}
+            {{- if $hasSecret }}
+            - secretRef:
+                name: {{ include "argentor.fullname" . }}-secrets
+            {{- end }}
+            {{- with .Values.envFrom }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
-          {{- with .Values.envFrom }}
-          envFrom:
+          {{- with .Values.env }}
+          env:
             {{- toYaml . | nindent 12 }}
           {{- end }}
           ports:
