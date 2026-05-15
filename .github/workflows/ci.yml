@@ -5,6 +5,7 @@ on:
     branches: [main, master]
   pull_request:
     branches: [main, master]
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always
@@ -61,7 +62,7 @@ jobs:
         run: cargo test --workspace
       - name: Print test summary
         if: always()
-        run: cargo test --workspace 2>&1 | grep "test result:" | awk '{sum += $4; fail += $6} END {print "Total:", sum, "passed,", fail, "failed"}'
+        run: echo "Workspace tests completed; see the 'Run workspace tests' step for full results."
 
   test-count-regression:
     name: Test count regression gate
@@ -86,9 +87,7 @@ jobs:
       - name: Count tests (current branch)
         id: count
         run: |
-          set +e
-          COUNT=$(cargo test --workspace --no-fail-fast 2>&1 | grep "test result:" | awk '{sum += $4} END {print sum}')
-          set -e
+          COUNT=$(cargo test --workspace -- --list 2>/dev/null | grep -E '^[^[:space:]].*: test$' | wc -l | tr -d ' ')
           echo "count=${COUNT:-0}" >> "$GITHUB_OUTPUT"
           echo "Current test count: ${COUNT:-0}"
       - name: Load baseline
@@ -163,7 +162,7 @@ jobs:
     name: Benchmarks
     runs-on: ubuntu-latest
     needs: [test]
-    if: github.ref == 'refs/heads/master' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[bench]'))
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
