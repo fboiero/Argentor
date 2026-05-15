@@ -42,8 +42,7 @@ impl LlmBackend for BenchMockBackend {
         self.call_count.fetch_add(1, Ordering::SeqCst);
         let last_user = messages
             .iter()
-            .filter(|m| matches!(m.role, argentor_core::Role::User))
-            .next_back()
+            .rfind(|m| matches!(m.role, argentor_core::Role::User))
             .map(|m| m.content.as_str())
             .unwrap_or("");
         Ok(LlmResponse::Done(format!(

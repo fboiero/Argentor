@@ -347,7 +347,7 @@ async fn main() {
 
     section(3, "Sales Qualifier — Calificación paralela de 3 leads");
 
-    let leads = vec![
+    let leads = [
         ("Acme Corp", "LATAM", "CFO", 75, "HIGH"),
         ("TechStart SRL", "LATAM", "Dev Lead", 45, "MEDIUM"),
         ("MegaBank", "Iberia", "CTO", 88, "HIGH"),
