@@ -545,6 +545,7 @@ mod tests {
             skill_name: skill.map(String::from),
             details: serde_json::json!({"key": "value"}),
             outcome,
+            correlation_id: None,
         }
     }
 

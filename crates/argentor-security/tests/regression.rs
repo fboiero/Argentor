@@ -114,6 +114,7 @@ fn test_audit_entry_serialization() {
         skill_name: Some("shell".to_string()),
         details: serde_json::json!({"cmd": "ls"}),
         outcome: AuditOutcome::Success,
+        correlation_id: None,
     };
 
     let json = serde_json::to_string(&entry).unwrap();

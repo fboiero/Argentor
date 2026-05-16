@@ -251,6 +251,7 @@ async fn test_audit_log_rotation_under_volume() {
             skill_name: None,
             details: serde_json::json!({"i": i}),
             outcome: AuditOutcome::Success,
+            correlation_id: None,
         };
         log.log(entry);
     }
@@ -383,6 +384,7 @@ async fn test_event_bus_history_capped() {
             skill_name: None,
             details: serde_json::Value::Null,
             outcome: AuditOutcome::Success,
+            correlation_id: None,
         });
     }
     tokio::time::sleep(Duration::from_secs(2)).await;

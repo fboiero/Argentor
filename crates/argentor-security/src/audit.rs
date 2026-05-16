@@ -49,6 +49,41 @@ pub struct AuditEntry {
     pub details: serde_json::Value,
     /// Whether the action succeeded, was denied, or errored.
     pub outcome: AuditOutcome,
+    /// Correlation identifier tying this action to a request or trace.
+    ///
+    /// `#[serde(default)]` keeps audit JSONL written before this field was
+    /// introduced deserializable — older entries simply have `None`.
+    #[serde(default)]
+    pub correlation_id: Option<String>,
+}
+
+impl AuditEntry {
+    /// Build an audit entry stamped with the current UTC time and no
+    /// correlation id. Use [`with_correlation_id`](Self::with_correlation_id)
+    /// to attach one.
+    pub fn new(
+        session_id: Uuid,
+        action: impl Into<String>,
+        skill_name: Option<String>,
+        details: serde_json::Value,
+        outcome: AuditOutcome,
+    ) -> Self {
+        Self {
+            timestamp: Utc::now(),
+            session_id,
+            action: action.into(),
+            skill_name,
+            details,
+            outcome,
+            correlation_id: None,
+        }
+    }
+
+    /// Attach a correlation id to this entry.
+    pub fn with_correlation_id(mut self, correlation_id: impl Into<String>) -> Self {
+        self.correlation_id = Some(correlation_id.into());
+        self
+    }
 }
 
 /// Outcome of an audited action.
@@ -236,14 +271,26 @@ impl AuditLog {
         details: serde_json::Value,
         outcome: AuditOutcome,
     ) {
-        self.log(AuditEntry {
-            timestamp: Utc::now(),
-            session_id,
-            action: action.into(),
-            skill_name,
-            details,
-            outcome,
-        });
+        self.log(AuditEntry::new(
+            session_id, action, skill_name, details, outcome,
+        ));
+    }
+
+    /// Like [`log_action`](Self::log_action) but stamps the entry with a
+    /// correlation id tying it to a request or distributed trace.
+    pub fn log_action_correlated(
+        &self,
+        session_id: Uuid,
+        action: impl Into<String>,
+        skill_name: Option<String>,
+        details: serde_json::Value,
+        outcome: AuditOutcome,
+        correlation_id: impl Into<String>,
+    ) {
+        self.log(
+            AuditEntry::new(session_id, action, skill_name, details, outcome)
+                .with_correlation_id(correlation_id),
+        );
     }
 }
 
@@ -600,6 +647,7 @@ mod tests {
             skill_name: None,
             details: serde_json::json!({"key": "value"}),
             outcome: AuditOutcome::Success,
+            correlation_id: None,
         }
     }
 
@@ -896,5 +944,78 @@ mod tests {
             req.to_lowercase().contains("x-argentor-signature"),
             "HMAC signature header missing: {req}"
         );
+    }
+
+    // -- Correlation IDs -----------------------------------------------------
+
+    #[test]
+    fn test_audit_entry_correlation_id_builder() {
+        let entry = AuditEntry::new(
+            Uuid::new_v4(),
+            "tool_call",
+            None,
+            serde_json::json!({}),
+            AuditOutcome::Success,
+        );
+        assert_eq!(entry.correlation_id, None);
+
+        let correlated = entry.with_correlation_id("req-abc-123");
+        assert_eq!(correlated.correlation_id.as_deref(), Some("req-abc-123"));
+    }
+
+    #[test]
+    fn test_audit_entry_correlation_id_round_trips() {
+        let entry = AuditEntry::new(
+            Uuid::new_v4(),
+            "tool_call",
+            None,
+            serde_json::json!({}),
+            AuditOutcome::Success,
+        )
+        .with_correlation_id("trace-xyz");
+
+        let json = serde_json::to_string(&entry).unwrap();
+        assert!(json.contains("\"correlation_id\":\"trace-xyz\""));
+
+        let parsed: AuditEntry = serde_json::from_str(&json).unwrap();
+        assert_eq!(parsed.correlation_id.as_deref(), Some("trace-xyz"));
+    }
+
+    #[test]
+    fn test_audit_entry_deserializes_legacy_jsonl_without_correlation_id() {
+        // An audit line written before the correlation_id field existed.
+        let legacy = r#"{
+            "timestamp": "2026-01-01T00:00:00Z",
+            "session_id": "a1a2a3a4-b1b2-c1c2-d1d2-d3d4d5d6d7d8",
+            "action": "login",
+            "skill_name": null,
+            "details": {},
+            "outcome": "success"
+        }"#;
+        let parsed: AuditEntry = serde_json::from_str(legacy).unwrap();
+        assert_eq!(parsed.correlation_id, None);
+        assert_eq!(parsed.action, "login");
+    }
+
+    #[tokio::test]
+    async fn test_log_action_correlated_persists_correlation_id() {
+        let dir = TempDir::new().unwrap();
+        let log = AuditLog::new(dir.path().to_path_buf());
+        log.log_action_correlated(
+            Uuid::new_v4(),
+            "correlated_action",
+            None,
+            serde_json::json!({}),
+            AuditOutcome::Success,
+            "corr-777",
+        );
+
+        sleep(Duration::from_millis(100)).await;
+
+        let content = tokio::fs::read_to_string(dir.path().join("audit.jsonl"))
+            .await
+            .unwrap();
+        assert!(content.contains("correlated_action"));
+        assert!(content.contains("\"correlation_id\":\"corr-777\""));
     }
 }

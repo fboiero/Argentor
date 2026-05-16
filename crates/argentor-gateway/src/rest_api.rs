@@ -1755,6 +1755,7 @@ mod tests {
             skill_name: Some("lookup".to_string()),
             details: serde_json::json!({"ok": true}),
             outcome: AuditOutcome::Success,
+            correlation_id: None,
         };
         let denied = AuditEntry {
             timestamp: Utc::now(),
@@ -1766,6 +1767,7 @@ mod tests {
                 "message": "PII blocked"
             }),
             outcome: AuditOutcome::Denied,
+            correlation_id: None,
         };
         let jsonl = format!(
             "{}\n{}\n",
@@ -1827,6 +1829,7 @@ mod tests {
             skill_name: Some("lookup".to_string()),
             details: serde_json::json!({"extra": true}),
             outcome: AuditOutcome::Success,
+            correlation_id: None,
         };
         std::fs::write(
             &audit_path,
@@ -1865,6 +1868,7 @@ mod tests {
             skill_name: Some("lookup".to_string()),
             details: serde_json::json!({"ok": true}),
             outcome: AuditOutcome::Success,
+            correlation_id: None,
         };
         let denied = AuditEntry {
             timestamp: Utc::now(),
@@ -1873,6 +1877,7 @@ mod tests {
             skill_name: None,
             details: serde_json::json!({"rule": "pii_detection"}),
             outcome: AuditOutcome::Denied,
+            correlation_id: None,
         };
         std::fs::write(
             &audit_path,
@@ -1908,6 +1913,7 @@ mod tests {
             skill_name: None,
             details: serde_json::json!({"rule": "stats_index"}),
             outcome: AuditOutcome::Denied,
+            correlation_id: None,
         };
         let success = AuditEntry {
             timestamp: Utc::now(),
@@ -1916,6 +1922,7 @@ mod tests {
             skill_name: None,
             details: serde_json::json!({"ok": true}),
             outcome: AuditOutcome::Success,
+            correlation_id: None,
         };
         std::fs::write(
             &audit_path,
@@ -1958,6 +1965,7 @@ mod tests {
             skill_name: None,
             details: serde_json::json!({"ok": true}),
             outcome: AuditOutcome::Success,
+            correlation_id: None,
         };
         std::fs::write(
             &audit_path,
@@ -1981,6 +1989,7 @@ mod tests {
             skill_name: None,
             details: serde_json::json!({"rule": "stats_stale_rebuild"}),
             outcome: AuditOutcome::Denied,
+            correlation_id: None,
         };
         std::fs::write(
             &audit_path,
@@ -2033,6 +2042,7 @@ mod tests {
                 skill_name: None,
                 details: serde_json::json!({ "i": i }),
                 outcome: AuditOutcome::Success,
+                correlation_id: None,
             };
             lines.push(serde_json::to_string(&entry).unwrap());
         }
@@ -2098,6 +2108,7 @@ mod tests {
                 skill_name: None,
                 details: serde_json::json!({ "i": i, "payload": payload }),
                 outcome: AuditOutcome::Success,
+                correlation_id: None,
             };
             lines.push(serde_json::to_string(&entry).unwrap());
         }
@@ -2173,6 +2184,7 @@ mod tests {
                 "message": "Outbound host blocked"
             }),
             outcome: AuditOutcome::Denied,
+            correlation_id: None,
         };
 
         let mut lines = vec![serde_json::to_string(&denied).unwrap()];
@@ -2184,6 +2196,7 @@ mod tests {
                 skill_name: Some("lookup".to_string()),
                 details: serde_json::json!({ "i": i }),
                 outcome: AuditOutcome::Success,
+                correlation_id: None,
             };
             lines.push(serde_json::to_string(&success).unwrap());
         }
@@ -2234,6 +2247,7 @@ mod tests {
                 } else {
                     AuditOutcome::Success
                 },
+                correlation_id: None,
             };
             lines.push(serde_json::to_string(&entry).unwrap());
         }
@@ -2297,6 +2311,7 @@ mod tests {
             skill_name: None,
             details: serde_json::json!({ "ok": true }),
             outcome: AuditOutcome::Success,
+            correlation_id: None,
         };
         std::fs::write(
             &audit_path,
@@ -2327,6 +2342,7 @@ mod tests {
                 "message": "rebuilt"
             }),
             outcome: AuditOutcome::Denied,
+            correlation_id: None,
         };
         std::fs::write(
             &audit_path,
