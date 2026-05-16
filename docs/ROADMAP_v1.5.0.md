@@ -73,7 +73,7 @@ Goal: make releases boring and recoverable.
 
 Deliverables:
 
-- `scripts/pretag-release-check.sh` that verifies workspace versions, changelog
+- Done: `scripts/pretag-release-check.sh` verifies workspace versions, changelog
   section, SDK package versions, release checklist, Docker context coverage, and
   dry-run package metadata before a tag is created.
 - A release status document for the latest tag, including artifact matrix and
@@ -276,9 +276,9 @@ Exit gate:
 
 ## Immediate Next Actions
 
-1. Implement the pre-tag release check script.
-2. Add `docs/RELEASE_STATUS_v1.4.7.md` to close the current release cleanly.
-3. Add a machine-readable performance budget file.
-4. Start the first CI budget gate with audit-scale warm-cache paths.
-5. Decide whether macOS Intel remains a required release artifact.
-
+1. Add a machine-readable performance budget file.
+2. Start the first CI budget gate with audit-scale warm-cache paths.
+3. Decide whether macOS Intel remains a required release artifact.
+4. Extend `scripts/pretag-release-check.sh --deep` to cover every publishable
+   crate once the dry-run cost is acceptable for release engineers.
+5. Add a release artifact matrix template for future tags.
