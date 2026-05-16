@@ -106,8 +106,12 @@ the audit JSONL is unchanged after process restart.
   config (`path`, `max_size_mb`, `max_rotated_files`, `retention_days`,
   `compress_rotated`).
 - Done: Zstandard compression policy for archived audit logs.
-- Remaining: add pluggable audit sinks: JSONL, SQLite/Postgres, S3-compatible object
-  storage, and SIEM webhook/export.
+- Done: `AuditSink` trait abstracts audit persistence. `AuditLog::with_sink`
+  accepts any sink; existing constructors delegate through it unchanged.
+- Done: `JsonlSink` (default) and `SqliteSink` (feature = "sqlite", indexed
+  `audit_entries` table, inserts on the blocking pool).
+- Remaining: Postgres, S3-compatible object storage, and SIEM webhook/export
+  sinks on top of the `AuditSink` trait.
 - Done: lightweight `audit.jsonl.violations.idx` index for fast
   `/api/v1/audit/violations` pagination, rebuilt when the audit JSONL changes.
 - Done: persisted `audit.jsonl.stats.idx` index for `/api/v1/audit/stats`,
