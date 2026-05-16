@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "argentor-sdk"
-version = "1.4.3"
+version = "1.4.4"
 description = "Python SDK client for the Argentor AI agent framework REST API"
 readme = "README.md"
 license = "AGPL-3.0-only"

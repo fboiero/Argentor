@@ -14,6 +14,8 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates/ crates/
 COPY wit/ wit/
 COPY experiments/ experiments/
+COPY benchmarks/ benchmarks/
+COPY examples/ examples/
 RUN cargo build --release --bin argentor && strip /build/target/release/argentor
 
 # Stage 3: Minimal runtime image (~80MB)

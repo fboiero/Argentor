@@ -212,7 +212,7 @@ describe('Type exports', () => {
 
   it('EnterpriseReadinessReport type is usable', () => {
     const report: EnterpriseReadinessReport = {
-      version: '1.4.3',
+      version: '1.4.4',
       posture: 'ready',
       score: 86,
       runtime: {
@@ -341,7 +341,7 @@ describe('Client methods with mocked fetch', () => {
 
   it('enterpriseReadiness() calls GET /api/v1/enterprise/readiness', async () => {
     const mockReport: EnterpriseReadinessReport = {
-      version: '1.4.3',
+      version: '1.4.4',
       posture: 'ready',
       score: 86,
       runtime: {
