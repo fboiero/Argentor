@@ -1,12 +1,12 @@
 # Stage 1: Build the WASM echo-skill
-FROM rust:1.87-slim-bookworm AS wasm-builder
+FROM rust:slim-bookworm AS wasm-builder
 RUN rustup target add wasm32-wasip1
 WORKDIR /build
 COPY skills/echo-skill/ skills/echo-skill/
 RUN cargo build --target wasm32-wasip1 --release --manifest-path skills/echo-skill/Cargo.toml
 
 # Stage 2: Build the main binary
-FROM rust:1.87-slim-bookworm AS builder
+FROM rust:slim-bookworm AS builder
 RUN apt-get update && apt-get install -y pkg-config libssl-dev && rm -rf /var/lib/apt/lists/*
 WORKDIR /build
 # Copy manifests first for dependency caching

@@ -10,6 +10,18 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.3] - 2026-05-16
+
+### Fixed
+- Release workflow now builds the x86_64 macOS binary on an Intel macOS runner.
+- Docker release image builds with the current Rust slim Bookworm image instead of a stale fixed toolchain.
+- TypeScript SDK publishing now uses the package build script and skips already-published versions.
+
+### Changed
+- Python and TypeScript SDK package metadata now matches the release version.
+
+---
+
 ## [1.4.2] - 2026-05-16
 
 ### Added
@@ -717,7 +729,8 @@ Argentor v1.0.0 is the first production-ready release. All 58 development phases
 
 ---
 
-[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.4.2...HEAD
+[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.4.3...HEAD
+[1.4.3]: https://github.com/fboiero/Argentor/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/fboiero/Argentor/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/fboiero/Argentor/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/fboiero/Argentor/compare/v1.3.0...v1.4.0

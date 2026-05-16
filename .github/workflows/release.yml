@@ -54,7 +54,7 @@ jobs:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
           - target: x86_64-apple-darwin
-            os: macos-latest
+            os: macos-13
           - target: aarch64-apple-darwin
             os: macos-latest
     runs-on: ${{ matrix.os }}
@@ -205,8 +205,14 @@ jobs:
         working-directory: sdks/typescript
         run: |
           npm install
-          npx tsc
-          npm publish --access public
+          npm run build
+          PKG_NAME=$(node -p "require('./package.json').name")
+          PKG_VERSION=$(node -p "require('./package.json').version")
+          if npm view "$PKG_NAME@$PKG_VERSION" version >/dev/null 2>&1; then
+            echo "INFO: $PKG_NAME@$PKG_VERSION already published, skipping."
+          else
+            npm publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
