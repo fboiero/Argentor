@@ -68,6 +68,8 @@ pub use alert_engine::{
 #[cfg(feature = "sqlite")]
 pub use audit::SqliteSink;
 pub use audit::{AuditLog, AuditRotationConfig, AuditSink, JsonlSink};
+#[cfg(feature = "siem")]
+pub use audit::{WebhookSink, WebhookSinkConfig};
 pub use audit_export::{
     AuditExportState, AuditExporter, ExportConfig, ExportFormat, ExportQuery, ExportResponse,
 };

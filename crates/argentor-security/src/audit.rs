@@ -486,6 +486,102 @@ impl AuditSink for SqliteSink {
 }
 
 // ---------------------------------------------------------------------------
+// WebhookSink (feature = "siem")
+// ---------------------------------------------------------------------------
+
+/// Configuration for the SIEM webhook sink.
+#[cfg(feature = "siem")]
+#[derive(Debug, Clone)]
+pub struct WebhookSinkConfig {
+    /// Target URL each audit entry is POSTed to as JSON.
+    pub url: String,
+    /// Optional HMAC-SHA256 secret. When set, each request carries an
+    /// `X-Argentor-Signature` header over the JSON body.
+    pub secret: Option<String>,
+    /// Per-request timeout in milliseconds. Bounds how long a slow SIEM
+    /// endpoint can stall the audit writer. Default: 5000.
+    pub timeout_ms: u64,
+}
+
+#[cfg(feature = "siem")]
+impl Default for WebhookSinkConfig {
+    fn default() -> Self {
+        Self {
+            url: String::new(),
+            secret: None,
+            timeout_ms: 5000,
+        }
+    }
+}
+
+/// SIEM webhook sink: forwards each audit entry as a JSON HTTP POST.
+///
+/// Intended for shipping audit events to a SIEM or log aggregator. Writes are
+/// fire-and-forget — a failed POST is logged and dropped, never retried.
+///
+/// The writer task awaits each POST (bounded by `timeout_ms`) to preserve
+/// entry order, so a persistently slow endpoint serializes the audit writer.
+/// Batching is intentionally left as future work.
+///
+/// Enabled by the `siem` crate feature.
+#[cfg(feature = "siem")]
+pub struct WebhookSink {
+    config: WebhookSinkConfig,
+    client: reqwest::Client,
+}
+
+#[cfg(feature = "siem")]
+impl WebhookSink {
+    /// Create a webhook sink with the given configuration.
+    pub fn new(config: WebhookSinkConfig) -> Self {
+        Self {
+            config,
+            client: reqwest::Client::new(),
+        }
+    }
+
+    /// Compute the hex-encoded HMAC-SHA256 of `body` under `secret`.
+    fn sign(secret: &str, body: &str) -> Option<String> {
+        use hmac::{Hmac, Mac};
+        use sha2::Sha256;
+        let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes()).ok()?;
+        mac.update(body.as_bytes());
+        Some(hex::encode(mac.finalize().into_bytes()))
+    }
+}
+
+#[cfg(feature = "siem")]
+#[async_trait]
+impl AuditSink for WebhookSink {
+    async fn write(&mut self, entry: &AuditEntry) {
+        let Ok(body) = serde_json::to_string(entry) else {
+            return;
+        };
+
+        let mut request = self
+            .client
+            .post(&self.config.url)
+            .header("Content-Type", "application/json")
+            .timeout(Duration::from_millis(self.config.timeout_ms))
+            .body(body.clone());
+
+        if let Some(secret) = &self.config.secret {
+            if let Some(signature) = Self::sign(secret, &body) {
+                request = request.header("X-Argentor-Signature", signature);
+            }
+        }
+
+        if let Err(err) = request.send().await {
+            tracing::warn!(
+                error = %err,
+                url = %self.config.url,
+                "Audit webhook sink POST failed",
+            );
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -745,5 +841,60 @@ mod tests {
         assert_eq!(count, 1);
         assert_eq!(action, "sqlite_action");
         assert_eq!(outcome, "denied");
+    }
+
+    #[cfg(feature = "siem")]
+    #[test]
+    fn test_webhook_sink_sign_is_deterministic() {
+        let a = WebhookSink::sign("secret", r#"{"action":"x"}"#);
+        let b = WebhookSink::sign("secret", r#"{"action":"x"}"#);
+        let c = WebhookSink::sign("other", r#"{"action":"x"}"#);
+        assert!(a.is_some());
+        assert_eq!(a, b, "same secret + body must produce the same signature");
+        assert_ne!(
+            a, c,
+            "a different secret must produce a different signature"
+        );
+    }
+
+    #[cfg(feature = "siem")]
+    #[tokio::test]
+    async fn test_webhook_sink_posts_entry() {
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+
+        let captured = std::sync::Arc::new(tokio::sync::Mutex::new(String::new()));
+        let cap = captured.clone();
+        let server = tokio::spawn(async move {
+            if let Ok((mut stream, _)) = listener.accept().await {
+                let mut buf = vec![0u8; 8192];
+                let n = stream.read(&mut buf).await.unwrap_or(0);
+                *cap.lock().await = String::from_utf8_lossy(&buf[..n]).to_string();
+                let _ = stream
+                    .write_all(b"HTTP/1.1 200 OK\r\nContent-Length: 0\r\n\r\n")
+                    .await;
+            }
+        });
+
+        let mut sink = WebhookSink::new(WebhookSinkConfig {
+            url: format!("http://{addr}/ingest"),
+            secret: Some("topsecret".to_string()),
+            timeout_ms: 2000,
+        });
+        sink.write(&make_entry()).await;
+        server.await.unwrap();
+
+        let req = captured.lock().await.clone();
+        assert!(req.contains("POST /ingest"), "request line missing: {req}");
+        assert!(
+            req.contains("test_action"),
+            "audit entry body missing: {req}"
+        );
+        assert!(
+            req.to_lowercase().contains("x-argentor-signature"),
+            "HMAC signature header missing: {req}"
+        );
     }
 }
