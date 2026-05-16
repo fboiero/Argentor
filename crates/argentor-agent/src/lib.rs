@@ -110,6 +110,8 @@ pub mod structured_output;
 pub mod test_oracle;
 /// Extended thinking mode — test-time compute scaling for deeper reasoning.
 pub mod thinking;
+/// Session-level output-token budget enforcement.
+pub mod token_budget;
 /// Token counting and cost estimation for different LLM providers.
 pub mod token_counter;
 /// Dynamic tool discovery — semantic search for relevant tools instead of loading all.
@@ -215,6 +217,7 @@ pub use query::{
 pub use react::{ReActAction, ReActConfig, ReActEngine, ReActOutcome, ReActStep, ReActTrace};
 pub use response_cache::{CacheKey, CacheMessage, CacheStats, ResponseCache};
 pub use response_cache_layer::{CacheConfig, CacheLayer, CacheLayerStats};
+pub use token_budget::{BudgetExhaustedError, TokenBudget, TokenBudgetConfig};
 pub use review_engine::{
     DimensionScore, FindingSeverity, ReviewConfig, ReviewDimension, ReviewEngine, ReviewFinding,
     ReviewReport, ReviewVerdict,

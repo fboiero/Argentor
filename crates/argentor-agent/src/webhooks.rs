@@ -65,10 +65,9 @@ impl Default for WebhookConfig {
 ///   payload includes the failing rule names and human-readable messages.
 /// - `ApprovalRequired` — when a tool marked `requires_approval: true` enters
 ///   the human-in-the-loop gate, before the approval skill is invoked.
-///
-/// `BudgetExhausted` is part of the public event surface but is **not** wired
-/// to a runner hook today. Callers driving their own `TokenBudget` should fire
-/// it from their own loop when `TokenBudget::is_exhausted()` flips to `true`.
+/// - `BudgetExhausted` — when a runner configured with
+///   `AgentRunner::with_token_budget` reaches its output-token ceiling. The
+///   payload includes `used`, `max`, and the `turn` at which it tripped.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum WebhookEvent {
@@ -86,7 +85,7 @@ pub enum WebhookEvent {
     /// A tool marked `requires_approval: true` is awaiting human approval.
     /// Payload carries `tool`, `call_id`, and `arguments`.
     ApprovalRequired,
-    /// Token or cost budget exhausted. Caller-fired; see the enum docs.
+    /// Output-token budget exhausted. Payload carries `used`, `max`, `turn`.
     BudgetExhausted,
 }
 

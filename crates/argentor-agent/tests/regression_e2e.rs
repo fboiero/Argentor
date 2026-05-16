@@ -27,6 +27,7 @@ use argentor_agent::thinking::{ThinkingConfig, ThinkingDepth};
 use argentor_agent::tool_discovery::DiscoveryConfig;
 use argentor_agent::{
     AgentRunner, CircuitConfig, CompactionConfig, LlmProvider, ModelConfig, StepType,
+    TokenBudgetConfig,
 };
 use argentor_core::{ArgentorResult, Message, ToolCall};
 use argentor_security::{AuditLog, PermissionSet};
@@ -215,6 +216,59 @@ async fn test_full_loop_single_turn_success() {
         "trace missing LlmResponse: {joined}"
     );
     assert!(joined.contains("Output"), "trace missing Output: {joined}");
+}
+
+/// Token budget exhaustion stops the agentic loop after the offending turn.
+#[tokio::test]
+async fn test_token_budget_stops_loop_when_exhausted() {
+    // Turn 1 emits "intermediate thinking step" (26 chars ~= 6 estimated
+    // tokens). With a 4-token ceiling the budget trips after turn 1, so the
+    // loop returns the partial text and never reaches the Done response.
+    let backend = ScriptedBackend::new(vec![
+        LlmResponse::Text("intermediate thinking step".to_string()),
+        LlmResponse::Done("this turn must never run".to_string()),
+    ]);
+    let counter = backend.call_count.clone();
+
+    let agent = build_scripted_agent(backend).with_token_budget(TokenBudgetConfig {
+        enabled: true,
+        max_output_tokens: 4,
+    });
+
+    let mut session = Session::new();
+    let response = agent.run(&mut session, "hello").await.unwrap();
+
+    assert_eq!(
+        counter.load(Ordering::Relaxed),
+        1,
+        "loop must stop after the first turn once the budget is exhausted"
+    );
+    assert_eq!(response, "intermediate thinking step");
+    let budget = agent.token_budget().expect("budget should be configured");
+    assert!(budget.is_exhausted(), "budget should report exhausted");
+    assert!(budget.used() >= 4, "used tokens should meet or exceed the cap");
+}
+
+/// A disabled token budget never stops the loop.
+#[tokio::test]
+async fn test_token_budget_disabled_does_not_stop_loop() {
+    let backend = ScriptedBackend::new(vec![
+        LlmResponse::Text("a very long intermediate reasoning step here".to_string()),
+        LlmResponse::Done("final answer".to_string()),
+    ]);
+    let counter = backend.call_count.clone();
+
+    let agent = build_scripted_agent(backend).with_token_budget(TokenBudgetConfig {
+        enabled: false,
+        max_output_tokens: 1,
+    });
+
+    let mut session = Session::new();
+    let response = agent.run(&mut session, "hello").await.unwrap();
+
+    assert_eq!(counter.load(Ordering::Relaxed), 2, "loop should run both turns");
+    assert_eq!(response, "final answer");
+    assert!(!agent.token_budget().unwrap().is_exhausted());
 }
 
 /// LLM wants calculator -> skill executes -> backfill -> LLM Done.

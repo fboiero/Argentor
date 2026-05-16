@@ -191,6 +191,9 @@ pub struct AgentRunner {
     scaffold_mode: ScaffoldMode,
     /// Optional webhook manager for event notifications.
     webhooks: Option<crate::webhooks::WebhookManager>,
+    /// Optional session-level output-token budget. When exhausted the agentic
+    /// loop stops gracefully and emits a `BudgetExhausted` webhook event.
+    token_budget: Option<crate::token_budget::TokenBudget>,
 }
 
 impl AgentRunner {
@@ -226,6 +229,7 @@ impl AgentRunner {
             learning: None,
             scaffold_mode: ScaffoldMode::Full,
             webhooks: None,
+            token_budget: None,
         }
     }
 
@@ -267,6 +271,7 @@ impl AgentRunner {
             learning: None,
             scaffold_mode: ScaffoldMode::Full,
             webhooks: None,
+            token_budget: None,
         }
     }
 
@@ -588,6 +593,22 @@ impl AgentRunner {
         self.webhooks.as_ref()
     }
 
+    /// Attach a session-level output-token budget.
+    ///
+    /// Once cumulative output tokens reach `config.max_output_tokens`, the
+    /// agentic loop stops after the current turn, records a `budget_exhausted`
+    /// audit entry, and emits a `BudgetExhausted` webhook event. Output token
+    /// counts are estimated from response text length (chars / 4).
+    pub fn with_token_budget(mut self, config: crate::token_budget::TokenBudgetConfig) -> Self {
+        self.token_budget = Some(crate::token_budget::TokenBudget::new(config));
+        self
+    }
+
+    /// Get a reference to the token budget (if configured).
+    pub fn token_budget(&self) -> Option<&crate::token_budget::TokenBudget> {
+        self.token_budget.as_ref()
+    }
+
     /// Run the agentic loop for a session. Returns the final assistant response.
     #[tracing::instrument(
         skip(self, session, user_input),
@@ -885,6 +906,42 @@ impl AgentRunner {
                     turn,
                 };
                 let _ = hooks.evaluate(&post_llm);
+            }
+
+            // --- Token budget accounting ---
+            // Record this turn's output tokens. If the budget is exhausted the
+            // loop stops gracefully, returning whatever text this turn produced.
+            if let Some(budget) = &self.token_budget {
+                let output_text: &str = match &response {
+                    LlmResponse::Done(t) | LlmResponse::Text(t) => t.as_str(),
+                    LlmResponse::ToolUse { content, .. } => content.as_deref().unwrap_or(""),
+                };
+                budget.record_output_from_text(output_text);
+                if budget.is_exhausted() {
+                    let used = budget.used();
+                    let max = budget.config().max_output_tokens;
+                    warn!(
+                        session_id = %session_id,
+                        used,
+                        max,
+                        "Output-token budget exhausted — stopping agentic loop"
+                    );
+                    self.audit.log_action(
+                        session_id,
+                        "budget_exhausted",
+                        None,
+                        serde_json::json!({"used": used, "max": max, "turn": turn}),
+                        AuditOutcome::Denied,
+                    );
+                    if let Some(wh) = &self.webhooks {
+                        wh.fire(
+                            crate::webhooks::WebhookEvent::BudgetExhausted,
+                            session_id.to_string(),
+                            serde_json::json!({"used": used, "max": max, "turn": turn}),
+                        );
+                    }
+                    return Ok(output_text.to_string());
+                }
             }
 
             match response {
