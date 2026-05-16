@@ -10,8 +10,9 @@ tests on the builtins path while publishing package metadata against an already
 available `argentor-builtins` version.
 
 The product release is complete across package registries and the main runtime
-artifacts. The only open item is the macOS Intel binary asset, which is waiting
-on GitHub Actions runner availability for `macos-13`.
+artifacts. The only open item is the macOS Intel binary asset, which is now
+classified as a delayed compatibility asset because it waits on GitHub Actions
+runner availability for `macos-13`.
 
 ## Release Links
 
@@ -22,16 +23,16 @@ on GitHub Actions runner availability for `macos-13`.
 
 ## Artifact Matrix
 
-| Artifact | Status | Notes |
-| --- | --- | --- |
-| GitHub Release | Complete | Release exists and is public. |
-| crates.io packages | Complete | `publish-crates` completed successfully. |
-| Python SDK / PyPI | Complete | `Publish Python SDK to PyPI` completed successfully. |
-| TypeScript SDK / npm | Complete | `publish-typescript` completed successfully. |
-| Docker image / GHCR | Complete | `publish-docker` completed successfully. |
-| Linux x86_64 binary | Complete | Asset and checksum uploaded. |
-| macOS ARM binary | Complete | Asset and checksum uploaded. |
-| macOS Intel binary | External wait | `upload-binaries (x86_64-apple-darwin, macos-13)` is queued on GitHub Actions runner availability. |
+| Artifact | Status | Blocking | Notes |
+| --- | --- | --- | --- |
+| GitHub Release | Complete | Yes | Release exists and is public. |
+| crates.io packages | Complete | Yes | `publish-crates` completed successfully. |
+| Python SDK / PyPI | Complete | Yes | `Publish Python SDK to PyPI` completed successfully. |
+| TypeScript SDK / npm | Complete | Yes | `publish-typescript` completed successfully. |
+| Docker image / GHCR | Complete | Yes | `publish-docker` completed successfully. |
+| Linux x86_64 binary | Complete | Yes | Asset and checksum uploaded. |
+| macOS ARM binary | Complete | Yes | Asset and checksum uploaded. |
+| macOS Intel binary | External wait | No | Delayed compatibility asset queued on GitHub Actions `macos-13` runner availability. |
 
 ## Uploaded GitHub Release Assets
 
@@ -56,16 +57,13 @@ on GitHub Actions runner availability for `macos-13`.
 The macOS Intel asset is not blocked by code. It is queued because the release
 workflow uses the `macos-13` runner for `x86_64-apple-darwin`.
 
-Decision required for `v1.5.0`:
-
-- keep macOS Intel as a required artifact and tolerate external queue time;
-- mark it as a delayed artifact that can finish after release announcement;
-- remove it from the critical path and publish it as best-effort compatibility.
+Decision for `v1.5.0`: macOS Intel is a delayed compatibility asset. It should
+not block the main release workflow or release announcement.
 
 ## Follow-Up for v1.5.0
 
 - Add a pre-tag release check that catches package metadata and crates.io
   dependency publication issues before tag creation.
-- Add a release artifact matrix template for every tagged release.
-- Decide the macOS Intel support policy before the next tag.
-
+- Use `docs/RELEASE_ARTIFACT_MATRIX_TEMPLATE.md` for every tagged release.
+- Publish macOS Intel through `release-macos-intel.yml` outside the critical
+  path.

@@ -306,7 +306,8 @@ do
   fi
 done
 
-check_file_contains ".github/workflows/release.yml" 'macos-13' "release workflow has Intel macOS runner policy"
+check_file_contains ".github/workflows/release.yml" 'macOS Intel is intentionally excluded from the critical release workflow' "release workflow excludes macOS Intel from the critical path"
+check_file_contains ".github/workflows/release-macos-intel.yml" 'runs-on: macos-13' "delayed macOS Intel compatibility workflow uses macos-13"
 check_file_contains ".github/workflows/release.yml" 'cargo publish -p "\$crate" --no-verify' "release workflow publishes crates with captured output"
 echo
 

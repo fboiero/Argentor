@@ -1,0 +1,74 @@
+name: Release macOS Intel compatibility asset
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to publish, for example v1.5.0"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  upload-macos-intel:
+    name: upload-binaries (x86_64-apple-darwin, macos-13)
+    runs-on: macos-13
+    steps:
+      - name: Resolve tag
+        id: release
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            TAG="${{ inputs.tag }}"
+          else
+            TAG="${GITHUB_REF#refs/tags/}"
+          fi
+          if [[ ! "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::Invalid release tag: $TAG"
+            exit 1
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.release.outputs.tag }}
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Build
+        run: cargo build --release --target x86_64-apple-darwin -p argentor-cli
+
+      - name: Package
+        shell: bash
+        run: |
+          BINARY_NAME=argentor
+          TAG="${{ steps.release.outputs.tag }}"
+          TARGET="x86_64-apple-darwin"
+          ARCHIVE="argentor-${TAG}-${TARGET}"
+          mkdir -p "$ARCHIVE"
+          cp "target/${TARGET}/release/$BINARY_NAME" "$ARCHIVE/"
+          cp README.md LICENSE "$ARCHIVE/"
+          tar czf "${ARCHIVE}.tar.gz" "$ARCHIVE"
+          shasum -a 256 "${ARCHIVE}.tar.gz" > "${ARCHIVE}.tar.gz.sha256"
+
+      - name: Upload to release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.release.outputs.tag }}
+          files: |
+            argentor-*.tar.gz
+            argentor-*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

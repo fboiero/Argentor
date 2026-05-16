@@ -4,8 +4,9 @@ Release planning baseline for the first post-`1.4.x` evolution line.
 
 `v1.4.7` closed the release-operability gap: crates.io, PyPI, npm, Docker,
 GitHub Release creation, Linux binaries, and macOS ARM binaries publish from
-the tag workflow. The only release task that can remain pending independently is
-the macOS Intel asset while GitHub Actions waits for a `macos-13` runner.
+the tag workflow. macOS Intel is now treated as a delayed compatibility asset
+because GitHub Actions `macos-13` runner availability can keep an otherwise
+healthy release queued for hours.
 
 ## Product Thesis
 
@@ -62,8 +63,8 @@ Known inherited limits:
 - SSE reconnect/resume semantics are incomplete;
 - dashboard health is useful for audit routes, but not yet a full operator
   cockpit;
-- release publication depends on a queued macOS Intel runner for the final
-  x86 asset.
+- macOS Intel publication depends on a queued `macos-13` runner, but no longer
+  blocks the main release path.
 
 ## Strategic Tracks
 
@@ -76,12 +77,13 @@ Deliverables:
 - Done: `scripts/pretag-release-check.sh` verifies workspace versions, changelog
   section, SDK package versions, release checklist, Docker context coverage, and
   dry-run package metadata before a tag is created.
-- A release status document for the latest tag, including artifact matrix and
+- Done: release status document for `v1.4.7`, including artifact matrix and
   known external waits.
 - Crates publish dependency validation that fails before tag creation if a crate
   depends on a not-yet-published sibling in a way crates.io cannot resolve.
-- A policy for macOS Intel: required artifact, delayed artifact, or best-effort
-  compatibility artifact.
+- Done: release artifact policy classifies macOS Intel as a delayed
+  compatibility artifact outside the critical path.
+- Done: release artifact matrix template for future tags.
 
 Success criteria:
 
@@ -194,11 +196,12 @@ Success criteria:
 
 Outcome: `v1.5.0` has a clean engineering runway.
 
-- finalize `v1.4.7` artifact status once macOS Intel resolves or is classified;
-- implement the pre-tag release check script;
+- Done: finalize `v1.4.7` artifact status by classifying macOS Intel as a
+  delayed compatibility asset;
+- Done: implement the pre-tag release check script;
 - add package metadata dependency validation for crates;
-- document release artifact matrix;
-- choose the macOS Intel support policy.
+- Done: document release artifact matrix;
+- Done: choose the macOS Intel support policy.
 
 Exit gate:
 
@@ -279,11 +282,11 @@ Exit gate:
 
 ## Immediate Next Actions
 
-1. Decide whether macOS Intel remains a required release artifact.
-2. Extend `scripts/pretag-release-check.sh --deep` to cover every publishable
+1. Extend `scripts/pretag-release-check.sh --deep` to cover every publishable
    crate once the dry-run cost is acceptable for release engineers.
-3. Add a release artifact matrix template for future tags.
-4. Add performance budget entries for core, security, skills, and SDK smoke
+2. Add performance budget entries for core, security, skills, and SDK smoke
    paths.
-5. Promote performance-budget CI from opt-in to required once variance is
+3. Promote performance-budget CI from opt-in to required once variance is
    measured across several runs.
+4. Prototype the distributed session broadcast adapter trait.
+5. Add operator dashboard health panels for stream pressure and cache hit rate.

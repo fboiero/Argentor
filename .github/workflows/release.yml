@@ -44,7 +44,12 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-  # Job 3: Build and upload platform binaries
+  # Job 3: Build and upload required platform binaries.
+  #
+  # macOS Intel is intentionally excluded from the critical release workflow.
+  # It is published by release-macos-intel.yml as a delayed compatibility asset
+  # because macos-13 runner availability can keep an otherwise healthy release
+  # queued for hours.
   upload-binaries:
     needs: create-release
     strategy:
@@ -53,8 +58,6 @@ jobs:
         include:
           - target: x86_64-unknown-linux-gnu
             os: ubuntu-latest
-          - target: x86_64-apple-darwin
-            os: macos-13
           - target: aarch64-apple-darwin
             os: macos-latest
     runs-on: ${{ matrix.os }}
