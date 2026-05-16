@@ -10,6 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.5] - 2026-05-16
+
+### Fixed
+- Docker release image build now copies the `dashboard/` assets required by the gateway audit dashboard `include_str!`.
+
+---
+
 ## [1.4.4] - 2026-05-16
 
 ### Fixed
@@ -736,7 +743,8 @@ Argentor v1.0.0 is the first production-ready release. All 58 development phases
 
 ---
 
-[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.4.4...HEAD
+[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.4.5...HEAD
+[1.4.5]: https://github.com/fboiero/Argentor/compare/v1.4.4...v1.4.5
 [1.4.4]: https://github.com/fboiero/Argentor/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/fboiero/Argentor/compare/v1.4.2...v1.4.3
 [1.4.2]: https://github.com/fboiero/Argentor/compare/v1.4.1...v1.4.2

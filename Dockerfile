@@ -16,6 +16,7 @@ COPY wit/ wit/
 COPY experiments/ experiments/
 COPY benchmarks/ benchmarks/
 COPY examples/ examples/
+COPY dashboard/ dashboard/
 RUN cargo build --release --bin argentor && strip /build/target/release/argentor
 
 # Stage 3: Minimal runtime image (~80MB)
