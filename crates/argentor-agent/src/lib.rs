@@ -217,7 +217,6 @@ pub use query::{
 pub use react::{ReActAction, ReActConfig, ReActEngine, ReActOutcome, ReActStep, ReActTrace};
 pub use response_cache::{CacheKey, CacheMessage, CacheStats, ResponseCache};
 pub use response_cache_layer::{CacheConfig, CacheLayer, CacheLayerStats};
-pub use token_budget::{BudgetExhaustedError, TokenBudget, TokenBudgetConfig};
 pub use review_engine::{
     DimensionScore, FindingSeverity, ReviewConfig, ReviewDimension, ReviewEngine, ReviewFinding,
     ReviewReport, ReviewVerdict,
@@ -239,6 +238,7 @@ pub use test_oracle::{
 pub use thinking::{
     ThinkingConfig, ThinkingDepth, ThinkingEngine, ThinkingResult, ThinkingStep, ThinkingStepType,
 };
+pub use token_budget::{BudgetExhaustedError, TokenBudget, TokenBudgetConfig};
 pub use token_counter::{TokenCounter, TokenEstimate, UsageTracker};
 pub use tool_discovery::{
     DiscoveredTool, DiscoveryConfig, DiscoveryResult, DiscoveryStrategy, ToolDiscoveryCache,

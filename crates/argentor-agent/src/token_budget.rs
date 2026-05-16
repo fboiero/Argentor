@@ -144,9 +144,7 @@ impl TokenBudget {
 
     /// Remaining output tokens before the budget is hit (saturating at 0).
     pub fn remaining(&self) -> u64 {
-        self.config
-            .max_output_tokens
-            .saturating_sub(self.used())
+        self.config.max_output_tokens.saturating_sub(self.used())
     }
 
     /// Reset the consumed counter (useful for testing or new sub-sessions).

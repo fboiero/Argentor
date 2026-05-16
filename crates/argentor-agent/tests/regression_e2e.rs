@@ -246,7 +246,10 @@ async fn test_token_budget_stops_loop_when_exhausted() {
     assert_eq!(response, "intermediate thinking step");
     let budget = agent.token_budget().expect("budget should be configured");
     assert!(budget.is_exhausted(), "budget should report exhausted");
-    assert!(budget.used() >= 4, "used tokens should meet or exceed the cap");
+    assert!(
+        budget.used() >= 4,
+        "used tokens should meet or exceed the cap"
+    );
 }
 
 /// A disabled token budget never stops the loop.
@@ -266,7 +269,11 @@ async fn test_token_budget_disabled_does_not_stop_loop() {
     let mut session = Session::new();
     let response = agent.run(&mut session, "hello").await.unwrap();
 
-    assert_eq!(counter.load(Ordering::Relaxed), 2, "loop should run both turns");
+    assert_eq!(
+        counter.load(Ordering::Relaxed),
+        2,
+        "loop should run both turns"
+    );
     assert_eq!(response, "final answer");
     assert!(!agent.token_budget().unwrap().is_exhausted());
 }
