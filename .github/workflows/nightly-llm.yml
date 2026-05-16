@@ -48,6 +48,26 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-nightly-
 
+      - name: Check live LLM credentials
+        id: credentials
+        run: |
+          if [ -n "$ANTHROPIC_API_KEY" ]; then
+            echo "has_anthropic=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_anthropic=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::ANTHROPIC_API_KEY is not configured; Claude smoke tests will be skipped."
+          fi
+
+          if [ -n "$OPENAI_API_KEY" ]; then
+            echo "has_openai=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "has_openai=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::OPENAI_API_KEY is not configured; OpenAI smoke test will be skipped."
+          fi
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
       - name: Build test binary (no-run)
         run: cargo test -p argentor-agent --test llm_integration --no-run
         env:
@@ -56,6 +76,7 @@ jobs:
 
       - name: Run Claude smoke test
         id: claude_smoke
+        if: steps.credentials.outputs.has_anthropic == 'true'
         continue-on-error: true
         run: |
           cargo test -p argentor-agent --test llm_integration \
@@ -66,6 +87,7 @@ jobs:
 
       - name: Run OpenAI smoke test
         id: openai_smoke
+        if: steps.credentials.outputs.has_openai == 'true'
         continue-on-error: true
         run: |
           cargo test -p argentor-agent --test llm_integration \
@@ -76,6 +98,7 @@ jobs:
 
       - name: Run tool-calling smoke test
         id: tool_smoke
+        if: steps.credentials.outputs.has_anthropic == 'true'
         continue-on-error: true
         run: |
           cargo test -p argentor-agent --test llm_integration \
@@ -95,19 +118,25 @@ jobs:
             echo "| Test | Result |"
             echo "|------|--------|"
 
-            if [ "${{ steps.claude_smoke.outputs.exit_code }}" = "0" ]; then
+            if [ "${{ steps.credentials.outputs.has_anthropic }}" != "true" ]; then
+              echo "| smoke_claude_simple_prompt | SKIP: missing ANTHROPIC_API_KEY |"
+            elif [ "${{ steps.claude_smoke.outputs.exit_code }}" = "0" ]; then
               echo "| smoke_claude_simple_prompt | PASS |"
             else
               echo "| smoke_claude_simple_prompt | FAIL |"
             fi
 
-            if [ "${{ steps.openai_smoke.outputs.exit_code }}" = "0" ]; then
+            if [ "${{ steps.credentials.outputs.has_openai }}" != "true" ]; then
+              echo "| smoke_openai_simple_prompt | SKIP: missing OPENAI_API_KEY |"
+            elif [ "${{ steps.openai_smoke.outputs.exit_code }}" = "0" ]; then
               echo "| smoke_openai_simple_prompt | PASS |"
             else
               echo "| smoke_openai_simple_prompt | FAIL |"
             fi
 
-            if [ "${{ steps.tool_smoke.outputs.exit_code }}" = "0" ]; then
+            if [ "${{ steps.credentials.outputs.has_anthropic }}" != "true" ]; then
+              echo "| smoke_tool_calling_agent | SKIP: missing ANTHROPIC_API_KEY |"
+            elif [ "${{ steps.tool_smoke.outputs.exit_code }}" = "0" ]; then
               echo "| smoke_tool_calling_agent | PASS |"
             else
               echo "| smoke_tool_calling_agent | FAIL |"
@@ -142,9 +171,9 @@ jobs:
 
       - name: Fail if any smoke test failed
         if: >
-          steps.claude_smoke.outputs.exit_code != '0' ||
-          steps.openai_smoke.outputs.exit_code != '0' ||
-          steps.tool_smoke.outputs.exit_code != '0'
+          (steps.credentials.outputs.has_anthropic == 'true' && steps.claude_smoke.outputs.exit_code != '0') ||
+          (steps.credentials.outputs.has_openai == 'true' && steps.openai_smoke.outputs.exit_code != '0') ||
+          (steps.credentials.outputs.has_anthropic == 'true' && steps.tool_smoke.outputs.exit_code != '0')
         run: |
           echo "One or more nightly smoke tests failed. See the uploaded report artifact."
           exit 1
