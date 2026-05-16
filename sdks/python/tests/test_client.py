@@ -28,7 +28,7 @@ class TestVersion:
     def test_version_is_set(self):
         assert argentor.__version__ is not None
         assert isinstance(argentor.__version__, str)
-        assert argentor.__version__ == "1.4.6"
+        assert argentor.__version__ == "1.4.7"
 
     def test_version_follows_semver(self):
         parts = argentor.__version__.split(".")
@@ -258,7 +258,7 @@ class TestSyncClientMethods:
         mock_resp = MagicMock()
         mock_resp.is_success = True
         mock_resp.json.return_value = {
-            "version": "1.4.6",
+            "version": "1.4.7",
             "posture": "ready",
             "score": 86,
             "runtime": {

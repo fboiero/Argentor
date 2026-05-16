@@ -211,7 +211,7 @@ class TestHealthModels:
 
     def test_enterprise_readiness_report(self):
         report = EnterpriseReadinessReport(
-            version="1.4.6",
+            version="1.4.7",
             posture="ready",
             score=86,
             runtime=EnterpriseRuntimeSnapshot(
