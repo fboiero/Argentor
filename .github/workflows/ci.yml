@@ -68,6 +68,7 @@ jobs:
     name: Test count regression gate
     runs-on: ubuntu-latest
     needs: [test]
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[test-count]'))
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
