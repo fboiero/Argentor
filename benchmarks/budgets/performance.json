@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "description": "Machine-readable performance budgets for release gates. Values are conservative and should be updated only with intentional benchmark evidence.",
+  "profiles": {
+    "audit-scale-100k": {
+      "runner": "argentor-benchmarks audit-scale",
+      "command": "cargo run -p argentor-benchmarks --release -- audit-scale --events 100000 --page-limit 100 --violation-every 1000 --samples 3",
+      "requirements": {
+        "events": 100000,
+        "page_limit": 100,
+        "violation_every": 1000,
+        "min_samples": 3,
+        "has_next_cursor": true
+      },
+      "metrics": {
+        "latency_ms.logs_first_page.p95": {
+          "max": 10.0,
+          "unit": "ms",
+          "severity": "fail",
+          "rationale": "Dashboard audit log pagination must stay bounded and responsive at 100k events."
+        },
+        "latency_ms.logs_second_page.p95": {
+          "max": 10.0,
+          "unit": "ms",
+          "severity": "fail",
+          "rationale": "Cursor pagination should not regress after the first page."
+        },
+        "latency_ms.violations_first_page.p95": {
+          "max": 100.0,
+          "unit": "ms",
+          "severity": "fail",
+          "rationale": "Operators need violation pages quickly enough for live triage."
+        },
+        "latency_ms.stats_warm.p95": {
+          "max": 1.0,
+          "unit": "ms",
+          "severity": "fail",
+          "rationale": "Persisted stats index should keep warm dashboard stats sub-millisecond."
+        },
+        "latency_ms.stats_cold.p95": {
+          "max": 1100.0,
+          "unit": "ms",
+          "severity": "warn",
+          "rationale": "Cold stats can scan or rebuild indexes, but should stay within the documented 1M-era budget."
+        }
+      }
+    },
+    "audit-scale-10m-evidence": {
+      "runner": "argentor-benchmarks audit-scale",
+      "command": "cargo run -p argentor-benchmarks --release -- audit-scale --events 10000000 --page-limit 100 --violation-every 1000 --samples 3",
+      "requirements": {
+        "events": 10000000,
+        "page_limit": 100,
+        "violation_every": 1000,
+        "min_samples": 3,
+        "has_next_cursor": true
+      },
+      "metrics": {
+        "latency_ms.logs_first_page.p95": {
+          "max": 10.0,
+          "unit": "ms",
+          "severity": "fail",
+          "rationale": "Large local JSONL files must not degrade bounded log pagination."
+        },
+        "latency_ms.logs_second_page.p95": {
+          "max": 10.0,
+          "unit": "ms",
+          "severity": "fail",
+          "rationale": "Large local JSONL files must not degrade cursor pagination."
+        },
+        "latency_ms.violations_first_page.p95": {
+          "max": 100.0,
+          "unit": "ms",
+          "severity": "fail",
+          "rationale": "The violation index should keep first-page operator triage under 100 ms."
+        },
+        "latency_ms.stats_warm.p95": {
+          "max": 1.0,
+          "unit": "ms",
+          "severity": "fail",
+          "rationale": "Persisted stats index should keep warm dashboard stats sub-millisecond."
+        },
+        "latency_ms.stats_cold.p95": {
+          "max": 1100.0,
+          "unit": "ms",
+          "severity": "warn",
+          "rationale": "Cold stats on 10M local JSONL should remain in the documented synthetic evidence range."
+        }
+      }
+    }
+  }
+}

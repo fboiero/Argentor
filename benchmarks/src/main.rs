@@ -2002,6 +2002,7 @@ fn generate_audit_jsonl(path: &Path, events: usize, violation_every: usize) -> a
             } else {
                 AuditOutcome::Success
             },
+            correlation_id: None,
         };
         serde_json::to_writer(&mut writer, &entry)?;
         writer.write_all(b"\n")?;

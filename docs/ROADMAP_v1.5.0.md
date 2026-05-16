@@ -96,10 +96,13 @@ Goal: turn existing benchmark evidence into enforced budgets.
 
 Deliverables:
 
-- benchmark budget file for audit endpoints, core message operations, security
-  guardrails, skill registry operations, and SDK smoke paths;
-- CI gate that compares current benchmark summaries against stored budgets for
-  selected low-noise paths;
+- Done: machine-readable benchmark budget file for audit-scale profiles under
+  `benchmarks/budgets/performance.json`.
+- Done: opt-in CI performance-budget job that runs the 100k audit-scale profile
+  and validates the generated JSON against the stored budget.
+- Remaining: benchmark budget file entries for core message operations,
+  security guardrails, skill registry operations, and SDK smoke paths.
+- Remaining: CI gate coverage for selected low-noise non-audit paths.
 - regression report format that separates runtime regression, measurement
   noise, and environment variance;
 - local `audit-scale` profiles for 100k, 1M, and 10M events.
@@ -276,9 +279,11 @@ Exit gate:
 
 ## Immediate Next Actions
 
-1. Add a machine-readable performance budget file.
-2. Start the first CI budget gate with audit-scale warm-cache paths.
-3. Decide whether macOS Intel remains a required release artifact.
-4. Extend `scripts/pretag-release-check.sh --deep` to cover every publishable
+1. Decide whether macOS Intel remains a required release artifact.
+2. Extend `scripts/pretag-release-check.sh --deep` to cover every publishable
    crate once the dry-run cost is acceptable for release engineers.
-5. Add a release artifact matrix template for future tags.
+3. Add a release artifact matrix template for future tags.
+4. Add performance budget entries for core, security, skills, and SDK smoke
+   paths.
+5. Promote performance-budget CI from opt-in to required once variance is
+   measured across several runs.

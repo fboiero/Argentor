@@ -174,6 +174,47 @@ jobs:
           path: target/criterion/
           retention-days: 30
 
+  performance-budget:
+    name: Performance Budget
+    runs-on: ubuntu-latest
+    needs: [test]
+    if: github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && contains(github.event.head_commit.message, '[perf-budget]'))
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-perf-budget-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: ${{ runner.os }}-cargo-perf-budget-
+      - name: Run audit-scale budget profile
+        run: |
+          mkdir -p /tmp/argentor-performance-budget
+          cargo run -p argentor-benchmarks --release -- audit-scale \
+            --events 100000 \
+            --page-limit 100 \
+            --violation-every 1000 \
+            --samples 3 \
+            --output-dir /tmp/argentor-performance-budget
+      - name: Enforce performance budget
+        run: |
+          scripts/check-performance-budgets.js \
+            --budget benchmarks/budgets/performance.json \
+            --profile audit-scale-100k \
+            --result-dir /tmp/argentor-performance-budget
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-budget-results
+          path: /tmp/argentor-performance-budget/*.json
+          retention-days: 30
+
   comparison-experiment:
     name: Comparison Experiment
     runs-on: ubuntu-latest
