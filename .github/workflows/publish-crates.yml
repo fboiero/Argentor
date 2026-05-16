@@ -40,8 +40,8 @@ jobs:
             argentor-channels
             argentor-compliance
             argentor-mcp
-            argentor-builtins
             argentor-agent
+            argentor-builtins
             argentor-a2a
             argentor-orchestrator
             argentor-gateway

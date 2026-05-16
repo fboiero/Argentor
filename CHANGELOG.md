@@ -10,6 +10,13 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.6] - 2026-05-16
+
+### Fixed
+- Crates.io release publishing now publishes `argentor-agent` before `argentor-builtins`, matching the optional dependency used by the built-in computer-use feature.
+
+---
+
 ## [1.4.5] - 2026-05-16
 
 ### Fixed
@@ -743,7 +750,8 @@ Argentor v1.0.0 is the first production-ready release. All 58 development phases
 
 ---
 
-[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.4.5...HEAD
+[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.4.6...HEAD
+[1.4.6]: https://github.com/fboiero/Argentor/compare/v1.4.5...v1.4.6
 [1.4.5]: https://github.com/fboiero/Argentor/compare/v1.4.4...v1.4.5
 [1.4.4]: https://github.com/fboiero/Argentor/compare/v1.4.3...v1.4.4
 [1.4.3]: https://github.com/fboiero/Argentor/compare/v1.4.2...v1.4.3
