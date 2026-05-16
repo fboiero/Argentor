@@ -19,6 +19,7 @@
 //! `Last-Event-ID`.
 
 use argentor_agent::StreamEvent;
+use async_trait::async_trait;
 use axum::{
     extract::{Json, Path, State},
     http::StatusCode,
@@ -47,6 +48,7 @@ use crate::router::MessageRouter;
 use argentor_session::SessionStore;
 
 const MAX_SESSION_BROADCAST_CHANNELS: usize = 4096;
+const SESSION_BROADCAST_CHANNEL_CAPACITY: usize = 256;
 
 // ---------------------------------------------------------------------------
 // SSE event types
@@ -227,11 +229,141 @@ pub struct StreamingState {
     pub connections: Arc<ConnectionManager>,
     /// Session persistence backend.
     pub sessions: Arc<dyn SessionStore>,
-    /// Per-session broadcast channels for `GET /api/v1/stream/{session_id}`.
-    ///
-    /// When an agent run is active it publishes SSE JSON strings here;
-    /// subscribers receive them in real time.
-    pub session_broadcast: Arc<RwLock<HashMap<uuid::Uuid, broadcast::Sender<String>>>>,
+    /// Per-session broadcast adapter for `GET /api/v1/stream/{session_id}`.
+    pub session_broadcast: Arc<dyn SessionBroadcast>,
+}
+
+/// Error returned by a session broadcast adapter.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SessionBroadcastError {
+    /// The adapter has reached its configured session-channel limit.
+    CapacityReached,
+}
+
+impl SessionBroadcastError {
+    fn status_code(self) -> StatusCode {
+        match self {
+            Self::CapacityReached => StatusCode::SERVICE_UNAVAILABLE,
+        }
+    }
+}
+
+/// Receiver returned by a session broadcast adapter.
+///
+/// This wrapper keeps the HTTP handler independent from the adapter
+/// construction path. A future Redis or NATS implementation can introduce a
+/// different receiver variant without changing the public handler shape.
+pub enum SessionBroadcastReceiver {
+    /// Local in-process Tokio broadcast receiver.
+    Local(broadcast::Receiver<String>),
+}
+
+/// Per-session event broadcast adapter used by the SSE subscription endpoint.
+#[async_trait]
+pub trait SessionBroadcast: Send + Sync {
+    /// Subscribe to events for a session.
+    async fn subscribe(
+        &self,
+        session_id: uuid::Uuid,
+    ) -> Result<SessionBroadcastReceiver, SessionBroadcastError>;
+
+    /// Publish an already-serialized event payload to a session.
+    async fn publish(&self, session_id: uuid::Uuid, payload: String) -> usize;
+
+    /// Count currently tracked session channels.
+    async fn active_channels(&self) -> usize;
+}
+
+/// Local in-process session broadcast adapter.
+///
+/// This preserves the existing Tokio broadcast behavior while isolating the
+/// gateway from the storage mechanics. Distributed adapters should implement
+/// [`SessionBroadcast`] behind the same contract.
+pub struct LocalSessionBroadcast {
+    channels: RwLock<HashMap<uuid::Uuid, broadcast::Sender<String>>>,
+    max_channels: usize,
+    channel_capacity: usize,
+}
+
+impl Default for LocalSessionBroadcast {
+    fn default() -> Self {
+        Self::new(
+            MAX_SESSION_BROADCAST_CHANNELS,
+            SESSION_BROADCAST_CHANNEL_CAPACITY,
+        )
+    }
+}
+
+impl LocalSessionBroadcast {
+    /// Create a local broadcast adapter with explicit capacity controls.
+    pub fn new(max_channels: usize, channel_capacity: usize) -> Self {
+        Self {
+            channels: RwLock::new(HashMap::new()),
+            max_channels,
+            channel_capacity,
+        }
+    }
+
+    fn prune_idle_channels(map: &mut HashMap<uuid::Uuid, broadcast::Sender<String>>) {
+        map.retain(|_, tx| tx.receiver_count() > 0);
+    }
+}
+
+#[async_trait]
+impl SessionBroadcast for LocalSessionBroadcast {
+    async fn subscribe(
+        &self,
+        session_id: uuid::Uuid,
+    ) -> Result<SessionBroadcastReceiver, SessionBroadcastError> {
+        let mut map = self.channels.write().await;
+
+        if !map.contains_key(&session_id) && map.len() >= self.max_channels {
+            Self::prune_idle_channels(&mut map);
+            if map.len() >= self.max_channels {
+                warn!(
+                    active_channels = map.len(),
+                    "SSE session broadcast channel limit reached"
+                );
+                return Err(SessionBroadcastError::CapacityReached);
+            }
+        }
+
+        let sender = map.entry(session_id).or_insert_with(|| {
+            let (tx, _) = broadcast::channel(self.channel_capacity);
+            tx
+        });
+
+        Ok(SessionBroadcastReceiver::Local(sender.subscribe()))
+    }
+
+    async fn publish(&self, session_id: uuid::Uuid, payload: String) -> usize {
+        let tx = {
+            let map = self.channels.read().await;
+            map.get(&session_id).cloned()
+        };
+
+        let Some(tx) = tx else {
+            return 0;
+        };
+
+        match tx.send(payload) {
+            Ok(count) => count,
+            Err(_) => {
+                let mut map = self.channels.write().await;
+                if map
+                    .get(&session_id)
+                    .is_some_and(|sender| sender.receiver_count() == 0)
+                {
+                    map.remove(&session_id);
+                }
+                0
+            }
+        }
+    }
+
+    async fn active_channels(&self) -> usize {
+        self.channels.read().await.len()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -382,13 +514,14 @@ pub async fn sse_session_stream_handler(
 
     info!(session_id = %session_id, "SSE session stream subscription");
 
-    let rx = match subscribe_session_broadcast(&state, session_id).await {
+    let rx = match state.session_broadcast.subscribe(session_id).await {
         Ok(rx) => rx,
-        Err(status) => return status.into_response(),
+        Err(err) => return err.status_code().into_response(),
     };
 
     let token_idx = Arc::new(AtomicU64::new(0));
 
+    let SessionBroadcastReceiver::Local(rx) = rx;
     let sse_stream = tokio_stream::wrappers::BroadcastStream::new(rx).filter_map(move |result| {
         let token_idx = token_idx.clone();
         match result {
@@ -420,35 +553,6 @@ pub async fn sse_session_stream_handler(
         .into_response()
 }
 
-async fn subscribe_session_broadcast(
-    state: &StreamingState,
-    session_id: uuid::Uuid,
-) -> Result<broadcast::Receiver<String>, StatusCode> {
-    let mut map = state.session_broadcast.write().await;
-
-    if !map.contains_key(&session_id) && map.len() >= MAX_SESSION_BROADCAST_CHANNELS {
-        prune_idle_broadcast_channels(&mut map);
-        if map.len() >= MAX_SESSION_BROADCAST_CHANNELS {
-            warn!(
-                active_channels = map.len(),
-                "SSE session broadcast channel limit reached"
-            );
-            return Err(StatusCode::SERVICE_UNAVAILABLE);
-        }
-    }
-
-    let sender = map.entry(session_id).or_insert_with(|| {
-        let (tx, _) = broadcast::channel(256);
-        tx
-    });
-
-    Ok(sender.subscribe())
-}
-
-fn prune_idle_broadcast_channels(map: &mut HashMap<uuid::Uuid, broadcast::Sender<String>>) {
-    map.retain(|_, tx| tx.receiver_count() > 0);
-}
-
 /// Publish an event to the per-session broadcast channel.
 ///
 /// Called by gateway layers when an agent produces a token, tool call, or
@@ -460,28 +564,7 @@ pub async fn publish_session_event(
     data: serde_json::Value,
 ) -> usize {
     let payload = serde_json::json!({ "event": event, "data": data }).to_string();
-    let tx = {
-        let map = state.session_broadcast.read().await;
-        map.get(&session_id).cloned()
-    };
-
-    let Some(tx) = tx else {
-        return 0;
-    };
-
-    match tx.send(payload) {
-        Ok(count) => count,
-        Err(_) => {
-            let mut map = state.session_broadcast.write().await;
-            if map
-                .get(&session_id)
-                .is_some_and(|sender| sender.receiver_count() == 0)
-            {
-                map.remove(&session_id);
-            }
-            0
-        }
-    }
+    state.session_broadcast.publish(session_id, payload).await
 }
 
 // ---------------------------------------------------------------------------
@@ -899,22 +982,45 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_prune_idle_broadcast_channels() {
-        let active_id = uuid::Uuid::new_v4();
-        let idle_id = uuid::Uuid::new_v4();
-        let (active_tx, active_rx) = broadcast::channel(1);
-        let (idle_tx, _idle_rx) = broadcast::channel(1);
-        drop(_idle_rx);
+    #[tokio::test]
+    async fn test_local_session_broadcast_delivers_payload() {
+        let adapter = LocalSessionBroadcast::new(8, 16);
+        let session_id = uuid::Uuid::new_v4();
+        let receiver = adapter.subscribe(session_id).await.unwrap();
+        let SessionBroadcastReceiver::Local(mut rx) = receiver;
 
-        let mut map = HashMap::new();
-        map.insert(active_id, active_tx);
-        map.insert(idle_id, idle_tx);
+        let subscribers = adapter
+            .publish(
+                session_id,
+                r#"{"event":"token","data":{"text":"hi"}}"#.to_string(),
+            )
+            .await;
 
-        prune_idle_broadcast_channels(&mut map);
+        assert_eq!(subscribers, 1);
+        let payload = rx.recv().await.unwrap();
+        assert!(payload.contains("\"event\":\"token\""));
+        assert!(payload.contains("\"text\":\"hi\""));
+    }
 
-        assert!(map.contains_key(&active_id));
-        assert!(!map.contains_key(&idle_id));
-        drop(active_rx);
+    #[tokio::test]
+    async fn test_local_session_broadcast_prunes_idle_channels_at_capacity() {
+        let adapter = LocalSessionBroadcast::new(1, 16);
+        let first_session = uuid::Uuid::new_v4();
+        let second_session = uuid::Uuid::new_v4();
+
+        let first = adapter.subscribe(first_session).await.unwrap();
+        assert_eq!(adapter.active_channels().await, 1);
+
+        let blocked = adapter.subscribe(second_session).await;
+        assert!(matches!(
+            blocked,
+            Err(SessionBroadcastError::CapacityReached)
+        ));
+
+        drop(first);
+
+        let second = adapter.subscribe(second_session).await;
+        assert!(second.is_ok());
+        assert_eq!(adapter.active_channels().await, 1);
     }
 }

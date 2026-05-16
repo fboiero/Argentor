@@ -132,7 +132,9 @@ Goal: support multi-instance deployments without breaking sessions and streams.
 
 Deliverables:
 
-- broadcast abstraction for local, Redis, and NATS adapters;
+- Done: `SessionBroadcast` abstraction with `LocalSessionBroadcast` as the
+  default in-process adapter for SSE session streams.
+- Remaining: Redis and NATS adapters behind feature flags;
 - SSE reconnect support with `Last-Event-ID`;
 - per-tenant and per-API-key backpressure;
 - provider and tool backend circuit breakers;
@@ -226,8 +228,8 @@ Exit gate:
 
 Outcome: local-only runtime assumptions are isolated behind interfaces.
 
-- introduce broadcast adapter trait;
-- keep local adapter as default;
+- Done: introduce broadcast adapter trait;
+- Done: keep local adapter as default;
 - add Redis or NATS adapter behind feature flag;
 - expose stream pressure metrics;
 - design SSE resume semantics with event IDs.
@@ -288,5 +290,5 @@ Exit gate:
    paths.
 3. Promote performance-budget CI from opt-in to required once variance is
    measured across several runs.
-4. Prototype the distributed session broadcast adapter trait.
+4. Add Redis or NATS implementation behind the `SessionBroadcast` trait.
 5. Add operator dashboard health panels for stream pressure and cache hit rate.

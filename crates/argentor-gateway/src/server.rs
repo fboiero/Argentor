@@ -18,7 +18,7 @@ use crate::proxy_management::{proxy_management_router, ProxyManagementState};
 use crate::rate_limit_per_key::PerKeyRateLimiter;
 use crate::rest_api::{api_router, audit_prometheus_export, RestApiState};
 use crate::router::{InboundMessage, MessageRouter};
-use crate::streaming::{streaming_router, StreamingState};
+use crate::streaming::{streaming_router, LocalSessionBroadcast, StreamingState};
 use crate::webhook::{webhook_handler, WebhookConfig, WebhookState};
 use argentor_a2a::server::{A2AServer, A2AServerState};
 use argentor_agent::AgentRunner;
@@ -260,7 +260,7 @@ impl GatewayServer {
             router: router.clone(),
             connections: connections.clone(),
             sessions: sessions_for_streaming,
-            session_broadcast: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
+            session_broadcast: Arc::new(LocalSessionBroadcast::default()),
         });
 
         let state = Arc::new(AppState {
@@ -393,7 +393,7 @@ impl GatewayServer {
             router: router.clone(),
             connections: connections.clone(),
             sessions: sessions_for_streaming,
-            session_broadcast: Arc::new(tokio::sync::RwLock::new(std::collections::HashMap::new())),
+            session_broadcast: Arc::new(LocalSessionBroadcast::default()),
         });
 
         let state = Arc::new(AppState {
