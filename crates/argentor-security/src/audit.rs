@@ -683,8 +683,7 @@ mod tests {
     #[async_trait]
     impl AuditSink for CountingSink {
         async fn write(&mut self, _entry: &AuditEntry) {
-            self.count
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+            self.count.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         }
     }
 
