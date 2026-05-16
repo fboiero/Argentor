@@ -477,10 +477,12 @@ name = "argentor-security"
 version = "1.4.1"
 dependencies = [
  "argentor-core",
+ "async-trait",
  "chrono",
  "criterion",
  "getrandom 0.2.17",
  "hex",
+ "rusqlite",
  "rustls-pemfile",
  "serde",
  "serde_json",

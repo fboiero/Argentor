@@ -21,6 +21,7 @@ tracing.workspace = true
 tokio.workspace = true
 chrono.workspace = true
 uuid.workspace = true
+async-trait.workspace = true
 tokio-rustls = "0.26"
 rustls-pemfile = "2"
 sha2 = "0.10"
@@ -28,6 +29,12 @@ hex = "0.4"
 getrandom = "0.2"
 unicode-normalization.workspace = true
 zstd = "0.13"
+rusqlite = { workspace = true, optional = true }
+
+[features]
+# Enables the SQLite audit sink. Off by default to keep the bundled C
+# SQLite build out of consumers that only need the JSONL sink.
+sqlite = ["dep:rusqlite"]
 
 [dev-dependencies]
 tempfile = "3"

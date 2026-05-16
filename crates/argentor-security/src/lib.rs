@@ -65,7 +65,9 @@ pub mod tls;
 pub use alert_engine::{
     Alert, AlertCondition, AlertEngine, AlertEngineStats, AlertRule, AlertSeverity,
 };
-pub use audit::{AuditLog, AuditRotationConfig};
+pub use audit::{AuditLog, AuditRotationConfig, AuditSink, JsonlSink};
+#[cfg(feature = "sqlite")]
+pub use audit::SqliteSink;
 pub use audit_export::{
     AuditExportState, AuditExporter, ExportConfig, ExportFormat, ExportQuery, ExportResponse,
 };

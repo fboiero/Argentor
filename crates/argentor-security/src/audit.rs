@@ -18,6 +18,7 @@
 //! If [`AuditRotationConfig::compress_rotated`] is enabled, rotated files are
 //! compressed with Zstandard and stored as `audit.jsonl.N.zst`.
 
+use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::fs::File;
@@ -87,14 +88,91 @@ impl Default for AuditRotationConfig {
 }
 
 // ---------------------------------------------------------------------------
+// AuditSink
+// ---------------------------------------------------------------------------
+
+/// A destination for audit entries.
+///
+/// The [`AuditLog`] owns exactly one sink, driven by a single background
+/// writer task. Implementations therefore do not need internal locking — the
+/// task calls [`init`](AuditSink::init) once, then [`write`](AuditSink::write)
+/// sequentially for every entry.
+///
+/// Implementations must not panic: a failed write should be dropped or logged,
+/// never propagated, because the audit hot path is fire-and-forget.
+#[async_trait]
+pub trait AuditSink: Send {
+    /// Called once before the write loop begins. Use it for directory
+    /// creation, schema setup, or retention cleanup. Default: no-op.
+    async fn init(&mut self) {}
+
+    /// Persist a single audit entry.
+    async fn write(&mut self, entry: &AuditEntry);
+}
+
+/// JSONL file sink with size rotation, age retention, and optional compression.
+///
+/// This is the default sink behind [`AuditLog::new`] and the rotation-aware
+/// constructors. It reproduces the historical behavior exactly.
+pub struct JsonlSink {
+    log_file: PathBuf,
+    rotation: AuditRotationConfig,
+}
+
+impl JsonlSink {
+    /// Create a JSONL sink writing to `log_file` with the given rotation policy.
+    pub fn new(log_file: PathBuf, rotation: AuditRotationConfig) -> Self {
+        Self { log_file, rotation }
+    }
+}
+
+#[async_trait]
+impl AuditSink for JsonlSink {
+    async fn init(&mut self) {
+        if let Some(parent) = self.log_file.parent() {
+            let _ = tokio::fs::create_dir_all(parent).await;
+        }
+        cleanup_expired_rotated_logs(&self.log_file, self.rotation.retention_days).await;
+    }
+
+    async fn write(&mut self, entry: &AuditEntry) {
+        let Ok(line) = serde_json::to_string(entry) else {
+            return;
+        };
+        let line = format!("{line}\n");
+
+        // Rotate if needed before writing.
+        if should_rotate(&self.log_file, self.rotation.max_size_bytes).await {
+            rotate_logs(
+                &self.log_file,
+                self.rotation.max_rotated_files,
+                self.rotation.compress_rotated,
+            )
+            .await;
+            cleanup_expired_rotated_logs(&self.log_file, self.rotation.retention_days).await;
+        }
+
+        if let Ok(mut file) = tokio::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.log_file)
+            .await
+        {
+            let _ = file.write_all(line.as_bytes()).await;
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // AuditLog
 // ---------------------------------------------------------------------------
 
 /// Append-only audit log that records all agent actions.
 ///
 /// Entries are sent over an unbounded channel to a single background writer
-/// task -- callers never block. When the active file exceeds the configured
-/// size limit it is automatically rotated.
+/// task -- callers never block. The writer delegates persistence to an
+/// [`AuditSink`]; the default sink is [`JsonlSink`], which rotates the active
+/// file when it exceeds the configured size limit.
 pub struct AuditLog {
     tx: mpsc::UnboundedSender<AuditEntry>,
 }
@@ -117,40 +195,21 @@ impl AuditLog {
     /// This keeps the same rotation and retention semantics as [`Self::with_rotation`],
     /// but lets operators configure an explicit `audit.jsonl` location.
     pub fn with_file_rotation(log_file: PathBuf, rotation: AuditRotationConfig) -> Self {
+        Self::with_sink(Box::new(JsonlSink::new(log_file, rotation)))
+    }
+
+    /// Create a new `AuditLog` backed by an arbitrary [`AuditSink`].
+    ///
+    /// Spawns the single background writer task. The task calls
+    /// [`AuditSink::init`] once, then [`AuditSink::write`] for every entry
+    /// received on the channel until all senders are dropped.
+    pub fn with_sink(mut sink: Box<dyn AuditSink>) -> Self {
         let (tx, mut rx) = mpsc::unbounded_channel::<AuditEntry>();
 
         tokio::spawn(async move {
-            if let Some(parent) = log_file.parent() {
-                let _ = tokio::fs::create_dir_all(parent).await;
-            }
-            cleanup_expired_rotated_logs(&log_file, rotation.retention_days).await;
-
+            sink.init().await;
             while let Some(entry) = rx.recv().await {
-                let Ok(line) = serde_json::to_string(&entry) else {
-                    continue;
-                };
-                let line = format!("{line}\n");
-
-                // Rotate if needed before writing.
-                if should_rotate(&log_file, rotation.max_size_bytes).await {
-                    rotate_logs(
-                        &log_file,
-                        rotation.max_rotated_files,
-                        rotation.compress_rotated,
-                    )
-                    .await;
-                    cleanup_expired_rotated_logs(&log_file, rotation.retention_days).await;
-                }
-
-                // Write directly -- no inner spawn, no extra task per entry.
-                if let Ok(mut file) = tokio::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open(&log_file)
-                    .await
-                {
-                    let _ = file.write_all(line.as_bytes()).await;
-                }
+                sink.write(&entry).await;
             }
         });
 
@@ -324,6 +383,105 @@ fn is_older_than(modified: SystemTime, max_age: Duration) -> bool {
     match SystemTime::now().duration_since(modified) {
         Ok(age) => age > max_age,
         Err(_) => false,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// SqliteSink (feature = "sqlite")
+// ---------------------------------------------------------------------------
+
+/// SQLite-backed audit sink.
+///
+/// Entries are inserted into an `audit_entries` table with indexes on
+/// `timestamp` and `outcome` for the queries the dashboard and exporters run.
+/// Each insert runs on a blocking thread pool so the async runtime is never
+/// stalled by SQLite I/O.
+///
+/// Enabled by the `sqlite` crate feature.
+#[cfg(feature = "sqlite")]
+pub struct SqliteSink {
+    db_path: PathBuf,
+    conn: Option<rusqlite::Connection>,
+}
+
+#[cfg(feature = "sqlite")]
+impl SqliteSink {
+    /// Create a SQLite sink that opens (or creates) the database at `db_path`.
+    ///
+    /// The connection and schema are established lazily in [`AuditSink::init`].
+    pub fn new(db_path: PathBuf) -> Self {
+        Self {
+            db_path,
+            conn: None,
+        }
+    }
+
+    fn outcome_str(outcome: &AuditOutcome) -> &'static str {
+        match outcome {
+            AuditOutcome::Success => "success",
+            AuditOutcome::Denied => "denied",
+            AuditOutcome::Error => "error",
+        }
+    }
+}
+
+#[cfg(feature = "sqlite")]
+#[async_trait]
+impl AuditSink for SqliteSink {
+    async fn init(&mut self) {
+        let db_path = self.db_path.clone();
+        // rusqlite::Connection is Send but not Sync and its calls are
+        // blocking — open it on the blocking pool and move it back here.
+        self.conn = tokio::task::spawn_blocking(move || {
+            if let Some(parent) = db_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let conn = rusqlite::Connection::open(&db_path).ok()?;
+            conn.execute_batch(
+                "CREATE TABLE IF NOT EXISTS audit_entries (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    timestamp   TEXT NOT NULL,
+                    session_id  TEXT NOT NULL,
+                    action      TEXT NOT NULL,
+                    skill_name  TEXT,
+                    details     TEXT NOT NULL,
+                    outcome     TEXT NOT NULL
+                );
+                CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_entries(timestamp);
+                CREATE INDEX IF NOT EXISTS idx_audit_outcome ON audit_entries(outcome);",
+            )
+            .ok()?;
+            Some(conn)
+        })
+        .await
+        .ok()
+        .flatten();
+    }
+
+    async fn write(&mut self, entry: &AuditEntry) {
+        let Some(conn) = self.conn.take() else {
+            return;
+        };
+        let timestamp = entry.timestamp.to_rfc3339();
+        let session_id = entry.session_id.to_string();
+        let action = entry.action.clone();
+        let skill_name = entry.skill_name.clone();
+        let details = entry.details.to_string();
+        let outcome = Self::outcome_str(&entry.outcome).to_string();
+
+        // Take the connection into the blocking task and return it so the
+        // sink keeps ownership across calls.
+        self.conn = tokio::task::spawn_blocking(move || {
+            let _ = conn.execute(
+                "INSERT INTO audit_entries
+                    (timestamp, session_id, action, skill_name, details, outcome)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+                rusqlite::params![timestamp, session_id, action, skill_name, details, outcome],
+            );
+            conn
+        })
+        .await
+        .ok();
     }
 }
 
@@ -511,5 +669,82 @@ mod tests {
 
         assert!(compressed_rotated_path(&base, 1).exists());
         assert!(compressed_rotated_path(&base, 2).exists());
+    }
+
+    // -- AuditSink abstraction -----------------------------------------------
+
+    /// Minimal in-memory sink that records how many entries it received and
+    /// the last action seen. Proves a third-party sink works through the
+    /// `with_sink` constructor without touching the filesystem.
+    struct CountingSink {
+        count: std::sync::Arc<std::sync::atomic::AtomicU32>,
+    }
+
+    #[async_trait]
+    impl AuditSink for CountingSink {
+        async fn write(&mut self, _entry: &AuditEntry) {
+            self.count
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_with_sink_drives_custom_sink() {
+        let count = std::sync::Arc::new(std::sync::atomic::AtomicU32::new(0));
+        let log = AuditLog::with_sink(Box::new(CountingSink {
+            count: count.clone(),
+        }));
+
+        for _ in 0..5 {
+            log.log(make_entry());
+        }
+        sleep(Duration::from_millis(150)).await;
+
+        assert_eq!(count.load(std::sync::atomic::Ordering::SeqCst), 5);
+    }
+
+    #[tokio::test]
+    async fn test_jsonl_sink_through_with_sink_is_equivalent() {
+        let dir = TempDir::new().unwrap();
+        let log_file = dir.path().join("audit.jsonl");
+        let log = AuditLog::with_sink(Box::new(JsonlSink::new(
+            log_file.clone(),
+            AuditRotationConfig::default(),
+        )));
+
+        log.log(make_entry());
+        sleep(Duration::from_millis(100)).await;
+
+        let content = tokio::fs::read_to_string(&log_file).await.unwrap();
+        assert!(content.contains("test_action"));
+    }
+
+    #[cfg(feature = "sqlite")]
+    #[tokio::test]
+    async fn test_sqlite_sink_inserts_entries() {
+        let dir = TempDir::new().unwrap();
+        let db_path = dir.path().join("audit.db");
+        let log = AuditLog::with_sink(Box::new(SqliteSink::new(db_path.clone())));
+
+        log.log_action(
+            Uuid::new_v4(),
+            "sqlite_action",
+            Some("sqlite_skill".to_string()),
+            serde_json::json!({"k": "v"}),
+            AuditOutcome::Denied,
+        );
+        sleep(Duration::from_millis(200)).await;
+
+        let conn = rusqlite::Connection::open(&db_path).unwrap();
+        let (count, action, outcome): (i64, String, String) = conn
+            .query_row(
+                "SELECT COUNT(*), action, outcome FROM audit_entries",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!(count, 1);
+        assert_eq!(action, "sqlite_action");
+        assert_eq!(outcome, "denied");
     }
 }
