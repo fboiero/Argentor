@@ -10,6 +10,28 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.4.2] - 2026-05-16
+
+### Added
+- Pluggable security audit sinks through `AuditSink`, with JSONL and SQLite sink support.
+- Optional `siem` audit sink feature with `WebhookSink` for HTTP POST forwarding and HMAC-SHA256 signatures.
+- Per-route audit endpoint health panel in the operator dashboard.
+- Guardrail blocked and approval required webhook events from the agent runner.
+
+### Fixed
+- GitHub Pages publishing by disabling Jekyll processing for documentation assets.
+- Release workflow target matrix by removing the unsupported Linux ARM OpenSSL cross-build path.
+- Rust 1.95 Clippy compatibility across gateway, builtins, agent, memory, marketplace, orchestrator, examples, and benchmark code.
+- Nightly live-LLM smoke workflow now skips credential-dependent tests when `ANTHROPIC_API_KEY` or `OPENAI_API_KEY` are absent, avoiding false 401 failures.
+- Security audit sink exports and tests formatted for the stable Rust formatter used in CI.
+
+### Changed
+- CI no longer runs benchmarks, comparison experiments, or test-count regression gates on every normal push; they are available through `workflow_dispatch` or explicit commit markers (`[bench]`, `[comparison]`, `[test-count]`).
+- Test summary reporting no longer re-runs the full workspace test suite.
+- Roadmap documentation records the completed audit sink work and dashboard latency/error panel.
+
+---
+
 ## [1.4.1] - 2026-05-15
 
 ### Audit plane
@@ -695,7 +717,8 @@ Argentor v1.0.0 is the first production-ready release. All 58 development phases
 
 ---
 
-[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.4.2...HEAD
+[1.4.2]: https://github.com/fboiero/Argentor/compare/v1.4.1...v1.4.2
 [1.4.1]: https://github.com/fboiero/Argentor/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/fboiero/Argentor/compare/v1.3.0...v1.4.0
 [1.3.0]: https://github.com/fboiero/Argentor/compare/v1.2.0...v1.3.0
