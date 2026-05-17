@@ -170,6 +170,15 @@ async fn operator_endpoints_all_respond() {
         body.contains("# HELP") || body.contains("# TYPE"),
         "/metrics body must include Prometheus HELP/TYPE comments"
     );
+    // Active-stream gauge: present from process start, zero with no subscribers.
+    assert!(
+        body.contains("argentor_active_streams"),
+        "/metrics must expose the argentor_active_streams gauge"
+    );
+    assert!(
+        body.contains("argentor_active_streams 0"),
+        "argentor_active_streams should read 0 with no active SSE subscribers"
+    );
 
     // /openapi.json — must be valid JSON with at least the audit + dashboard paths
     let r = client

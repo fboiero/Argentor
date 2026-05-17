@@ -18,7 +18,9 @@ use crate::proxy_management::{proxy_management_router, ProxyManagementState};
 use crate::rate_limit_per_key::PerKeyRateLimiter;
 use crate::rest_api::{api_router, audit_prometheus_export, RestApiState};
 use crate::router::{InboundMessage, MessageRouter};
-use crate::streaming::{streaming_router, LocalSessionBroadcast, StreamingState};
+use crate::streaming::{
+    streaming_router, LocalSessionBroadcast, StreamBackpressureLimiter, StreamingState,
+};
 use crate::webhook::{webhook_handler, WebhookConfig, WebhookState};
 use argentor_a2a::server::{A2AServer, A2AServerState};
 use argentor_agent::AgentRunner;
@@ -63,6 +65,9 @@ pub struct AppState {
     pub per_key_rate_limiter: Option<Arc<PerKeyRateLimiter>>,
     /// Optional request-level observability metrics.
     pub request_metrics: Option<Arc<RequestMetrics>>,
+    /// SSE stream backpressure limiter, shared with the streaming router so
+    /// `/metrics` can report the active-stream gauge.
+    pub stream_backpressure: Option<Arc<StreamBackpressureLimiter>>,
     /// Whether API authentication is configured.
     pub auth_enabled: bool,
     /// Whether proxy management routes are mounted.
@@ -255,12 +260,15 @@ impl GatewayServer {
 
         let request_metrics = Arc::new(RequestMetrics::new());
 
-        // Build SSE streaming state (always available)
+        // Build SSE streaming state (always available). The backpressure
+        // limiter is shared with AppState so /metrics can report it.
+        let stream_backpressure = Arc::new(StreamBackpressureLimiter::default());
         let streaming_state = Arc::new(StreamingState {
             router: router.clone(),
             connections: connections.clone(),
             sessions: sessions_for_streaming,
             session_broadcast: Arc::new(LocalSessionBroadcast::default()),
+            stream_backpressure: Arc::clone(&stream_backpressure),
         });
 
         let state = Arc::new(AppState {
@@ -273,6 +281,7 @@ impl GatewayServer {
             shutdown_manager,
             per_key_rate_limiter: per_key_rate_limiter.clone(),
             request_metrics: Some(Arc::clone(&request_metrics)),
+            stream_backpressure: Some(stream_backpressure),
             auth_enabled,
             proxy_management_mounted,
             a2a_mounted,
@@ -388,12 +397,15 @@ impl GatewayServer {
 
         let request_metrics = Arc::new(RequestMetrics::new());
 
-        // Build SSE streaming state (always available)
+        // Build SSE streaming state (always available). The backpressure
+        // limiter is shared with AppState so /metrics can report it.
+        let stream_backpressure = Arc::new(StreamBackpressureLimiter::default());
         let streaming_state = Arc::new(StreamingState {
             router: router.clone(),
             connections: connections.clone(),
             sessions: sessions_for_streaming,
             session_broadcast: Arc::new(LocalSessionBroadcast::default()),
+            stream_backpressure: Arc::clone(&stream_backpressure),
         });
 
         let state = Arc::new(AppState {
@@ -406,6 +418,7 @@ impl GatewayServer {
             shutdown_manager,
             per_key_rate_limiter: None,
             request_metrics: Some(Arc::clone(&request_metrics)),
+            stream_backpressure: Some(stream_backpressure),
             auth_enabled,
             proxy_management_mounted,
             a2a_mounted,
@@ -863,6 +876,20 @@ async fn prometheus_metrics_handler(State(state): State<Arc<AppState>>) -> impl 
             body.push('\n');
         }
         body.push_str(&audit_prometheus_export(rest_api).await);
+        has_metrics = true;
+    }
+
+    // SSE active-stream gauge from the shared backpressure limiter.
+    if let Some(limiter) = &state.stream_backpressure {
+        if has_metrics {
+            body.push('\n');
+        }
+        let (global, _, _) = limiter.active_counts(None, None);
+        body.push_str(
+            "# HELP argentor_active_streams Current number of active SSE stream subscriptions.\n",
+        );
+        body.push_str("# TYPE argentor_active_streams gauge\n");
+        body.push_str(&format!("argentor_active_streams {global}\n"));
         has_metrics = true;
     }
 
