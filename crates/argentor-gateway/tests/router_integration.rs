@@ -231,6 +231,15 @@ async fn test_release_operability_smoke() {
         audit_html.contains("renderEndpointHealth"),
         "audit dashboard must wire renderEndpointHealth() to fetchAll()"
     );
+    // Correlation IDs: the detail drawer must offer a copy handler.
+    assert!(
+        audit_html.contains("copyCorrelationId"),
+        "audit dashboard must wire the correlation-id copy handler"
+    );
+    assert!(
+        audit_html.contains("Correlation ID"),
+        "audit dashboard detail drawer must show a Correlation ID row"
+    );
 
     let (metrics_status, metrics_body) = get(&app, "/metrics").await;
     assert_eq!(metrics_status, StatusCode::OK);

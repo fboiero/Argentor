@@ -543,6 +543,9 @@ pub struct AuditLogEntry {
     pub details: serde_json::Value,
     /// Outcome: "success", "denied", or "error".
     pub outcome: String,
+    /// Correlation id tying this action to a request or trace, if recorded.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub correlation_id: Option<String>,
 }
 
 /// A guardrail/policy violation entry.
@@ -1437,6 +1440,7 @@ impl From<AuditEntry> for AuditLogEntry {
             skill_name: entry.skill_name,
             details: entry.details,
             outcome: outcome.to_string(),
+            correlation_id: entry.correlation_id,
         }
     }
 }
@@ -2087,6 +2091,68 @@ mod tests {
         let logs: Vec<AuditLogEntry> = serde_json::from_slice(&body).unwrap();
         assert_eq!(logs.len(), 1);
         assert_eq!(logs[0].action, "event_0");
+    }
+
+    #[tokio::test]
+    async fn test_audit_logs_endpoint_surfaces_correlation_id() {
+        let tmp = tempfile::tempdir().unwrap();
+        let state = test_state(&tmp).await;
+        let audit_path = state.audit_log_path.clone().unwrap();
+        std::fs::create_dir_all(audit_path.parent().unwrap()).unwrap();
+
+        let correlated = AuditEntry::new(
+            Uuid::new_v4(),
+            "tool_call",
+            None,
+            serde_json::json!({}),
+            AuditOutcome::Success,
+        )
+        .with_correlation_id("req-corr-42");
+        let plain = AuditEntry::new(
+            Uuid::new_v4(),
+            "login",
+            None,
+            serde_json::json!({}),
+            AuditOutcome::Success,
+        );
+        std::fs::write(
+            &audit_path,
+            format!(
+                "{}\n{}\n",
+                serde_json::to_string(&plain).unwrap(),
+                serde_json::to_string(&correlated).unwrap(),
+            ),
+        )
+        .unwrap();
+
+        let app = api_router(state);
+        let req = Request::builder()
+            .uri("/api/v1/audit/logs?limit=10")
+            .body(Body::empty())
+            .unwrap();
+        let resp = app.oneshot(req).await.unwrap();
+        assert_eq!(resp.status(), StatusCode::OK);
+        let body = axum::body::to_bytes(resp.into_body(), usize::MAX)
+            .await
+            .unwrap();
+        let raw = String::from_utf8(body.to_vec()).unwrap();
+        assert!(
+            raw.contains("\"correlation_id\":\"req-corr-42\""),
+            "the audit logs response must carry correlation_id so the dashboard can render it: {raw}"
+        );
+
+        let logs: Vec<AuditLogEntry> = serde_json::from_slice(&body).unwrap();
+        let by_action = |a: &str| {
+            logs.iter()
+                .find(|e| e.action == a)
+                .unwrap_or_else(|| panic!("missing {a}"))
+        };
+        assert_eq!(
+            by_action("tool_call").correlation_id.as_deref(),
+            Some("req-corr-42")
+        );
+        // Entries without a correlation id omit the field rather than null it.
+        assert_eq!(by_action("login").correlation_id, None);
     }
 
     #[tokio::test]

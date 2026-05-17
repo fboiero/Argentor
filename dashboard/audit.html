@@ -487,12 +487,41 @@
       ['Skill', entry.skill_name || '-'],
       ['Outcome', entry.outcome || '-'],
     ];
-    document.getElementById('detail-grid').innerHTML = rows.map(([label, value]) => `
+    let gridHtml = rows.map(([label, value]) => `
       <div class="detail-label">${escapeHtml(label)}</div>
       <div class="detail-value">${escapeHtml(value)}</div>
     `).join('');
+    // Correlation ID — copyable when present. The copy handler receives the
+    // row index (an integer), never the value interpolated into HTML, so a
+    // hostile correlation id cannot inject script.
+    const corr = entry.correlation_id;
+    gridHtml += `
+      <div class="detail-label">Correlation ID</div>
+      <div class="detail-value">${
+        corr
+          ? `<code>${escapeHtml(corr)}</code> ` +
+            `<button class="command-btn" type="button" ` +
+            `onclick="copyCorrelationId(${index}, this)">Copy</button>`
+          : '<span class="muted">—</span>'
+      }</div>`;
+    document.getElementById('detail-grid').innerHTML = gridHtml;
     document.getElementById('detail-json').textContent = JSON.stringify(entry.details || {}, null, 2);
     document.getElementById('detail-backdrop').classList.add('open');
+  }
+
+  // Copy the correlation id of the entry at `index` to the clipboard, with
+  // brief in-button feedback. Looks the value up from filteredLogs rather
+  // than receiving it as a string, keeping the onclick attribute injection-safe.
+  function copyCorrelationId(index, btn) {
+    const entry = filteredLogs[index];
+    if (!entry || !entry.correlation_id) return;
+    navigator.clipboard.writeText(entry.correlation_id).then(() => {
+      btn.textContent = 'Copied';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 1200);
+    }).catch(() => {
+      btn.textContent = 'Failed';
+      setTimeout(() => { btn.textContent = 'Copy'; }, 1200);
+    });
   }
 
   function closeDetail(event) {
