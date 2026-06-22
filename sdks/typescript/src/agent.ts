@@ -6,7 +6,7 @@
  *
  * @example
  * ```ts
- * import { query, AgentOptions } from '@argentor/sdk/agent';
+ * import { query, AgentOptions } from 'argentor-sdk/agent';
  *
  * for await (const event of query('Fix the bug in auth.py', {
  *   provider: 'claude',

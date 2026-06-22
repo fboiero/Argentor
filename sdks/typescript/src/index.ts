@@ -1,9 +1,9 @@
 /**
- * @argentor/sdk -- TypeScript client for the Argentor REST API.
+ * argentor-sdk -- TypeScript client for the Argentor REST API.
  *
  * @example
  * ```ts
- * import { ArgentorClient } from '@argentor/sdk';
+ * import { ArgentorClient } from 'argentor-sdk';
  *
  * const client = new ArgentorClient({ apiKey: 'sk-...' });
  * const result = await client.runTask({ role: 'assistant', context: 'Hello!' });

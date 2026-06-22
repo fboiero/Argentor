@@ -1,17 +1,19 @@
-# @argentor/sdk v1.4.7
+# argentor-sdk v1.5.1
 
-TypeScript SDK client for the [Argentor](https://github.com/fboiero/Agentor) AI agent framework REST API.
+TypeScript SDK client for the [Argentor](https://github.com/fboiero/Argentor) AI agent framework REST API.
+
+> Renamed from `argentor-sdk` in v1.5.1. Earlier versions remain published under the scoped name; new releases ship as the unscoped `argentor-sdk`.
 
 ## Installation
 
 ```bash
-npm install @argentor/sdk
+npm install argentor-sdk
 ```
 
 ## Quick Start
 
 ```typescript
-import { ArgentorClient } from '@argentor/sdk';
+import { ArgentorClient } from 'argentor-sdk';
 
 const client = new ArgentorClient({
   baseUrl: 'http://localhost:8080',
@@ -73,7 +75,7 @@ similar to how Claude Agent SDK wraps Claude Code.  It communicates
 via NDJSON over stdin/stdout and works with any LLM provider.
 
 ```typescript
-import { agentQuery, claudeOptions } from '@argentor/sdk';
+import { agentQuery, claudeOptions } from 'argentor-sdk';
 
 // Stream events from the agent
 for await (const event of agentQuery('What files are in this directory?', claudeOptions('sk-...'))) {
@@ -86,7 +88,7 @@ for await (const event of agentQuery('What files are in this directory?', claude
 ### One-liner convenience functions
 
 ```typescript
-import { askClaude, askOpenai, askGemini, askOllama } from '@argentor/sdk';
+import { askClaude, askOpenai, askGemini, askOllama } from 'argentor-sdk';
 
 const result = await askClaude('Explain Argentor', 'sk-...');
 const result2 = await askOpenai('Explain Argentor', 'sk-...');
@@ -97,7 +99,7 @@ const result4 = await askOllama('Explain Argentor', 'llama3');
 ### Provider presets
 
 ```typescript
-import { claudeOptions, openaiOptions, geminiOptions, ollamaOptions } from '@argentor/sdk';
+import { claudeOptions, openaiOptions, geminiOptions, ollamaOptions } from 'argentor-sdk';
 
 claudeOptions('sk-...');              // Anthropic Claude
 openaiOptions('sk-...');              // OpenAI GPT-4o
@@ -124,7 +126,7 @@ ollamaOptions('llama3');              // Local Ollama (no key)
 ## Error Handling
 
 ```typescript
-import { ArgentorClient, ArgentorAPIError, ArgentorConnectionError } from '@argentor/sdk';
+import { ArgentorClient, ArgentorAPIError, ArgentorConnectionError } from 'argentor-sdk';
 
 const client = new ArgentorClient({ baseUrl: 'http://localhost:8080' });
 

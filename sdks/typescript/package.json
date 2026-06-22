@@ -1,6 +1,6 @@
 {
-  "name": "@argentor/sdk",
-  "version": "1.5.0",
+  "name": "argentor-sdk",
+  "version": "1.5.1",
   "description": "TypeScript SDK client for the Argentor AI agent framework REST API",
   "main": "dist/index.js",
   "module": "dist/index.js",
@@ -50,12 +50,12 @@
   "license": "AGPL-3.0-only",
   "repository": {
     "type": "git",
-    "url": "https://github.com/fboiero/Agentor.git",
+    "url": "https://github.com/fboiero/Argentor.git",
     "directory": "sdks/typescript"
   },
-  "homepage": "https://github.com/fboiero/Agentor/tree/master/sdks/typescript",
+  "homepage": "https://github.com/fboiero/Argentor/tree/master/sdks/typescript",
   "bugs": {
-    "url": "https://github.com/fboiero/Agentor/issues"
+    "url": "https://github.com/fboiero/Argentor/issues"
   },
   "engines": {
     "node": ">=18.0.0"
