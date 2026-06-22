@@ -121,9 +121,13 @@ pub use sso::{
     sso_auth_middleware, sso_router, SsoConfig, SsoManager, SsoMiddlewareState, SsoProvider,
     SsoState, UserIdentity,
 };
+#[cfg(feature = "redis-broadcast")]
+pub use streaming::RedisSessionBroadcast;
 pub use streaming::{
-    sse_chat_handler, stream_event_to_sse, streaming_router, LocalSessionBroadcast,
-    SessionBroadcast, SessionBroadcastError, SessionBroadcastReceiver, SseEvent, StreamRequest,
+    sse_chat_handler, stream_event_to_sse, streaming_router, FileSessionBroadcast,
+    LocalSessionBroadcast, SessionBroadcast, SessionBroadcastError, SessionBroadcastEvent,
+    SessionBroadcastReceiver, SessionBroadcastSubscription, SseEvent, StreamBackpressureConfig,
+    StreamBackpressureError, StreamBackpressureLimiter, StreamBackpressurePermit, StreamRequest,
     StreamingState,
 };
 pub use trace_viewer::{

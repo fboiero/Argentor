@@ -13,6 +13,9 @@ categories.workspace = true
 [lints]
 workspace = true
 
+[features]
+redis-broadcast = ["dep:redis"]
+
 [dependencies]
 argentor-core.workspace = true
 argentor-security.workspace = true
@@ -42,6 +45,7 @@ getrandom = "0.2"
 reqwest.workspace = true
 base64.workspace = true
 regex.workspace = true
+redis = { version = "0.27", features = ["tokio-comp"], optional = true }
 
 [dev-dependencies]
 tokio-tungstenite = "0.24"

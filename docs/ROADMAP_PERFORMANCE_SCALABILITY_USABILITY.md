@@ -129,11 +129,22 @@ the audit JSONL is unchanged after process restart.
 **Goal:** support multi-instance gateway deployments without losing session or
 streaming semantics.
 
-- Abstract session broadcast behind a local/Redis/NATS implementation.
-- Support SSE reconnect with `Last-Event-ID`.
-- Add per-tenant and per-API-key backpressure.
-- Add circuit breakers for LLM providers and tool backends.
-- Add distributed-safe session persistence.
+- Done: abstract session broadcast behind local, shared-filesystem, and
+  optional Redis implementations. NATS can be added behind the same trait later.
+- Done: local SSE reconnect with `Last-Event-ID` through per-session monotonic
+  event IDs and bounded replay buffers on the `SessionBroadcast` abstraction.
+- Done: shared-filesystem `FileSessionBroadcast` for multi-replica deployments
+  on a common volume, with per-session append logs, lock-based event ID
+  assignment, replay from disk, and live polling.
+- Done: optional `RedisSessionBroadcast` behind the `redis-broadcast` feature,
+  using Redis Pub/Sub for live fanout, Redis lists for bounded replay, and an
+  atomic Lua publish path for event ID assignment plus append/publish.
+- Done: local stream backpressure for active SSE subscriptions with global,
+  per-tenant, and per-API-key limits.
+- Done: circuit breakers for LLM providers and tool backends.
+- Done: distributed-safe local session persistence for shared filesystems:
+  `SqliteSessionStore` uses unique temp files, an interprocess index lock,
+  disk-index refresh before reads, and merge-before-write updates.
 
 **Success criteria:**
 
@@ -185,7 +196,7 @@ streaming semantics.
 
 1. Add pluggable audit sinks for SQLite/Postgres, S3-compatible object storage,
    and SIEM webhook/export.
-2. Add distributed session broadcast adapters for Redis or NATS.
+2. Add NATS session broadcast support if the deployment target needs it.
 3. Prototype Replay Lab for policy and model rollout simulation.
 
 Done in this hardening line:
@@ -194,6 +205,8 @@ Done in this hardening line:
   the existing `argentor_http_requests_total` and
   `argentor_http_request_duration_us` counters (no new server-side metrics
   required).
+- Promoted the 10M audit-scale benchmark JSON result as small, versionable
+  performance evidence under `benchmarks/results/`.
 
 ## Release Readiness
 

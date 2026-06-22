@@ -9,7 +9,7 @@ This tutorial walks you through setting up a brand-new Cargo project that uses A
 ## Prerequisites
 
 - Rust **1.80+** installed via [rustup](https://rustup.rs)
-- An **Anthropic API key** exported as `ANTHROPIC_API_KEY` (or an OpenAI / Gemini key if you prefer those providers)
+- A **DeepSeek API key** exported as `DEEPSEEK_API_KEY` (or another supported provider key if you prefer)
 - Basic familiarity with `cargo` (new, add, run)
 
 If you do not have an API key, you can still follow along with a mocked backend — see the "Running without API keys" section at the end.
@@ -80,12 +80,12 @@ async fn main() -> anyhow::Result<()> {
         .init();
 
     // 1. Configure the model
-    let api_key = std::env::var("ANTHROPIC_API_KEY")
-        .map_err(|_| anyhow::anyhow!("Set ANTHROPIC_API_KEY before running"))?;
+    let api_key = std::env::var("DEEPSEEK_API_KEY")
+        .map_err(|_| anyhow::anyhow!("Set DEEPSEEK_API_KEY before running"))?;
 
     let config = ModelConfig {
-        provider: LlmProvider::Claude,
-        model_id: "claude-sonnet-4-20250514".into(),
+        provider: LlmProvider::DeepSeek,
+        model_id: "deepseek-chat".into(),
         api_key,
         api_base_url: None,
         temperature: 0.7,
@@ -133,7 +133,7 @@ async fn main() -> anyhow::Result<()> {
 ## 4. Run It
 
 ```bash
-export ANTHROPIC_API_KEY="sk-ant-..."
+export DEEPSEEK_API_KEY="sk-..."
 cargo run
 ```
 
@@ -161,7 +161,7 @@ On the first run the `audit-logs/` directory is created and a JSONL file is writ
 
 ## 5. Try Different Providers
 
-Swap `LlmProvider::Claude` for another backend to see how fast the runtime lets you retarget:
+Swap `LlmProvider::DeepSeek` for another backend to see how fast the runtime lets you retarget:
 
 ```rust
 // OpenAI
@@ -202,8 +202,8 @@ use argentor_agent::query::{query, QueryEvent, QueryOptions};
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let api_key = std::env::var("ANTHROPIC_API_KEY")?;
-    let options = QueryOptions::claude(api_key)
+    let api_key = std::env::var("DEEPSEEK_API_KEY")?;
+    let options = QueryOptions::deepseek(api_key)
         .system_prompt("You are a concise Rust tutor.")
         .max_turns(3);
 
@@ -222,7 +222,7 @@ async fn main() -> anyhow::Result<()> {
 }
 ```
 
-The `QueryOptions::claude` / `openai` / `gemini` / `ollama` / ... constructors cover all 14 providers. See `crates/argentor-agent/src/query.rs` for the full list.
+The `QueryOptions::deepseek` / `claude` / `openai` / `gemini` / `ollama` / ... constructors cover all providers. See `crates/argentor-agent/src/query.rs` for the full list.
 
 ---
 

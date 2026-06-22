@@ -67,26 +67,15 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
     profiles.insert("sales_qualifier".to_string(), XcapitAgentProfile {
         role: "sales_qualifier".to_string(),
         model: ModelConfig {
-            provider: argentor_agent::config::LlmProvider::Claude,
-            model_id: "claude-sonnet-4-6-20250514".to_string(),
+            provider: argentor_agent::config::LlmProvider::DeepSeek,
+            model_id: "deepseek-chat".to_string(),
             api_key: String::new(), // resolved from env
             api_base_url: None,
             temperature: 0.3,
             max_tokens: 2048,
             max_turns: 5,
             max_context_tokens: 200_000,
-            fallback_models: vec![ModelConfig {
-                provider: argentor_agent::config::LlmProvider::OpenAi,
-                model_id: "gpt-4o-mini".to_string(),
-                api_key: String::new(),
-                api_base_url: None,
-                temperature: 0.3,
-                max_tokens: 2048,
-                max_turns: 5,
-                max_context_tokens: 200_000,
-                fallback_models: vec![],
-                retry_policy: None,
-            }],
+            fallback_models: vec![],
             retry_policy: None,
         },
         system_prompt: "Sos el agente de calificación de ventas de Xcapit. Evaluás leads usando ICP scoring (Region, C-Level, Afinidad, Score). Clasificás como hot (>=70), warm (>=45), cool (>=25), cold (<25). Para cada lead, respondé con: score, clasificación, acción recomendada, prioridad de outreach. Sé conciso y accionable.".to_string(),
@@ -96,26 +85,15 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
     profiles.insert("outreach_composer".to_string(), XcapitAgentProfile {
         role: "outreach_composer".to_string(),
         model: ModelConfig {
-            provider: argentor_agent::config::LlmProvider::Claude,
-            model_id: "claude-sonnet-4-6-20250514".to_string(),
+            provider: argentor_agent::config::LlmProvider::DeepSeek,
+            model_id: "deepseek-chat".to_string(),
             api_key: String::new(),
             api_base_url: None,
             temperature: 0.7,
             max_tokens: 4096,
             max_turns: 5,
             max_context_tokens: 200_000,
-            fallback_models: vec![ModelConfig {
-                provider: argentor_agent::config::LlmProvider::OpenAi,
-                model_id: "gpt-4o-mini".to_string(),
-                api_key: String::new(),
-                api_base_url: None,
-                temperature: 0.7,
-                max_tokens: 4096,
-                max_turns: 5,
-                max_context_tokens: 200_000,
-                fallback_models: vec![],
-                retry_policy: None,
-            }],
+            fallback_models: vec![],
             retry_policy: None,
         },
         system_prompt: "Sos el agente de outreach de Xcapit, empresa de tecnología financiera (inversión automatizada, gestión de activos digitales, DeFi). Componés mensajes personalizados según canal (email/linkedin/whatsapp), región (LATAM=español neutro, Iberia=español peninsular), seniority (C-Level=ROI estratégico, otros=operativo), y afinidad (HIGH=directo, MEDIUM=educativo, LOW=nurturing). Siempre incluí mensaje principal, variante A/B, y siguiente paso sugerido.".to_string(),
@@ -125,26 +103,15 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
     profiles.insert("support_responder".to_string(), XcapitAgentProfile {
         role: "support_responder".to_string(),
         model: ModelConfig {
-            provider: argentor_agent::config::LlmProvider::Claude,
-            model_id: "claude-sonnet-4-6-20250514".to_string(),
+            provider: argentor_agent::config::LlmProvider::DeepSeek,
+            model_id: "deepseek-chat".to_string(),
             api_key: String::new(),
             api_base_url: None,
             temperature: 0.4,
             max_tokens: 4096,
             max_turns: 5,
             max_context_tokens: 200_000,
-            fallback_models: vec![ModelConfig {
-                provider: argentor_agent::config::LlmProvider::OpenAi,
-                model_id: "gpt-4o-mini".to_string(),
-                api_key: String::new(),
-                api_base_url: None,
-                temperature: 0.4,
-                max_tokens: 4096,
-                max_turns: 5,
-                max_context_tokens: 200_000,
-                fallback_models: vec![],
-                retry_policy: None,
-            }],
+            fallback_models: vec![],
             retry_policy: None,
         },
         system_prompt: "Sos el agente de soporte al cliente de Xcapit (fintech, inversión automatizada, activos digitales). Resolvés tickets de forma empática, precisa y rápida. Si no tenés certeza, decilo. Si es tema de fondos/dinero, NUNCA dar instrucciones sin verificación. Si es bug, documentar pasos de reproducción. Siempre ofrecer siguiente paso claro. Español LATAM por defecto. Respondé con: respuesta al cliente, notas internas, y si hay que escalar.".to_string(),
@@ -154,26 +121,15 @@ pub fn default_xcapit_profiles() -> HashMap<String, XcapitAgentProfile> {
     profiles.insert("ticket_router".to_string(), XcapitAgentProfile {
         role: "ticket_router".to_string(),
         model: ModelConfig {
-            provider: argentor_agent::config::LlmProvider::Claude,
-            model_id: "claude-sonnet-4-6-20250514".to_string(),
+            provider: argentor_agent::config::LlmProvider::DeepSeek,
+            model_id: "deepseek-chat".to_string(),
             api_key: String::new(),
             api_base_url: None,
             temperature: 0.2,
             max_tokens: 1024,
             max_turns: 3,
             max_context_tokens: 200_000,
-            fallback_models: vec![ModelConfig {
-                provider: argentor_agent::config::LlmProvider::OpenAi,
-                model_id: "gpt-4o-mini".to_string(),
-                api_key: String::new(),
-                api_base_url: None,
-                temperature: 0.2,
-                max_tokens: 1024,
-                max_turns: 3,
-                max_context_tokens: 200_000,
-                fallback_models: vec![],
-                retry_policy: None,
-            }],
+            fallback_models: vec![],
             retry_policy: None,
         },
         system_prompt: "Clasificás tickets de soporte por categoría (billing, technical, account, crypto, general) y prioridad (urgent, high, medium, low). Respondé SOLO con JSON: {\"category\": \"...\", \"priority\": \"...\", \"confidence\": 0.0-1.0, \"requires_human_review\": true/false, \"reasoning\": \"...\"}."
@@ -196,6 +152,17 @@ fn resolve_api_keys(config: &mut ModelConfig) {
             }
             argentor_agent::config::LlmProvider::OpenAi => ("OPENAI_API_KEY", "OpenAI"),
             argentor_agent::config::LlmProvider::Gemini => ("GEMINI_API_KEY", "Gemini"),
+            argentor_agent::config::LlmProvider::DeepSeek => ("DEEPSEEK_API_KEY", "DeepSeek"),
+            argentor_agent::config::LlmProvider::Groq => ("GROQ_API_KEY", "Groq"),
+            argentor_agent::config::LlmProvider::Mistral => ("MISTRAL_API_KEY", "Mistral"),
+            argentor_agent::config::LlmProvider::OpenRouter => ("OPENROUTER_API_KEY", "OpenRouter"),
+            argentor_agent::config::LlmProvider::XAi => ("XAI_API_KEY", "xAI"),
+            argentor_agent::config::LlmProvider::Cerebras => ("CEREBRAS_API_KEY", "Cerebras"),
+            argentor_agent::config::LlmProvider::Together => ("TOGETHER_API_KEY", "Together"),
+            argentor_agent::config::LlmProvider::Fireworks => ("FIREWORKS_API_KEY", "Fireworks"),
+            argentor_agent::config::LlmProvider::HuggingFace => {
+                ("HUGGINGFACE_API_KEY", "Hugging Face")
+            }
             _ => ("OPENAI_API_KEY", "OpenAI-compatible"),
         };
 
@@ -889,19 +856,19 @@ pub fn xcapitsff_router(state: Arc<XcapitState>) -> Router {
 /// Resolve a routing hint to a model ID override.
 ///
 /// Maps human-friendly hints to concrete model identifiers:
-/// - `"fast_cheap"` → `gpt-4o-mini`
-/// - `"balanced"` → `claude-sonnet-4-6-20250514` (default, no change)
-/// - `"quality_max"` → `claude-opus-4-6-20250514`
+/// - `"fast_cheap"` -> `deepseek-chat`
+/// - `"balanced"` -> current DeepSeek model (default, no change)
+/// - `"quality_max"` -> `deepseek-reasoner`
 fn resolve_routing_hint(hint: &str) -> Option<(String, argentor_agent::config::LlmProvider)> {
     match hint {
         "fast_cheap" => Some((
-            "gpt-4o-mini".to_string(),
-            argentor_agent::config::LlmProvider::OpenAi,
+            "deepseek-chat".to_string(),
+            argentor_agent::config::LlmProvider::DeepSeek,
         )),
         "balanced" => None, // Keep current model
         "quality_max" => Some((
-            "claude-opus-4-6-20250514".to_string(),
-            argentor_agent::config::LlmProvider::Claude,
+            "deepseek-reasoner".to_string(),
+            argentor_agent::config::LlmProvider::DeepSeek,
         )),
         _ => None,
     }
@@ -911,10 +878,12 @@ fn resolve_routing_hint(hint: &str) -> Option<(String, argentor_agent::config::L
 fn estimate_cost_usd(model_id: &str, tokens_in: u64, tokens_out: u64) -> f64 {
     // Approximate pricing per 1M tokens (USD)
     let (in_price, out_price) = match model_id {
+        m if m.contains("deepseek-reasoner") => (0.55, 2.19),
+        m if m.contains("deepseek-chat") => (0.27, 1.10),
         m if m.contains("gpt-4o-mini") => (0.15, 0.60),
         m if m.contains("opus") => (15.0, 75.0),
         m if m.contains("sonnet") => (3.0, 15.0),
-        _ => (3.0, 15.0), // default to sonnet pricing
+        _ => (0.27, 1.10), // default to DeepSeek chat pricing
     };
     (tokens_in as f64 * in_price + tokens_out as f64 * out_price) / 1_000_000.0
 }
@@ -2280,6 +2249,12 @@ async fn list_workflow_runs_handler(State(state): State<Arc<XcapitState>>) -> im
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
     use super::*;
+    use std::sync::{Mutex, OnceLock};
+
+    fn env_lock() -> &'static Mutex<()> {
+        static ENV_LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+        ENV_LOCK.get_or_init(|| Mutex::new(()))
+    }
 
     #[test]
     fn test_default_profiles_has_four() {
@@ -2315,11 +2290,22 @@ mod tests {
         for profile in profiles.values() {
             assert_eq!(
                 profile.model.fallback_models.len(),
-                1,
-                "Profile {} should have 1 fallback",
+                0,
+                "Profile {} should not fallback away from DeepSeek by default",
                 profile.role
             );
-            assert_eq!(profile.model.fallback_models[0].model_id, "gpt-4o-mini");
+        }
+    }
+
+    #[test]
+    fn test_profiles_default_to_deepseek() {
+        let profiles = default_xcapit_profiles();
+        for profile in profiles.values() {
+            assert!(matches!(
+                profile.model.provider,
+                argentor_agent::config::LlmProvider::DeepSeek
+            ));
+            assert_eq!(profile.model.model_id, "deepseek-chat");
         }
     }
 
@@ -2422,11 +2408,50 @@ mod tests {
 
     #[test]
     fn test_resolve_api_keys_from_env() {
-        std::env::set_var("ANTHROPIC_API_KEY", "test-key-123");
+        let _guard = env_lock().lock().unwrap();
+        let original_deepseek = std::env::var("DEEPSEEK_API_KEY").ok();
+        std::env::set_var("DEEPSEEK_API_KEY", "test-key-123");
         let mut config = default_xcapit_profiles()["sales_qualifier"].model.clone();
         resolve_api_keys(&mut config);
         assert_eq!(config.api_key, "test-key-123");
-        std::env::remove_var("ANTHROPIC_API_KEY");
+        match original_deepseek {
+            Some(value) => std::env::set_var("DEEPSEEK_API_KEY", value),
+            None => std::env::remove_var("DEEPSEEK_API_KEY"),
+        }
+    }
+
+    #[test]
+    fn test_resolve_deepseek_api_key_from_env() {
+        let _guard = env_lock().lock().unwrap();
+        let original_openai = std::env::var("OPENAI_API_KEY").ok();
+        let original_deepseek = std::env::var("DEEPSEEK_API_KEY").ok();
+        std::env::set_var("OPENAI_API_KEY", "wrong-provider-key");
+        std::env::set_var("DEEPSEEK_API_KEY", "deepseek-key-123");
+
+        let mut config = argentor_agent::config::ModelConfig {
+            provider: argentor_agent::config::LlmProvider::DeepSeek,
+            model_id: "deepseek-chat".to_string(),
+            api_key: String::new(),
+            api_base_url: None,
+            temperature: 0.7,
+            max_tokens: 1024,
+            max_turns: 10,
+            max_context_tokens: 200_000,
+            fallback_models: vec![],
+            retry_policy: None,
+        };
+
+        resolve_api_keys(&mut config);
+
+        assert_eq!(config.api_key, "deepseek-key-123");
+        match original_openai {
+            Some(value) => std::env::set_var("OPENAI_API_KEY", value),
+            None => std::env::remove_var("OPENAI_API_KEY"),
+        }
+        match original_deepseek {
+            Some(value) => std::env::set_var("DEEPSEEK_API_KEY", value),
+            None => std::env::remove_var("DEEPSEEK_API_KEY"),
+        }
     }
 
     #[test]
@@ -2455,10 +2480,10 @@ mod tests {
         let result = resolve_routing_hint("fast_cheap");
         assert!(result.is_some());
         let (model, provider) = result.unwrap();
-        assert_eq!(model, "gpt-4o-mini");
+        assert_eq!(model, "deepseek-chat");
         assert!(matches!(
             provider,
-            argentor_agent::config::LlmProvider::OpenAi
+            argentor_agent::config::LlmProvider::DeepSeek
         ));
     }
 
@@ -2467,10 +2492,10 @@ mod tests {
         let result = resolve_routing_hint("quality_max");
         assert!(result.is_some());
         let (model, provider) = result.unwrap();
-        assert_eq!(model, "claude-opus-4-6-20250514");
+        assert_eq!(model, "deepseek-reasoner");
         assert!(matches!(
             provider,
-            argentor_agent::config::LlmProvider::Claude
+            argentor_agent::config::LlmProvider::DeepSeek
         ));
     }
 

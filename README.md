@@ -144,9 +144,9 @@ ls examples/
 ```toml
 # argentor.toml
 [model]
-provider = "claude"
-model_id = "claude-sonnet-4-20250514"
-api_key = "${ANTHROPIC_API_KEY}"
+provider = "deepseek"
+model_id = "deepseek-chat"
+api_key = "${DEEPSEEK_API_KEY}"
 max_tokens = 4096
 max_turns = 20
 

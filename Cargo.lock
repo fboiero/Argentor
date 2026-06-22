@@ -141,8 +141,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 
 [[package]]
+name = "arc-swap"
+version = "1.9.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6a3a1fd6f75306b68087b831f025c712524bcb19aad54e557b1129cfa0a2b207"
+dependencies = [
+ "rustversion",
+]
+
+[[package]]
 name = "argentor-a2a"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -161,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-agent"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-builtins",
  "argentor-core",
@@ -221,7 +230,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-builtins"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-agent",
  "argentor-core",
@@ -252,7 +261,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-channels"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -269,7 +278,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-cli"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "anyhow",
  "argentor-a2a",
@@ -305,7 +314,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-cloud"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-agent",
  "argentor-core",
@@ -342,7 +351,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-compliance"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -357,7 +366,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-core"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "async-trait",
  "chrono",
@@ -377,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-gateway"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-a2a",
  "argentor-agent",
@@ -397,6 +406,7 @@ dependencies = [
  "futures-util",
  "getrandom 0.2.17",
  "hex",
+ "redis",
  "regex",
  "reqwest",
  "serde",
@@ -415,7 +425,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-mcp"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-core",
  "argentor-security",
@@ -433,7 +443,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-memory"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -450,7 +460,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-orchestrator"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-agent",
  "argentor-builtins",
@@ -474,7 +484,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-security"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -500,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-session"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -516,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-skills"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-core",
  "argentor-security",
@@ -543,7 +553,7 @@ dependencies = [
 
 [[package]]
 name = "argentor-tee"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "argentor-core",
  "async-trait",
@@ -993,6 +1003,20 @@ name = "colorchoice"
 version = "1.0.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1d07550c9036bf2ae0c684c4297d503f838287c83c53686d05370d0e139ae570"
+
+[[package]]
+name = "combine"
+version = "4.6.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba5a308b75df32fe02788e748662718f03fde005016435c444eea572398219fd"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "memchr",
+ "pin-project-lite",
+ "tokio",
+ "tokio-util",
+]
 
 [[package]]
 name = "const-oid"
@@ -1539,7 +1563,7 @@ dependencies = [
 
 [[package]]
 name = "epec-legal-agent"
-version = "1.4.7"
+version = "1.5.0"
 dependencies = [
  "anyhow",
  "argentor-agent",
@@ -2198,7 +2222,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2",
+ "socket2 0.6.3",
  "system-configuration",
  "tokio",
  "tower-service",
@@ -2468,6 +2492,15 @@ name = "itertools"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba291022dbbd398a455acf126c1e341954079855bc60dfdda641363bd6922569"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "413ee7dfc52ee1a4949ceeb7dbc8a33f2d6c088194d9f922fb8318faf1f01186"
 dependencies = [
  "either",
 ]
@@ -2869,6 +2902,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "num-bigint"
+version = "0.4.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5e44f723f1133c9deac646763579fdb3ac745e418f2a7af9cd0c431da1f20b9"
+dependencies = [
+ "num-integer",
+ "num-traits",
 ]
 
 [[package]]
@@ -3452,7 +3495,7 @@ dependencies = [
  "quinn-udp",
  "rustc-hash",
  "rustls",
- "socket2",
+ "socket2 0.6.3",
  "thiserror 2.0.18",
  "tokio",
  "tracing",
@@ -3489,7 +3532,7 @@ dependencies = [
  "cfg_aliases",
  "libc",
  "once_cell",
- "socket2",
+ "socket2 0.6.3",
  "tracing",
  "windows-sys 0.60.2",
 ]
@@ -3608,6 +3651,30 @@ checksum = "22e18b0f0062d30d4230b2e85ff77fdfe4326feb054b9783a3460d8435c8ab91"
 dependencies = [
  "crossbeam-deque",
  "crossbeam-utils",
+]
+
+[[package]]
+name = "redis"
+version = "0.27.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "09d8f99a4090c89cc489a94833c901ead69bfbf3877b4867d5482e321ee875bc"
+dependencies = [
+ "arc-swap",
+ "async-trait",
+ "bytes",
+ "combine",
+ "futures-util",
+ "itertools 0.13.0",
+ "itoa",
+ "num-bigint",
+ "percent-encoding",
+ "pin-project-lite",
+ "ryu",
+ "sha1_smol",
+ "socket2 0.5.10",
+ "tokio",
+ "tokio-util",
+ "url",
 ]
 
 [[package]]
@@ -4171,6 +4238,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "sha1_smol"
+version = "1.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bbfa15b3dddfee50a0fff136974b3e1bde555604ba463834a7eb7deb6417705d"
+
+[[package]]
 name = "sha2"
 version = "0.10.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4262,6 +4335,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 dependencies = [
  "serde",
+]
+
+[[package]]
+name = "socket2"
+version = "0.5.10"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e22376abed350d73dd1cd119b57ffccad95b4e585a7cda43e286245ce23c0678"
+dependencies = [
+ "libc",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4626,7 +4709,7 @@ dependencies = [
  "parking_lot",
  "pin-project-lite",
  "signal-hook-registry",
- "socket2",
+ "socket2 0.6.3",
  "tokio-macros",
  "windows-sys 0.61.2",
 ]

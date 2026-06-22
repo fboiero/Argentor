@@ -10,6 +10,26 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ---
 
+## [1.5.0] - 2026-06-22
+
+### Added
+- DeepSeek is now the default LLM provider for first-run examples and XcapitSFF agent profiles, using `DEEPSEEK_API_KEY` and `deepseek-chat` by default.
+- Optional Redis-backed `SessionBroadcast` behind the `redis-broadcast` feature, using Redis Pub/Sub for live fanout and Redis lists for bounded replay.
+- Shared-filesystem `FileSessionBroadcast` for multi-replica deployments on a common volume.
+- SSE reconnect support with `Last-Event-ID`, monotonic per-session event IDs, and bounded replay buffers.
+- Stream backpressure limits for active SSE subscriptions, including global, tenant, and API-key scopes.
+- Distributed-safe local session persistence for shared filesystems.
+
+### Changed
+- OpenAI-compatible providers now report provider-specific names for metrics, cache keys, and circuit breaker isolation; DeepSeek is reported as `deepseek`.
+- XcapitSFF runtime API key resolution now uses provider-specific environment variables such as `DEEPSEEK_API_KEY`, `GROQ_API_KEY`, `MISTRAL_API_KEY`, and `OPENROUTER_API_KEY`.
+
+### Fixed
+- Tool backend circuit breakers are isolated from LLM provider circuit breakers.
+- The 10M audit-scale benchmark JSON is promoted as versioned release evidence.
+
+---
+
 ## [1.4.7] - 2026-05-16
 
 ### Fixed
@@ -757,7 +777,8 @@ Argentor v1.0.0 is the first production-ready release. All 58 development phases
 
 ---
 
-[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.4.7...HEAD
+[Unreleased]: https://github.com/fboiero/Argentor/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/fboiero/Argentor/compare/v1.4.7...v1.5.0
 [1.4.7]: https://github.com/fboiero/Argentor/compare/v1.4.6...v1.4.7
 [1.4.6]: https://github.com/fboiero/Argentor/compare/v1.4.5...v1.4.6
 [1.4.5]: https://github.com/fboiero/Argentor/compare/v1.4.4...v1.4.5

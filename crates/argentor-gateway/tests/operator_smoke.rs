@@ -179,6 +179,11 @@ async fn operator_endpoints_all_respond() {
         body.contains("argentor_active_streams 0"),
         "argentor_active_streams should read 0 with no active SSE subscribers"
     );
+    // Stream capacity: a positive gauge so operators can compute pressure.
+    assert!(
+        body.contains("argentor_stream_capacity"),
+        "/metrics must expose the argentor_stream_capacity gauge"
+    );
 
     // /openapi.json — must be valid JSON with at least the audit + dashboard paths
     let r = client

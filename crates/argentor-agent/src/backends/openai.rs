@@ -97,7 +97,22 @@ impl OpenAiBackend {
 #[async_trait]
 impl LlmBackend for OpenAiBackend {
     fn provider_name(&self) -> &str {
-        "openai"
+        match self.config.provider {
+            LlmProvider::OpenAi => "openai",
+            LlmProvider::OpenRouter => "openrouter",
+            LlmProvider::Groq => "groq",
+            LlmProvider::Ollama => "ollama",
+            LlmProvider::Mistral => "mistral",
+            LlmProvider::XAi => "xai",
+            LlmProvider::AzureOpenAi => "azure_openai",
+            LlmProvider::Cerebras => "cerebras",
+            LlmProvider::Together => "together",
+            LlmProvider::DeepSeek => "deepseek",
+            LlmProvider::VLlm => "vllm",
+            LlmProvider::Fireworks => "fireworks",
+            LlmProvider::HuggingFace => "huggingface",
+            _ => "openai",
+        }
     }
 
     async fn chat(

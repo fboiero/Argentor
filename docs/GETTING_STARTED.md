@@ -63,8 +63,8 @@ Launch the HTTP/WebSocket gateway with the dashboard:
 
 ```bash
 # Set your LLM provider key
-export ANTHROPIC_API_KEY="sk-ant-..."
-# Or: export OPENAI_API_KEY="sk-..."
+export DEEPSEEK_API_KEY="sk-..."
+# Or: export ANTHROPIC_API_KEY="sk-ant-..." / OPENAI_API_KEY="sk-..."
 # Or: export GEMINI_API_KEY="..."
 
 # Start the server
@@ -216,8 +216,8 @@ async fn main() -> anyhow::Result<()> {
     register_builtins(&mut registry);
 
     // Configure LLM
-    let config = ModelConfig::new(LlmProvider::Claude)
-        .with_model("claude-sonnet-4-20250514")
+    let config = ModelConfig::new(LlmProvider::DeepSeek)
+        .with_model("deepseek-chat")
         .with_max_tokens(4096);
 
     // Create and run agent
@@ -254,7 +254,7 @@ let response = runner.run("Process this customer data").await?;
 docker run -d \
   --name argentor \
   -p 8080:8080 \
-  -e ANTHROPIC_API_KEY="sk-ant-..." \
+  -e DEEPSEEK_API_KEY="sk-..." \
   ghcr.io/fboiero/argentor:latest serve
 ```
 

@@ -41,6 +41,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
+use std::time::Duration;
 use tokio::sync::RwLock;
 use uuid::Uuid;
 
@@ -52,10 +53,51 @@ use uuid::Uuid;
 /// file, then rename over the target. This guarantees that a reader never
 /// sees a partially written file.
 async fn atomic_write(target: &Path, data: &[u8]) -> ArgentorResult<()> {
-    let tmp = target.with_extension("tmp");
+    let tmp = target.with_extension(format!("{}.tmp", Uuid::new_v4()));
     tokio::fs::write(&tmp, data).await?;
     tokio::fs::rename(&tmp, target).await?;
     Ok(())
+}
+
+struct IndexLock {
+    path: PathBuf,
+}
+
+impl IndexLock {
+    async fn acquire(base_dir: &Path) -> ArgentorResult<Self> {
+        let path = base_dir.join("sessions").join("index.lock");
+        for _ in 0..100 {
+            match tokio::fs::OpenOptions::new()
+                .write(true)
+                .create_new(true)
+                .open(&path)
+                .await
+            {
+                Ok(_) => return Ok(Self { path }),
+                Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+                    tokio::time::sleep(Duration::from_millis(10)).await;
+                }
+                Err(e) => return Err(e.into()),
+            }
+        }
+
+        Err(ArgentorError::Session(
+            "Timed out waiting for session index lock".to_string(),
+        ))
+    }
+
+    async fn release(self) -> ArgentorResult<()> {
+        if self.path.exists() {
+            tokio::fs::remove_file(&self.path).await?;
+        }
+        Ok(())
+    }
+}
+
+impl Drop for IndexLock {
+    fn drop(&mut self) {
+        let _ = std::fs::remove_file(&self.path);
+    }
 }
 
 // ===========================================================================
@@ -137,11 +179,19 @@ impl SqliteSessionStore {
         atomic_write(&self.index_path(), json.as_bytes()).await
     }
 
+    async fn refresh_index(&self) -> ArgentorResult<()> {
+        let latest = Self::load_index(&self.base_dir).await?;
+        let mut index = self.index.write().await;
+        *index = latest;
+        Ok(())
+    }
+
     // -- public helpers beyond SessionStore -----------------------------------
 
     /// Return session IDs whose metadata contains a key with the given
     /// string value (exact, case-sensitive comparison).
     pub async fn query_by_metadata(&self, key: &str, value: &str) -> ArgentorResult<Vec<Uuid>> {
+        self.refresh_index().await?;
         let index = self.index.read().await;
         let ids = index
             .iter()
@@ -159,6 +209,7 @@ impl SqliteSessionStore {
 
     /// Return the total number of sessions tracked in the index.
     pub async fn count(&self) -> ArgentorResult<usize> {
+        self.refresh_index().await?;
         let index = self.index.read().await;
         Ok(index.len())
     }
@@ -167,6 +218,7 @@ impl SqliteSessionStore {
 #[async_trait]
 impl SessionStore for SqliteSessionStore {
     async fn create(&self, session: &Session) -> ArgentorResult<()> {
+        let lock = IndexLock::acquire(&self.base_dir).await?;
         let path = self.session_path(session.id);
         let json = serde_json::to_string_pretty(session)?;
         atomic_write(&path, json.as_bytes()).await?;
@@ -178,14 +230,20 @@ impl SessionStore for SqliteSessionStore {
             metadata: session.metadata.clone(),
         };
 
-        let mut index = self.index.write().await;
+        let mut index = Self::load_index(&self.base_dir).await?;
         index.insert(session.id, entry);
         self.persist_index(&index).await?;
+        {
+            let mut cached = self.index.write().await;
+            *cached = index;
+        }
+        lock.release().await?;
 
         Ok(())
     }
 
     async fn get(&self, id: Uuid) -> ArgentorResult<Option<Session>> {
+        self.refresh_index().await?;
         // Fast-path: check the index first to avoid a filesystem hit.
         {
             let index = self.index.read().await;
@@ -210,19 +268,26 @@ impl SessionStore for SqliteSessionStore {
     }
 
     async fn delete(&self, id: Uuid) -> ArgentorResult<()> {
+        let lock = IndexLock::acquire(&self.base_dir).await?;
         let path = self.session_path(id);
         if path.exists() {
             tokio::fs::remove_file(&path).await?;
         }
 
-        let mut index = self.index.write().await;
+        let mut index = Self::load_index(&self.base_dir).await?;
         index.remove(&id);
         self.persist_index(&index).await?;
+        {
+            let mut cached = self.index.write().await;
+            *cached = index;
+        }
+        lock.release().await?;
 
         Ok(())
     }
 
     async fn list(&self) -> ArgentorResult<Vec<Uuid>> {
+        self.refresh_index().await?;
         let index = self.index.read().await;
         Ok(index.keys().copied().collect())
     }
@@ -656,6 +721,49 @@ mod tests {
             assert!(loaded.is_some());
             assert_eq!(loaded.unwrap().id, session.id);
         }
+    }
+
+    #[tokio::test]
+    async fn session_instances_refresh_index_before_reads() {
+        let tmp = TempDir::new().unwrap();
+        let dir = tmp.path().to_path_buf();
+        let store1 = SqliteSessionStore::new(dir.clone()).await.unwrap();
+        let store2 = SqliteSessionStore::new(dir).await.unwrap();
+        let session = Session::new();
+
+        store1.create(&session).await.unwrap();
+
+        let loaded = store2.get(session.id).await.unwrap();
+        assert!(loaded.is_some());
+        assert_eq!(store2.count().await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn session_concurrent_creates_across_instances_preserve_index() {
+        let tmp = TempDir::new().unwrap();
+        let dir = tmp.path().to_path_buf();
+        let mut expected_ids = Vec::new();
+        let mut handles = Vec::new();
+
+        for _ in 0..10 {
+            let store = SqliteSessionStore::new(dir.clone()).await.unwrap();
+            let session = Session::new();
+            expected_ids.push(session.id);
+            handles.push(tokio::spawn(async move {
+                store.create(&session).await.unwrap();
+            }));
+        }
+
+        for handle in handles {
+            handle.await.unwrap();
+        }
+
+        let verifier = SqliteSessionStore::new(dir).await.unwrap();
+        let mut ids = verifier.list().await.unwrap();
+        ids.sort();
+        expected_ids.sort();
+
+        assert_eq!(ids, expected_ids);
     }
 
     #[tokio::test]

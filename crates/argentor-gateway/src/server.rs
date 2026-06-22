@@ -890,6 +890,14 @@ async fn prometheus_metrics_handler(State(state): State<Arc<AppState>>) -> impl 
         );
         body.push_str("# TYPE argentor_active_streams gauge\n");
         body.push_str(&format!("argentor_active_streams {global}\n"));
+
+        // Stream capacity — operators compute pressure as active / capacity.
+        let capacity = limiter.max_global_streams();
+        body.push_str(
+            "# HELP argentor_stream_capacity Maximum concurrent SSE stream subscriptions.\n",
+        );
+        body.push_str("# TYPE argentor_stream_capacity gauge\n");
+        body.push_str(&format!("argentor_stream_capacity {capacity}\n"));
         has_metrics = true;
     }
 

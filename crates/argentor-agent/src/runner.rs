@@ -167,6 +167,8 @@ pub struct AgentRunner {
     cache: Option<ResponseCache>,
     /// Circuit breaker registry for provider resilience.
     circuit_breakers: CircuitBreakerRegistry,
+    /// Circuit breaker registry for tool backend resilience.
+    tool_circuit_breakers: CircuitBreakerRegistry,
     /// Debug recorder for step-by-step trace capture.
     debug_recorder: DebugRecorder,
     /// Optional guardrail engine for input/output validation and sanitization.
@@ -217,6 +219,7 @@ impl AgentRunner {
             proxy: None,
             cache: None,
             circuit_breakers: CircuitBreakerRegistry::new(CircuitConfig::default()),
+            tool_circuit_breakers: CircuitBreakerRegistry::new(CircuitConfig::default()),
             debug_recorder: DebugRecorder::disabled(),
             guardrails: None,
             hooks: None,
@@ -259,6 +262,7 @@ impl AgentRunner {
             proxy: None,
             cache: None,
             circuit_breakers: CircuitBreakerRegistry::new(CircuitConfig::default()),
+            tool_circuit_breakers: CircuitBreakerRegistry::new(CircuitConfig::default()),
             debug_recorder: DebugRecorder::disabled(),
             guardrails: None,
             hooks: None,
@@ -353,6 +357,12 @@ impl AgentRunner {
         self
     }
 
+    /// Set a custom circuit breaker configuration for tool backends.
+    pub fn with_tool_circuit_breaker(mut self, config: CircuitConfig) -> Self {
+        self.tool_circuit_breakers = CircuitBreakerRegistry::new(config);
+        self
+    }
+
     /// Enable debug recording for this agent run.
     pub fn with_debug_recorder(mut self, trace_id: impl Into<String>) -> Self {
         self.debug_recorder = DebugRecorder::new(trace_id);
@@ -374,6 +384,11 @@ impl AgentRunner {
     /// Get the circuit breaker registry.
     pub fn circuit_breakers(&self) -> &CircuitBreakerRegistry {
         &self.circuit_breakers
+    }
+
+    /// Get the tool backend circuit breaker registry.
+    pub fn tool_circuit_breakers(&self) -> &CircuitBreakerRegistry {
+        &self.tool_circuit_breakers
     }
 
     /// Enable guardrails with the provided engine. Guardrails validate input before
@@ -1371,11 +1386,41 @@ impl AgentRunner {
             }
         }
 
+        let tool_breaker_key = format!("tool:{}", call.name);
+        if !self.tool_circuit_breakers.allow_request(&tool_breaker_key) {
+            warn!(
+                tool = %call.name,
+                "Tool circuit breaker open — rejecting call"
+            );
+            self.debug_recorder.record(
+                StepType::Error,
+                format!("Tool circuit breaker open for: {}", call.name),
+                None,
+            );
+            return Ok(argentor_core::ToolResult::error(
+                &call.id,
+                format!("Tool circuit breaker open for '{}'", call.name),
+            ));
+        }
+
         let result = if let Some((proxy, agent_id)) = &self.proxy {
             proxy.execute(call, agent_id).await
         } else {
             self.skills.execute(call, &self.permissions).await
         };
+
+        match &result {
+            Ok(tool_result) if tool_result.is_error => {
+                self.tool_circuit_breakers.record_failure(&tool_breaker_key);
+            }
+            Ok(_) => {
+                self.tool_circuit_breakers.record_success(&tool_breaker_key);
+            }
+            Err(_) => {
+                self.tool_circuit_breakers.record_failure(&tool_breaker_key);
+            }
+        }
+
         tracing::Span::current().record("duration_ms", _tool_start.elapsed().as_millis() as u64);
         result
     }
@@ -1713,14 +1758,49 @@ impl AgentRunner {
 mod scaffold_tests {
     use super::*;
     use crate::backends::LlmBackend;
-    use argentor_core::{ArgentorError, ArgentorResult, Message};
+    use argentor_core::{ArgentorError, ArgentorResult, Message, ToolCall, ToolResult};
     use argentor_security::{AuditLog, PermissionSet};
-    use argentor_skills::SkillRegistry;
+    use argentor_skills::{Skill, SkillDescriptor, SkillRegistry};
     use std::path::PathBuf;
     use std::sync::Arc;
 
     /// Minimal no-op backend for constructing an `AgentRunner` without network.
     struct NopBackend;
+
+    struct FixedResultSkill {
+        descriptor: SkillDescriptor,
+        is_error: bool,
+    }
+
+    impl FixedResultSkill {
+        fn new(name: &str, is_error: bool) -> Self {
+            Self {
+                descriptor: SkillDescriptor {
+                    name: name.to_string(),
+                    description: "fixed test skill".to_string(),
+                    parameters_schema: serde_json::json!({}),
+                    required_capabilities: vec![],
+                    requires_approval: false,
+                },
+                is_error,
+            }
+        }
+    }
+
+    #[async_trait::async_trait]
+    impl Skill for FixedResultSkill {
+        fn descriptor(&self) -> &SkillDescriptor {
+            &self.descriptor
+        }
+
+        async fn execute(&self, call: ToolCall) -> ArgentorResult<ToolResult> {
+            if self.is_error {
+                Ok(ToolResult::error(&call.id, "tool backend failed"))
+            } else {
+                Ok(ToolResult::success(&call.id, "ok"))
+            }
+        }
+    }
 
     #[async_trait::async_trait]
     impl LlmBackend for NopBackend {
@@ -1863,5 +1943,54 @@ mod scaffold_tests {
         let runner2 =
             make_runner(Arc::new(SkillRegistry::new())).with_scaffold_mode(ScaffoldMode::Full);
         assert_eq!(runner2.scaffold_mode(), ScaffoldMode::Full);
+    }
+
+    #[tokio::test]
+    async fn tool_circuit_breaker_opens_after_tool_error_result() {
+        let registry = Arc::new(SkillRegistry::new());
+        registry.register(Arc::new(FixedResultSkill::new("unstable_tool", true)));
+        let runner = make_runner(registry).with_tool_circuit_breaker(CircuitConfig::new(1));
+
+        let call = ToolCall {
+            id: "call-1".into(),
+            name: "unstable_tool".into(),
+            arguments: serde_json::json!({}),
+        };
+
+        let first = runner.execute_tool(call.clone()).await.unwrap();
+        assert!(first.is_error);
+
+        let status = runner
+            .tool_circuit_breakers()
+            .status("tool:unstable_tool")
+            .expect("tool breaker should be registered");
+        assert_eq!(status.state, crate::circuit_breaker::CircuitState::Open);
+
+        let second = runner.execute_tool(call).await.unwrap();
+        assert!(second.is_error);
+        assert!(second.content.contains("Tool circuit breaker open"));
+    }
+
+    #[tokio::test]
+    async fn tool_circuit_breaker_records_successful_tool_call() {
+        let registry = Arc::new(SkillRegistry::new());
+        registry.register(Arc::new(FixedResultSkill::new("stable_tool", false)));
+        let runner = make_runner(registry).with_tool_circuit_breaker(CircuitConfig::new(1));
+
+        let call = ToolCall {
+            id: "call-1".into(),
+            name: "stable_tool".into(),
+            arguments: serde_json::json!({}),
+        };
+
+        let result = runner.execute_tool(call).await.unwrap();
+        assert!(!result.is_error);
+
+        let status = runner
+            .tool_circuit_breakers()
+            .status("tool:stable_tool")
+            .expect("tool breaker should be registered");
+        assert_eq!(status.total_successes, 1);
+        assert_eq!(status.total_failures, 0);
     }
 }

@@ -746,3 +746,175 @@
 5. **Phase 38 — Tenant Rate Limiting** — Free/Pro/Enterprise plans with daily/monthly/budget/concurrent enforcement
 
 **Results:** 2230 → 2380 (+150 tests), 0 failures, 0 clippy errors, 119K LOC, 147 modules
+
+---
+
+## 2026-05-16 — Phase 3 Runtime Scalability: SSE Reconnect
+
+**Asked:** Continue with the next step.
+
+**Decision:** Implemented local SSE reconnect support for `GET /api/v1/stream/{session_id}` using `Last-Event-ID`.
+
+**Why:** The previous commit already abstracted session stream broadcast. The next small, verifiable Phase 3 step was to make reconnect semantics work on that abstraction before adding Redis/NATS.
+
+**Changes:**
+- `SessionBroadcast` subscriptions now accept an optional last event ID and return both live receiver plus replay events.
+- `LocalSessionBroadcast` assigns monotonic per-session event IDs and stores a bounded replay buffer.
+- The SSE handler reads `Last-Event-ID`, replays buffered events with greater IDs, then chains into the live stream.
+- Added unit coverage for delivery, channel pruning, and replay after a last event ID.
+- Updated PSU roadmap and session context.
+
+**Verification:**
+- `cargo test -p argentor-gateway streaming::tests --lib` — 23 passed.
+- `cargo test -p argentor-gateway` — 669 tests/doc-tests passed, 4 ignored.
+- `cargo fmt --check` — passed after formatting.
+
+**Alternatives considered:** Jumping directly to Redis/NATS. Deferred because the handler contract needed replay semantics first; the distributed adapter can now implement the same API.
+
+**Estimated token usage:** Not measured.
+
+---
+
+## 2026-05-17 - Phase 3 Runtime Scalability: Tool Backend Circuit Breakers
+
+**Asked:** Continue with the next step.
+
+**Decision:** Extended circuit breaker protection from LLM providers to tool backends.
+
+**Why:** `argentor-agent` already had LLM provider circuit breakers and tests. The roadmap gap was tool backend isolation, so repeated failing tools should stop being called without opening the LLM provider breaker or affecting unrelated tools.
+
+**Changes:**
+- Added a separate `tool_circuit_breakers` registry to `AgentRunner`.
+- Added `.with_tool_circuit_breaker(...)` and `.tool_circuit_breakers()` APIs.
+- `execute_tool` now checks `tool:<name>` before real backend execution.
+- Tool executions record success on normal results and failure on `ToolResult::is_error` or execution errors.
+- Circuit-open tool calls return a `ToolResult::error` instead of hitting the backend.
+- Added unit tests for error-result opening and success accounting.
+- Updated PSU roadmap and session context.
+
+**Verification:**
+- `cargo test -p argentor-agent runner::scaffold_tests --lib` - 12 passed.
+- `cargo test -p argentor-agent` - 1495 tests/doc-tests passed, 14 ignored.
+
+**Alternatives considered:** Reuse the LLM provider breaker registry for tools. Rejected because tool failures and provider failures need separate health domains.
+
+**Estimated token usage:** Not measured.
+
+---
+
+## 2026-05-17 - Phase 3 Runtime Scalability: Stream Backpressure
+
+**Asked:** Continue with the next step.
+
+**Decision:** Implemented local backpressure for long-lived SSE stream subscriptions.
+
+**Why:** Redis/NATS support still needs a new client dependency. The next Phase 3 item that could be completed without introducing external infrastructure was explicit stream pressure control, which protects the local gateway and also gives the future distributed adapter a clear pressure model.
+
+**Changes:**
+- Added `StreamBackpressureConfig`, `StreamBackpressureLimiter`, `StreamBackpressurePermit`, and error types.
+- Wired default backpressure into `StreamingState` from both gateway server build paths.
+- `GET /api/v1/stream/{session_id}` now extracts tenant identity from `X-Tenant-ID` / `X-Tenant` and API key identity from `Authorization: Bearer` / `X-API-Key`.
+- Active stream permits are held by the SSE response stream and released on disconnect/drop.
+- Added unit coverage for global, tenant, API-key limits, active counts, and stream identity header extraction.
+- Updated PSU roadmap and session context.
+
+**Verification:**
+- `cargo test -p argentor-gateway streaming::tests --lib` - 28 passed.
+- `cargo test -p argentor-gateway` - 674 tests/doc-tests passed, 4 ignored.
+
+**Alternatives considered:** Add Redis immediately. Deferred because the workspace has no Redis/NATS dependency today and the pressure controls are useful regardless of the distributed transport.
+
+**Estimated token usage:** Not measured.
+
+---
+
+## 2026-05-17 - Phase 3 Runtime Scalability: Distributed-Safe Session Persistence
+
+**Asked:** Continue with the next step.
+
+**Decision:** Hardened `SqliteSessionStore` for multi-instance/shared-filesystem usage.
+
+**Why:** Phase 3 still needed session persistence that behaves correctly when multiple gateway replicas share the same local session directory. `SqliteSessionStore` was already public and gateway-compatible, so improving it avoided adding a new storage dependency before choosing Redis/NATS/Postgres infrastructure.
+
+**Changes:**
+- Atomic writes now use unique temporary file names to avoid writer collisions.
+- Session index updates are guarded by an interprocess lock file.
+- Reads refresh the in-memory index from disk before listing, counting, querying metadata, or fetching by ID.
+- Creates and deletes reload and merge the disk index before writing it back.
+- Added coverage for cross-instance index refresh and concurrent creates across store instances.
+
+**Verification:**
+- `cargo test -p argentor-session sqlite_store::tests --lib` - 27 passed.
+- `cargo test -p argentor-session` - 89 tests/doc-tests passed.
+
+**Alternatives considered:** Add Postgres/Redis persistence now. Deferred because no new infrastructure dependency is required for the current roadmap step. `DatabaseSessionStore` was also considered, but the exported `SqliteSessionStore` is the existing public API used by local deployments.
+
+**Estimated token usage:** Not measured.
+
+---
+
+## 2026-05-17 - Phase 3 Runtime Scalability: Shared Filesystem Session Broadcast
+
+**Asked:** Continue with the next step.
+
+**Decision:** Added a distributed-capable `FileSessionBroadcast` adapter for shared-filesystem multi-replica deployments.
+
+**Why:** The next Phase 3 gap was cross-replica session streaming. Redis/NATS still requires adding and selecting a broker dependency, but the project already has a shared-filesystem path from the session persistence work. A file-backed adapter gives multi-instance fanout semantics now and keeps the same `SessionBroadcast` trait for a future broker implementation.
+
+**Changes:**
+- Added a generic `SessionBroadcastReceiver::Stream` variant so the SSE handler is no longer tied to Tokio local broadcast receivers.
+- Added `FileSessionBroadcast` with per-session JSONL append logs, lock-file event ID assignment, disk replay, and polling for live events.
+- Exported `FileSessionBroadcast` from `argentor-gateway`.
+- Added tests for cross-instance delivery, replay after `Last-Event-ID`, and concurrent publish ID serialization.
+
+**Verification:**
+- `cargo test -p argentor-gateway streaming::tests --lib` - 31 passed.
+
+**Alternatives considered:** Add Redis immediately. Deferred because no broker dependency is present today and the shared-filesystem adapter closes a deployable multi-replica path without new infrastructure.
+
+**Estimated token usage:** Not measured.
+
+---
+
+## 2026-05-18 - Phase 3 Runtime Scalability: Redis Session Broadcast
+
+**Asked:** Continue with the pending items.
+
+**Decision:** Added optional Redis-backed session broadcast support behind the `redis-broadcast` feature.
+
+**Why:** The remaining Phase 3 runtime gap was a broker-backed `SessionBroadcast`. Redis is the smallest next backend because it can provide live fanout with Pub/Sub, bounded replay with lists, and atomic event ID assignment with a Lua script, while staying optional for default gateway builds.
+
+**Changes:**
+- Added optional `redis` dependency and gateway feature `redis-broadcast`.
+- Added `RedisSessionBroadcast` with Redis Pub/Sub live delivery and Redis list replay.
+- Publish uses a Lua script to atomically increment the per-session event ID, append the replay record, trim the replay list, and publish to subscribers.
+- Re-exported `RedisSessionBroadcast` only when the feature is enabled.
+
+**Verification:**
+- `cargo test -p argentor-gateway streaming::tests --lib` - 31 passed.
+- `cargo check -p argentor-gateway --features redis-broadcast` - passed.
+
+**Alternatives considered:** Add NATS first. Deferred because Redis covers the roadmap need with fewer moving parts and can be enabled without changing the `SessionBroadcast` trait.
+
+**Estimated token usage:** Not measured.
+
+---
+
+## 2026-05-18 - Benchmark Evidence Tracking
+
+**Asked:** Continue with the pending items.
+
+**Decision:** Promote `benchmarks/results/audit_scale_20260515_013517.json` as versionable benchmark evidence.
+
+**Why:** The file is small, contains the 10M audit-scale run referenced by the roadmap, and `benchmarks/results/` already contains tracked JSON outputs for other benchmark families.
+
+**Changes:**
+- Kept the 10M audit-scale JSON result in `benchmarks/results/` for inclusion in the next commit.
+- Updated context and roadmap language so it is no longer treated as local-only evidence.
+
+**Verification:**
+- Inspected the JSON size and contents: 1,890 bytes, 10,000,000 events, 3 samples, violation every 1,000.
+
+**Alternatives considered:** Leave it untracked as local evidence. Rejected because the roadmap cites the numbers and the artifact is small enough to keep reproducible.
+
+**Estimated token usage:** Not measured.

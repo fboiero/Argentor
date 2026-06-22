@@ -314,6 +314,7 @@ async fn deepseek_uses_openai_format() {
     let server = MockServer::start().await;
     Mock::given(method("POST"))
         .and(path("/v1/chat/completions"))
+        .and(header("Authorization", "Bearer test-key-123"))
         .respond_with(ResponseTemplate::new(200).set_body_json(openai_text_response()))
         .mount(&server)
         .await;
@@ -324,6 +325,33 @@ async fn deepseek_uses_openai_format() {
         .chat(None, &[user_message("Hi")], &[])
         .await
         .unwrap();
+    assert!(matches!(result, LlmResponse::Done(_)));
+}
+
+#[tokio::test]
+async fn deepseek_backend_reports_provider_name() {
+    let server = MockServer::start().await;
+    let config = make_config(LlmProvider::DeepSeek, &server.uri());
+    let backend = argentor_agent::backends::openai::OpenAiBackend::new(config);
+
+    assert_eq!(backend.provider_name(), "deepseek");
+}
+
+#[tokio::test]
+async fn llm_client_dispatches_deepseek() {
+    let server = MockServer::start().await;
+    Mock::given(method("POST"))
+        .and(path("/v1/chat/completions"))
+        .and(header("Authorization", "Bearer test-key-123"))
+        .respond_with(ResponseTemplate::new(200).set_body_json(openai_text_response()))
+        .mount(&server)
+        .await;
+
+    let config = make_config(LlmProvider::DeepSeek, &server.uri());
+    let client = argentor_agent::LlmClient::new(config);
+
+    assert_eq!(client.provider_name(), "deepseek");
+    let result = client.chat(None, &[user_message("Hi")], &[]).await.unwrap();
     assert!(matches!(result, LlmResponse::Done(_)));
 }
 
@@ -941,7 +969,7 @@ async fn llm_client_dispatches_fireworks_to_openai_backend() {
     let client = argentor_agent::LlmClient::new(config);
     let result = client.chat(None, &[user_message("Hi")], &[]).await.unwrap();
     assert!(matches!(result, LlmResponse::Done(_)));
-    assert_eq!(client.provider_name(), "openai");
+    assert_eq!(client.provider_name(), "fireworks");
 }
 
 #[tokio::test]
